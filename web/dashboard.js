@@ -1953,6 +1953,8 @@ function navigateTo(page) {
         loadScannerResults();
     } else if (page === 'risk') {
         loadRiskConfig();
+    } else if (page === 'trading') {
+        loadTradingConfig();
     }
 }
 
