@@ -180,7 +180,7 @@ router.get('/analysis', async (req, res) => {
 
 /**
  * GET /api/positions
- * Retourne les positions ouvertes de l'utilisateur
+ * Retourne les positions ouvertes de l'utilisateur avec leurs analyses
  */
 router.get('/positions', optionalAuth, async (req, res) => {
     try {
@@ -190,7 +190,28 @@ router.get('/positions', optionalAuth, async (req, res) => {
             address = activeWallet?.tradingAddress || activeWallet?.address;
         }
         const positions = await api.getOpenPositions(address);
-        res.json({ positions });
+        
+        // Enrichit chaque position avec son analyse si disponible
+        const enrichedPositions = positions.map(pos => {
+            const symbol = pos.coin || pos.symbol;
+            const analysis = tradeEngine.state.multiAnalysis?.get(symbol);
+            return {
+                ...pos,
+                analysis: analysis ? {
+                    score: analysis.score,
+                    direction: analysis.direction,
+                    confidence: analysis.confidence,
+                    winProbability: analysis.winProbability,
+                    indicators: analysis.indicators,
+                    signalQuality: analysis.signalQuality,
+                    recommendation: analysis.recommendation,
+                    sltp: analysis.sltp,
+                    timestamp: analysis.timestamp
+                } : null
+            };
+        });
+        
+        res.json({ positions: enrichedPositions });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

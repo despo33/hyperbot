@@ -2606,6 +2606,9 @@ async function loadChartPositions() {
         const data = await apiRequest('/positions');
         const positions = data.positions || [];
         
+        // Stocke les positions pour la modal
+        positionsData = positions;
+        
         if (positions.length === 0) {
             container.innerHTML = `
                 <div class="empty-positions">
@@ -2617,7 +2620,7 @@ async function loadChartPositions() {
             return;
         }
         
-        container.innerHTML = positions.map(pos => {
+        container.innerHTML = positions.map((pos, index) => {
             const isLong = pos.side === 'long' || parseFloat(pos.szi || pos.size) > 0;
             const side = isLong ? 'long' : 'short';
             const symbol = pos.coin || pos.symbol || 'N/A';
@@ -2626,14 +2629,18 @@ async function loadChartPositions() {
             const pnl = parseFloat(pos.unrealizedPnl || pos.pnl || 0);
             const leverage = pos.leverage?.value || pos.leverage || '1';
             
-            // TP et SL depuis les ordres ou estimés
-            const tp = pos.takeProfit || pos.tp || (isLong ? entryPrice * 1.02 : entryPrice * 0.98);
-            const sl = pos.stopLoss || pos.sl || (isLong ? entryPrice * 0.98 : entryPrice * 1.02);
+            // TP et SL depuis l'analyse ou estimés
+            const analysis = pos.analysis;
+            const tp = analysis?.sltp?.takeProfit || pos.takeProfit || pos.tp || (isLong ? entryPrice * 1.02 : entryPrice * 0.98);
+            const sl = analysis?.sltp?.stopLoss || pos.stopLoss || pos.sl || (isLong ? entryPrice * 0.98 : entryPrice * 1.02);
+            
+            // Indicateur si analyse disponible
+            const hasAnalysis = !!analysis;
             
             return `
-                <div class="position-card ${side}">
+                <div class="position-card ${side}" onclick="openAnalysisModal(${index})" title="${hasAnalysis ? 'Cliquez pour voir l\'analyse' : 'Aucune analyse disponible'}">
                     <div class="position-symbol">
-                        <span class="symbol">${symbol}</span>
+                        <span class="symbol">${symbol} ${hasAnalysis ? '📊' : ''}</span>
                         <span class="side ${side}">${side.toUpperCase()} ${leverage}x</span>
                     </div>
                     <div class="position-prices">
@@ -2687,6 +2694,163 @@ function formatPrice(price) {
     if (price >= 1) return price.toFixed(4);
     return price.toFixed(6);
 }
+
+// Variable globale pour stocker les positions avec leurs analyses
+let positionsData = [];
+
+/**
+ * Ouvre la modal d'analyse pour une position
+ */
+function openAnalysisModal(index) {
+    const pos = positionsData[index];
+    if (!pos) return;
+    
+    const modal = document.getElementById('analysisModal');
+    const title = document.getElementById('analysisModalTitle');
+    const body = document.getElementById('analysisModalBody');
+    
+    const symbol = pos.coin || pos.symbol || 'N/A';
+    const isLong = pos.side === 'long' || parseFloat(pos.szi || pos.size) > 0;
+    const analysis = pos.analysis;
+    
+    title.textContent = `Analyse ${symbol} ${isLong ? 'LONG' : 'SHORT'}`;
+    
+    if (!analysis) {
+        body.innerHTML = `
+            <div class="empty-positions">
+                <i data-lucide="info"></i>
+                <p>Aucune analyse disponible pour cette position</p>
+                <p style="font-size: 0.8rem; color: var(--text-muted);">
+                    L'analyse est disponible uniquement pour les positions ouvertes par le bot.
+                </p>
+            </div>
+        `;
+    } else {
+        const grade = analysis.signalQuality?.grade || analysis.recommendation?.grade || 'N/A';
+        const gradeClass = grade ? `grade-${grade.toLowerCase()}` : '';
+        const winProb = analysis.winProbability ? (analysis.winProbability * 100).toFixed(1) : 'N/A';
+        const score = analysis.score || 0;
+        const confidence = analysis.confidence || 'N/A';
+        const indicators = analysis.indicators || {};
+        const sltp = analysis.sltp || {};
+        const factors = analysis.signalQuality?.factors || [];
+        
+        body.innerHTML = `
+            <!-- Score et Grade -->
+            <div class="analysis-section">
+                <h4><i data-lucide="award"></i> Évaluation du Signal</h4>
+                <div class="analysis-grid">
+                    <div class="analysis-item" style="display: flex; align-items: center; gap: 1rem;">
+                        <div class="grade-badge ${gradeClass}">${grade}</div>
+                        <div>
+                            <div class="label">Grade</div>
+                            <div class="value">${analysis.recommendation?.message || 'Signal détecté'}</div>
+                        </div>
+                    </div>
+                    <div class="analysis-item">
+                        <div class="label">Score Ichimoku</div>
+                        <div class="value ${score > 0 ? 'positive' : score < 0 ? 'negative' : ''}">${score > 0 ? '+' : ''}${score}/7</div>
+                    </div>
+                    <div class="analysis-item">
+                        <div class="label">Probabilité de gain</div>
+                        <div class="value ${parseFloat(winProb) >= 65 ? 'positive' : parseFloat(winProb) >= 50 ? 'neutral' : 'negative'}">${winProb}%</div>
+                    </div>
+                    <div class="analysis-item">
+                        <div class="label">Confiance</div>
+                        <div class="value ${confidence === 'high' ? 'positive' : confidence === 'medium' ? 'neutral' : 'negative'}">${confidence.toUpperCase()}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Indicateurs Techniques -->
+            <div class="analysis-section">
+                <h4><i data-lucide="activity"></i> Indicateurs Techniques</h4>
+                <div class="indicator-bar">
+                    <span class="indicator-name">RSI</span>
+                    <div class="indicator-value">
+                        <div class="indicator-fill ${indicators.rsi?.signal === 'bullish' || indicators.rsi?.signal === 'oversold' ? 'bullish' : indicators.rsi?.signal === 'bearish' || indicators.rsi?.signal === 'overbought' ? 'bearish' : 'neutral'}" 
+                             style="width: ${indicators.rsi?.value || 50}%"></div>
+                    </div>
+                    <span class="indicator-text">${indicators.rsi?.value?.toFixed(1) || 'N/A'}</span>
+                </div>
+                <div class="indicator-bar">
+                    <span class="indicator-name">MACD</span>
+                    <div class="indicator-value">
+                        <div class="indicator-fill ${indicators.macd?.histogram > 0 ? 'bullish' : indicators.macd?.histogram < 0 ? 'bearish' : 'neutral'}" 
+                             style="width: ${50 + (indicators.macd?.histogram || 0) * 10}%"></div>
+                    </div>
+                    <span class="indicator-text">${indicators.macd?.histogram?.toFixed(3) || 'N/A'}</span>
+                </div>
+                <div class="indicator-bar">
+                    <span class="indicator-name">ADX</span>
+                    <div class="indicator-value">
+                        <div class="indicator-fill ${indicators.adx?.trending ? 'bullish' : 'neutral'}" 
+                             style="width: ${Math.min(100, (indicators.adx?.value || 0) * 2)}%"></div>
+                    </div>
+                    <span class="indicator-text">${indicators.adx?.value?.toFixed(1) || 'N/A'}</span>
+                </div>
+                <div class="indicator-bar">
+                    <span class="indicator-name">Volume</span>
+                    <div class="indicator-value">
+                        <div class="indicator-fill ${indicators.volume?.aboveAverage ? 'bullish' : 'neutral'}" 
+                             style="width: ${Math.min(100, (indicators.volume?.ratio || 1) * 50)}%"></div>
+                    </div>
+                    <span class="indicator-text">${indicators.volume?.ratio?.toFixed(2) || 'N/A'}x</span>
+                </div>
+            </div>
+            
+            <!-- Stop Loss / Take Profit -->
+            <div class="analysis-section">
+                <h4><i data-lucide="target"></i> Niveaux de Prix</h4>
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="label">Stop Loss</div>
+                        <div class="value sl">${formatPrice(sltp.stopLoss)}</div>
+                    </div>
+                    <div class="analysis-item">
+                        <div class="label">Take Profit</div>
+                        <div class="value tp">${formatPrice(sltp.takeProfit)}</div>
+                    </div>
+                    <div class="analysis-item">
+                        <div class="label">Risk/Reward</div>
+                        <div class="value highlight">${sltp.riskRewardRatio?.toFixed(2) || 'N/A'}</div>
+                    </div>
+                    <div class="analysis-item">
+                        <div class="label">Méthode SL</div>
+                        <div class="value">${sltp.slMethod || 'N/A'}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Facteurs -->
+            ${factors.length > 0 ? `
+            <div class="analysis-section">
+                <h4><i data-lucide="list-checks"></i> Facteurs de Décision</h4>
+                <div class="factors-list">
+                    ${factors.map(f => `<span class="factor-tag">${f}</span>`).join('')}
+                </div>
+            </div>
+            ` : ''}
+        `;
+    }
+    
+    modal.style.display = 'flex';
+    lucide.createIcons();
+}
+
+/**
+ * Ferme la modal d'analyse
+ */
+function closeAnalysisModal() {
+    document.getElementById('analysisModal').style.display = 'none';
+}
+
+// Ferme la modal en cliquant à l'extérieur
+document.getElementById('analysisModal')?.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal-overlay')) {
+        closeAnalysisModal();
+    }
+});
 
 document.querySelectorAll('.tf-btn').forEach(btn => {
     btn.addEventListener('click', () => {
