@@ -32,8 +32,11 @@ class DatabaseService {
             
             this.connection = await mongoose.connect(connectionString, {
                 // Options recommandées pour MongoDB Atlas
-                serverSelectionTimeoutMS: 5000,
+                serverSelectionTimeoutMS: 30000,
                 socketTimeoutMS: 45000,
+                connectTimeoutMS: 30000,
+                maxPoolSize: 10,
+                retryWrites: true,
             });
 
             this.isConnected = true;
