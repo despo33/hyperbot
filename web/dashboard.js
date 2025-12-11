@@ -1923,7 +1923,10 @@ function navigateTo(page) {
     if (page === 'history') {
         loadTradeHistory();
     } else if (page === 'chart') {
-        setTimeout(() => initTradingViewWidget(), 100);
+        setTimeout(() => {
+            initTradingViewWidget();
+            loadChartPositions();
+        }, 100);
     } else if (page === 'scanner') {
         loadScannerResults();
     } else if (page === 'risk') {
@@ -2591,6 +2594,99 @@ function updateTradingViewChart() {
 document.getElementById('chartSymbol')?.addEventListener('change', updateTradingViewChart);
 document.getElementById('showIchimoku')?.addEventListener('change', updateTradingViewChart);
 document.getElementById('showVolume')?.addEventListener('change', updateTradingViewChart);
+
+/**
+ * Charge et affiche les positions ouvertes dans le panneau du graphique
+ */
+async function loadChartPositions() {
+    const container = document.getElementById('chartPositionsList');
+    if (!container) return;
+    
+    try {
+        const data = await apiRequest('/positions');
+        const positions = data.positions || [];
+        
+        if (positions.length === 0) {
+            container.innerHTML = `
+                <div class="empty-positions">
+                    <i data-lucide="inbox"></i>
+                    <p>Aucune position ouverte</p>
+                </div>
+            `;
+            lucide.createIcons();
+            return;
+        }
+        
+        container.innerHTML = positions.map(pos => {
+            const isLong = pos.side === 'long' || parseFloat(pos.szi || pos.size) > 0;
+            const side = isLong ? 'long' : 'short';
+            const symbol = pos.coin || pos.symbol || 'N/A';
+            const entryPrice = parseFloat(pos.entryPx || pos.entryPrice || 0);
+            const size = Math.abs(parseFloat(pos.szi || pos.size || 0));
+            const pnl = parseFloat(pos.unrealizedPnl || pos.pnl || 0);
+            const leverage = pos.leverage?.value || pos.leverage || '1';
+            
+            // TP et SL depuis les ordres ou estimés
+            const tp = pos.takeProfit || pos.tp || (isLong ? entryPrice * 1.02 : entryPrice * 0.98);
+            const sl = pos.stopLoss || pos.sl || (isLong ? entryPrice * 0.98 : entryPrice * 1.02);
+            
+            return `
+                <div class="position-card ${side}">
+                    <div class="position-symbol">
+                        <span class="symbol">${symbol}</span>
+                        <span class="side ${side}">${side.toUpperCase()} ${leverage}x</span>
+                    </div>
+                    <div class="position-prices">
+                        <div class="position-price-item">
+                            <span class="label">Entrée</span>
+                            <span class="value entry">${formatPrice(entryPrice)}</span>
+                        </div>
+                        <div class="position-price-item">
+                            <span class="label">Taille</span>
+                            <span class="value">${size.toFixed(4)}</span>
+                        </div>
+                        <div class="position-price-item">
+                            <span class="label">Take Profit</span>
+                            <span class="value tp">${formatPrice(tp)}</span>
+                        </div>
+                        <div class="position-price-item">
+                            <span class="label">Stop Loss</span>
+                            <span class="value sl">${formatPrice(sl)}</span>
+                        </div>
+                    </div>
+                    <div class="position-pnl">
+                        <span>P&L</span>
+                        <span class="pnl-value ${pnl >= 0 ? 'positive' : 'negative'}">
+                            ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} $
+                        </span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        lucide.createIcons();
+        
+    } catch (error) {
+        console.error('Erreur chargement positions:', error);
+        container.innerHTML = `
+            <div class="empty-positions">
+                <i data-lucide="alert-circle"></i>
+                <p>Erreur de chargement</p>
+            </div>
+        `;
+        lucide.createIcons();
+    }
+}
+
+/**
+ * Formate un prix avec le bon nombre de décimales
+ */
+function formatPrice(price) {
+    if (!price || isNaN(price)) return '—';
+    if (price >= 1000) return price.toFixed(2);
+    if (price >= 1) return price.toFixed(4);
+    return price.toFixed(6);
+}
 
 document.querySelectorAll('.tf-btn').forEach(btn => {
     btn.addEventListener('click', () => {

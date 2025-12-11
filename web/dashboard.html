@@ -1185,9 +1185,27 @@
                         </div>
                     </div>
 
-                    <!-- TradingView Widget -->
-                    <div class="tradingview-container">
-                        <div id="tradingview_widget"></div>
+                    <!-- TradingView Widget + Positions Panel -->
+                    <div class="chart-layout">
+                        <div class="tradingview-container">
+                            <div id="tradingview_widget"></div>
+                        </div>
+                        
+                        <!-- Panneau des positions ouvertes -->
+                        <div class="positions-panel">
+                            <div class="positions-header">
+                                <h4><i data-lucide="target"></i> Positions Ouvertes</h4>
+                                <button class="btn btn-sm" onclick="loadChartPositions()">
+                                    <i data-lucide="refresh-cw"></i>
+                                </button>
+                            </div>
+                            <div class="positions-list" id="chartPositionsList">
+                                <div class="empty-positions">
+                                    <i data-lucide="inbox"></i>
+                                    <p>Aucune position</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
