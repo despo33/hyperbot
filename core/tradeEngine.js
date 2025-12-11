@@ -14,6 +14,7 @@ import positionManager from './positionManager.js';
 import correlationManager from './correlationManager.js';
 import rateLimiter from '../services/rateLimiter.js';
 import connectionManager from '../services/connectionManager.js';
+import multiTimeframe from './multiTimeframe.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -40,7 +41,7 @@ class TradeEngine {
         // Configuration
         this.config = {
             symbols: ['BTC', 'ETH', 'SOL', 'DOGE', 'XRP', 'ADA', 'AVAX', 'LINK', 'DOT', 'MATIC', 'UNI', 'ATOM', 'LTC', 'BCH', 'APT', 'ARB', 'OP', 'INJ', 'SUI', 'SEI'],
-            timeframes: ['15m'],          // Timeframe d'analyse
+            timeframes: ['15m'],          // Timeframe principal d'analyse
             analysisInterval: 60000,      // Intervalle d'analyse en ms (1 min)
             mode: 'auto',                 // 'auto' ou 'manual'
             leverage: 5,
@@ -63,7 +64,18 @@ class TradeEngine {
             // Filtres avancés
             useRSIFilter: true,           // Activer le filtre RSI
             rsiOverbought: 70,            // Seuil de surachat (pas de LONG au-dessus)
-            rsiOversold: 30               // Seuil de survente (pas de SHORT en-dessous)
+            rsiOversold: 30,              // Seuil de survente (pas de SHORT en-dessous)
+            // ===== MODE MULTI-TIMEFRAME =====
+            multiTimeframeMode: false,    // Activer l'analyse multi-timeframe
+            mtfTimeframes: ['5m', '15m', '1h'], // Timeframes à analyser en mode MTF
+            mtfMinConfirmation: 2,        // Minimum de TF en accord pour valider
+            mtfWeights: {                 // Poids de chaque timeframe
+                '1m': 0.15,
+                '5m': 0.25,
+                '15m': 0.30,
+                '1h': 0.20,
+                '4h': 0.10
+            }
         };
 
         // État
@@ -479,6 +491,83 @@ class TradeEngine {
         
         const currentPrice = candles[candles.length - 1].close;
         
+        // ===== ANALYSE MULTI-TIMEFRAME =====
+        let mtfAnalysis = null;
+        let mtfConfirmed = true; // Par défaut, pas de blocage si MTF désactivé
+        let mtfBonus = 0;
+        
+        if (this.config.multiTimeframeMode) {
+            try {
+                // Récupère les données pour chaque timeframe configuré
+                const mtfTimeframes = this.config.mtfTimeframes || ['5m', '15m', '1h'];
+                const mtfResults = {};
+                
+                for (const tf of mtfTimeframes) {
+                    const tfCandles = await priceFetcher.getCandles(symbol, tf, 100);
+                    if (tfCandles && tfCandles.length >= 30) {
+                        const tfAnalysis = signalDetector.analyze(tfCandles, {}, tf);
+                        mtfResults[tf] = {
+                            timeframe: tf,
+                            score: tfAnalysis.ichimokuScore?.score || 0,
+                            direction: tfAnalysis.ichimokuScore?.direction || 'neutral',
+                            signal: tfAnalysis.finalSignal?.action || null,
+                            confidence: tfAnalysis.finalSignal?.confidence || 'low',
+                            indicatorScore: tfAnalysis.indicators?.score || 0
+                        };
+                    }
+                }
+                
+                // Calcule le consensus multi-timeframe
+                let bullishCount = 0;
+                let bearishCount = 0;
+                let weightedScore = 0;
+                let totalWeight = 0;
+                
+                const weights = this.config.mtfWeights || { '5m': 0.25, '15m': 0.30, '1h': 0.25, '4h': 0.20 };
+                
+                for (const [tf, result] of Object.entries(mtfResults)) {
+                    const weight = weights[tf] || 0.25;
+                    if (result.direction === 'bullish' || result.signal === 'BUY') {
+                        bullishCount++;
+                        weightedScore += Math.abs(result.score) * weight;
+                    } else if (result.direction === 'bearish' || result.signal === 'SELL') {
+                        bearishCount++;
+                        weightedScore -= Math.abs(result.score) * weight;
+                    }
+                    totalWeight += weight;
+                }
+                
+                const minConfirmation = this.config.mtfMinConfirmation || 2;
+                const dominantDirection = bullishCount > bearishCount ? 'bullish' : 
+                                         bearishCount > bullishCount ? 'bearish' : 'neutral';
+                const confirmationCount = Math.max(bullishCount, bearishCount);
+                
+                mtfAnalysis = {
+                    timeframes: mtfResults,
+                    bullishCount,
+                    bearishCount,
+                    dominantDirection,
+                    confirmationCount,
+                    aligned: confirmationCount >= minConfirmation,
+                    weightedScore: totalWeight > 0 ? weightedScore / totalWeight : 0
+                };
+                
+                // Vérifie si le signal principal est confirmé par les autres TF
+                mtfConfirmed = confirmationCount >= minConfirmation;
+                
+                // Bonus si tous les TF sont alignés
+                if (confirmationCount === Object.keys(mtfResults).length && confirmationCount >= 2) {
+                    mtfBonus = 2; // +2 points si parfaitement aligné
+                    this.log(`${symbol}: MTF parfaitement aligné (${confirmationCount} TF ${dominantDirection}) +${mtfBonus} bonus`, 'info');
+                } else if (mtfConfirmed) {
+                    mtfBonus = 1; // +1 point si confirmé
+                }
+                
+            } catch (e) {
+                this.log(`${symbol}: Erreur MTF: ${e.message}`, 'warn');
+            }
+        }
+        
         // Analyse avec réglages Ichimoku optimisés pour le timeframe
         const analysis = signalDetector.analyze(candles, {}, timeframe);
         
@@ -588,8 +677,9 @@ class TradeEngine {
         const minConfluence = timeframe === '5m' ? 3 : (timeframe === '1m' ? 4 : 2);
         const hasMinConfluence = confluence >= minConfluence;
         
-        // Calcul de la probabilité de gain (amélioré avec VWAP, CVD et Funding Rate)
-        const winProbability = this.calculateWinProbability(ichimokuScore, analysis.finalSignal?.confidence, signalQuality, fundingBonus);
+        // Calcul de la probabilité de gain (amélioré avec VWAP, CVD, Funding Rate et MTF)
+        const totalBonus = fundingBonus + mtfBonus; // Combine funding + MTF bonus
+        const winProbability = this.calculateWinProbability(ichimokuScore, analysis.finalSignal?.confidence, signalQuality, totalBonus);
         const minWinProb = this.config.minWinProbability || 0.65;
         
         // ===== NOUVEAUX FILTRES DE SÉCURITÉ =====
@@ -662,6 +752,14 @@ class TradeEngine {
             timeframeFilterOK = absIchimokuScore >= 6 || (absIchimokuScore >= 5 && confluence >= 4);
         }
         
+        // ===== FILTRE MULTI-TIMEFRAME =====
+        // Si MTF activé, vérifie que la direction est confirmée par les autres TF
+        let mtfFilterOK = true;
+        if (this.config.multiTimeframeMode && mtfAnalysis) {
+            const signalDir = signalDirection === 'long' ? 'bullish' : 'bearish';
+            mtfFilterOK = mtfAnalysis.dominantDirection === signalDir || mtfAnalysis.dominantDirection === 'neutral';
+        }
+        
         const tradeable = (qualityTradeable || ichimokuTradeable) && 
                          winProbability >= minWinProb && 
                          safetyFiltersOK &&
@@ -669,7 +767,8 @@ class TradeEngine {
                          volatilityOK &&
                          momentumAligned &&
                          hasMinConfluence &&
-                         timeframeFilterOK;
+                         timeframeFilterOK &&
+                         mtfFilterOK;
         
         // Log si trade rejeté par les nouveaux filtres
         if ((qualityTradeable || ichimokuTradeable) && winProbability >= minWinProb && safetyFiltersOK) {
@@ -687,6 +786,9 @@ class TradeEngine {
             }
             if (!timeframeFilterOK) {
                 this.log(`${symbol}: Rejeté - Score trop faible pour ${timeframe} (${absIchimokuScore}/7)`, 'warn');
+            }
+            if (!mtfFilterOK) {
+                this.log(`${symbol}: Rejeté - MTF non aligné (${mtfAnalysis?.dominantDirection} vs ${signalDirection})`, 'warn');
             }
         }
         
@@ -812,6 +914,18 @@ class TradeEngine {
                 bonus: fundingBonus,
                 description: fundingRate.description
             },
+            // ===== MULTI-TIMEFRAME =====
+            multiTimeframe: mtfAnalysis ? {
+                enabled: this.config.multiTimeframeMode,
+                timeframes: mtfAnalysis.timeframes,
+                bullishCount: mtfAnalysis.bullishCount,
+                bearishCount: mtfAnalysis.bearishCount,
+                dominantDirection: mtfAnalysis.dominantDirection,
+                aligned: mtfAnalysis.aligned,
+                confirmed: mtfConfirmed,
+                bonus: mtfBonus,
+                weightedScore: mtfAnalysis.weightedScore
+            } : { enabled: false },
             timestamp: Date.now()
         };
     }

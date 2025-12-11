@@ -386,6 +386,41 @@
                                             </div>
                                         </div>
                                     </div>
+                                    
+                                    <!-- Mode Multi-Timeframe -->
+                                    <div class="mtf-toggle" style="margin-top: 15px;">
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="configMultiTimeframe">
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                        <div class="toggle-label">
+                                            <strong>Mode Multi-Timeframe</strong>
+                                            <small>Analyse sur plusieurs TF simultanément (5m + 15m + 1h)</small>
+                                        </div>
+                                    </div>
+                                    <div class="mtf-options" id="mtfOptions" style="display: none; margin-top: 10px; padding: 10px; background: var(--bg-tertiary); border-radius: 8px;">
+                                        <div class="form-group">
+                                            <label>Timeframes à analyser</label>
+                                            <div class="checkbox-group">
+                                                <label><input type="checkbox" name="mtfTimeframes" value="1m"> 1m</label>
+                                                <label><input type="checkbox" name="mtfTimeframes" value="5m" checked> 5m</label>
+                                                <label><input type="checkbox" name="mtfTimeframes" value="15m" checked> 15m</label>
+                                                <label><input type="checkbox" name="mtfTimeframes" value="1h" checked> 1h</label>
+                                                <label><input type="checkbox" name="mtfTimeframes" value="4h"> 4h</label>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="mtfMinConfirmation">Confirmation minimum</label>
+                                            <select id="mtfMinConfirmation">
+                                                <option value="2" selected>2 TF en accord</option>
+                                                <option value="3">3 TF en accord (strict)</option>
+                                            </select>
+                                        </div>
+                                        <div class="info-box info-small">
+                                            <i data-lucide="layers"></i>
+                                            <span>Le signal doit être confirmé par plusieurs timeframes pour être validé</span>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- Paramètres d'analyse -->
