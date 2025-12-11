@@ -47,11 +47,16 @@ async function main() {
     try {
         // 0. Connexion à MongoDB (optionnel)
         const mongoUri = process.env.MONGODB_URI;
+        console.log('[INIT] MONGODB_URI défini:', mongoUri ? 'Oui (' + mongoUri.substring(0, 30) + '...)' : 'Non');
         if (mongoUri) {
             console.log('[INIT] Connexion à MongoDB...');
-            const dbConnected = await database.connect(mongoUri);
-            if (!dbConnected) {
-                console.log('[INIT] ⚠️  MongoDB non connecté. Le bot fonctionnera sans base de données.');
+            try {
+                const dbConnected = await database.connect(mongoUri);
+                if (!dbConnected) {
+                    console.log('[INIT] ⚠️  MongoDB non connecté. Le bot fonctionnera sans base de données.');
+                }
+            } catch (dbError) {
+                console.error('[INIT] ❌ Erreur MongoDB:', dbError.message);
             }
         } else {
             console.log('[INIT] ℹ️  MongoDB non configuré (MONGODB_URI manquant). Utilisation du stockage local.');
