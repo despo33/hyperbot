@@ -475,19 +475,55 @@ class TradeEngine {
 
         // Démarre l'analyse périodique
         this.state.isRunning = true;
+        
+        // ===== LOG DÉTAILLÉ DES RÉGLAGES =====
+        this.log(`═══════════════════════════════════════`, 'info');
+        this.log(`📊 CONFIGURATION ACTIVE DU BOT`, 'info');
+        this.log(`═══════════════════════════════════════`, 'info');
         this.log(`Mode: ${this.config.mode.toUpperCase()}`, 'info');
         
         // Mode multi-crypto ou single
         if (this.config.multiCryptoMode && this.config.symbols?.length > 0) {
-            this.log(`Mode Multi-Crypto: ${this.config.symbols.length} paires`, 'info');
-            this.log(`Symboles: ${this.config.symbols.join(', ')}`, 'info');
+            this.log(`🪙 Multi-Crypto: ${this.config.symbols.length} paires`, 'info');
+            this.log(`   Symboles: ${this.config.symbols.join(', ')}`, 'info');
         } else {
-            this.log(`Symbole: ${this.config.symbol}`, 'info');
+            this.log(`🪙 Symbole: ${this.config.symbol}`, 'info');
         }
         
-        this.log(`Timeframes: ${this.config.timeframes.join(', ')}`, 'info');
-        this.log(`Intervalle d'analyse: ${this.config.analysisInterval / 1000}s`, 'info');
-        this.log(`Max positions simultanées: ${this.config.maxConcurrentTrades}`, 'info');
+        // Timeframes
+        if (this.config.multiTimeframeMode && this.config.mtfTimeframes?.length > 0) {
+            this.log(`⏱️ Mode Multi-Timeframe ACTIF`, 'info');
+            this.log(`   Timeframes: ${this.config.mtfTimeframes.join(', ')}`, 'info');
+            this.log(`   Confirmation min: ${this.config.mtfMinConfirmation || 2} TF`, 'info');
+        } else {
+            this.log(`⏱️ Timeframe: ${this.config.timeframes.join(', ')}`, 'info');
+        }
+        
+        // Preset actif
+        const activePreset = this.getTimeframePreset(this.config.timeframes[0]);
+        this.log(`📋 Preset: ${activePreset.name}`, 'info');
+        
+        // Filtres et seuils
+        this.log(`🎯 Filtres actifs:`, 'info');
+        this.log(`   Score min: ${this.config.minScore || activePreset.minScore}`, 'info');
+        this.log(`   Win Prob min: ${((this.config.minWinProbability || activePreset.minWinProbability) * 100).toFixed(0)}%`, 'info');
+        this.log(`   RSI LONG max: ${this.config.presetRsiLongMax || activePreset.rsiLongMax}`, 'info');
+        this.log(`   RSI SHORT min: ${this.config.presetRsiShortMin || activePreset.rsiShortMin}`, 'info');
+        this.log(`   ADX min: ${this.config.presetAdxMin || activePreset.adxMin}`, 'info');
+        this.log(`   RRR min: ${activePreset.minRRR}`, 'info');
+        
+        // TP/SL
+        const tpsl = this.getTPSLForTimeframe();
+        this.log(`💰 TP/SL:`, 'info');
+        this.log(`   Mode: ${this.config.tpslMode || 'auto'}`, 'info');
+        this.log(`   TP: ${tpsl.tp}% | SL: ${tpsl.sl}%`, 'info');
+        
+        // Autres paramètres
+        this.log(`⚙️ Paramètres:`, 'info');
+        this.log(`   Intervalle: ${this.config.analysisInterval / 1000}s`, 'info');
+        this.log(`   Levier: ${this.config.leverage}x`, 'info');
+        this.log(`   Max positions: ${this.config.maxConcurrentTrades}`, 'trade');
+        this.log(`═══════════════════════════════════════`, 'info');
 
         // IMPORTANT: Synchronise avec les positions existantes sur l'exchange
         // Cela évite d'ouvrir des trades sur des symboles où on a déjà une position
