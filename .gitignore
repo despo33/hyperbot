@@ -1,0 +1,42 @@
+# ===== FICHIERS SENSIBLES - NE JAMAIS COMMIT =====
+.env
+.env.local
+.env.production
+
+# Stockage local (contient des clés chiffrées)
+storage/
+*.json
+!package.json
+!package-lock.json
+
+# Node modules
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build
+dist/
+build/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Scripts de test/debug
+create-user.js
+check-user.js
+fix-wallet.js

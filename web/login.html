@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion - Hyperliquid Trading Bot</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- EmailJS SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border: #334155;
+            --success: #22c55e;
+            --error: #ef4444;
+        }
+        
+        body {
+            background: linear-gradient(135deg, var(--bg-dark) 0%, #1a1a2e 100%);
+            min-height: 100vh;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        
+        .glass-card {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+        }
+        
+        .input-field {
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+        
+        .input-field:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+            outline: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .tab-btn {
+            transition: all 0.3s ease;
+        }
+        
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary);
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .logo-glow {
+            filter: drop-shadow(0 0 20px rgba(99, 102, 241, 0.5));
+        }
+        
+        .alert {
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+        
+        .alert-error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid var(--error);
+            color: var(--error);
+        }
+        
+        .alert-success {
+            background: rgba(34, 197, 94, 0.2);
+            border: 1px solid var(--success);
+            color: var(--success);
+        }
+        
+        .spinner {
+            border: 2px solid transparent;
+            border-top-color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4">
+    <div class="w-full max-w-md">
+        <!-- Logo -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 mb-4 logo-glow">
+                <i class="fas fa-robot text-4xl text-white"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-white">Hyperliquid Bot</h1>
+            <p class="text-gray-400 mt-2">Trading automatisé avec Ichimoku</p>
+        </div>
+        
+        <!-- Card principale -->
+        <div class="glass-card p-8">
+            <!-- Tabs -->
+            <div class="flex border-b border-gray-700 mb-6">
+                <button id="tab-login" class="tab-btn active flex-1 py-3 text-center font-medium" onclick="showTab('login')">
+                    <i class="fas fa-sign-in-alt mr-2"></i>Connexion
+                </button>
+                <button id="tab-register" class="tab-btn flex-1 py-3 text-center font-medium text-gray-400" onclick="showTab('register')">
+                    <i class="fas fa-user-plus mr-2"></i>Inscription
+                </button>
+            </div>
+            
+            <!-- Alertes -->
+            <div id="alert-error" class="alert alert-error">
+                <i class="fas fa-exclamation-circle mr-2"></i>
+                <span id="error-message"></span>
+            </div>
+            <div id="alert-success" class="alert alert-success">
+                <i class="fas fa-check-circle mr-2"></i>
+                <span id="success-message"></span>
+            </div>
+            
+            <!-- Formulaire Connexion -->
+            <form id="form-login" class="fade-in" onsubmit="handleLogin(event)">
+                <div class="mb-4">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        <i class="fas fa-envelope mr-2"></i>Email
+                    </label>
+                    <input type="email" id="login-email" class="input-field w-full px-4 py-3 rounded-lg" 
+                           placeholder="votre@email.com" required>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        <i class="fas fa-lock mr-2"></i>Mot de passe
+                    </label>
+                    <div class="relative">
+                        <input type="password" id="login-password" class="input-field w-full px-4 py-3 rounded-lg pr-12" 
+                               placeholder="••••••••" required>
+                        <button type="button" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                                onclick="togglePassword('login-password')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <button type="submit" id="btn-login" class="btn-primary w-full py-3 rounded-lg text-white font-semibold">
+                    <i class="fas fa-sign-in-alt mr-2"></i>Se connecter
+                </button>
+                
+                <div class="mt-4 text-center">
+                    <a href="#" class="text-indigo-400 hover:text-indigo-300 text-sm" onclick="showForgotPassword()">
+                        Mot de passe oublié ?
+                    </a>
+                </div>
+            </form>
+            
+            <!-- Formulaire Inscription -->
+            <form id="form-register" class="fade-in hidden" onsubmit="handleRegister(event)">
+                <div class="mb-4">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        <i class="fas fa-user mr-2"></i>Nom d'utilisateur
+                    </label>
+                    <input type="text" id="register-username" class="input-field w-full px-4 py-3 rounded-lg" 
+                           placeholder="MonPseudo" minlength="3" maxlength="30" required>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        <i class="fas fa-envelope mr-2"></i>Email
+                    </label>
+                    <input type="email" id="register-email" class="input-field w-full px-4 py-3 rounded-lg" 
+                           placeholder="votre@email.com" required>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        <i class="fas fa-lock mr-2"></i>Mot de passe
+                    </label>
+                    <div class="relative">
+                        <input type="password" id="register-password" class="input-field w-full px-4 py-3 rounded-lg pr-12" 
+                               placeholder="Minimum 6 caractères" minlength="6" required>
+                        <button type="button" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                                onclick="togglePassword('register-password')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        <i class="fas fa-lock mr-2"></i>Confirmer le mot de passe
+                    </label>
+                    <input type="password" id="register-password-confirm" class="input-field w-full px-4 py-3 rounded-lg" 
+                           placeholder="Confirmez votre mot de passe" required>
+                </div>
+                
+                <button type="submit" id="btn-register" class="btn-primary w-full py-3 rounded-lg text-white font-semibold">
+                    <i class="fas fa-user-plus mr-2"></i>Créer mon compte
+                </button>
+            </form>
+            
+            <!-- Formulaire Vérification Email -->
+            <form id="form-verify" class="fade-in hidden" onsubmit="handleVerify(event)">
+                <div class="text-center mb-6">
+                    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-500/20 mb-4">
+                        <i class="fas fa-envelope-open-text text-3xl text-indigo-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white">Vérifiez votre email</h3>
+                    <p class="text-gray-400 mt-2">Un code à 6 chiffres a été envoyé à<br><span id="verify-email-display" class="text-indigo-400"></span></p>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        <i class="fas fa-key mr-2"></i>Code de vérification
+                    </label>
+                    <input type="text" id="verify-code" class="input-field w-full px-4 py-3 rounded-lg text-center text-2xl tracking-widest" 
+                           placeholder="000000" maxlength="6" pattern="[0-9]{6}" required>
+                </div>
+                
+                <button type="submit" id="btn-verify" class="btn-primary w-full py-3 rounded-lg text-white font-semibold">
+                    <i class="fas fa-check mr-2"></i>Vérifier
+                </button>
+                
+                <div class="mt-4 text-center">
+                    <button type="button" class="text-indigo-400 hover:text-indigo-300 text-sm" onclick="resendVerification()">
+                        <i class="fas fa-redo mr-1"></i>Renvoyer le code
+                    </button>
+                </div>
+            </form>
+            
+            <!-- Formulaire Mot de passe oublié -->
+            <form id="form-forgot" class="fade-in hidden" onsubmit="handleForgotPassword(event)">
+                <div class="text-center mb-6">
+                    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-500/20 mb-4">
+                        <i class="fas fa-key text-3xl text-indigo-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white">Mot de passe oublié</h3>
+                    <p class="text-gray-400 mt-2">Entrez votre email pour recevoir un lien de réinitialisation</p>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        <i class="fas fa-envelope mr-2"></i>Email
+                    </label>
+                    <input type="email" id="forgot-email" class="input-field w-full px-4 py-3 rounded-lg" 
+                           placeholder="votre@email.com" required>
+                </div>
+                
+                <button type="submit" id="btn-forgot" class="btn-primary w-full py-3 rounded-lg text-white font-semibold">
+                    <i class="fas fa-paper-plane mr-2"></i>Envoyer
+                </button>
+                
+                <div class="mt-4 text-center">
+                    <button type="button" class="text-indigo-400 hover:text-indigo-300 text-sm" onclick="showTab('login')">
+                        <i class="fas fa-arrow-left mr-1"></i>Retour à la connexion
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Footer -->
+        <p class="text-center text-gray-500 text-sm mt-6">
+            © 2024 Hyperliquid Trading Bot. Tous droits réservés.
+        </p>
+    </div>
+
+    <script>
+        // Configuration EmailJS
+        let emailjsConfig = null;
+        let pendingVerificationEmail = null;
+        let pendingEmailData = null;
+        
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Vérifie si déjà connecté
+            const token = localStorage.getItem('authToken');
+            if (token) {
+                try {
+                    const response = await fetch('/api/auth/me', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (response.ok) {
+                        window.location.href = '/dashboard.html';
+                        return;
+                    }
+                } catch (e) {
+                    localStorage.removeItem('authToken');
+                }
+            }
+            
+            // Charge la config EmailJS
+            try {
+                const response = await fetch('/api/auth/emailjs-config');
+                const data = await response.json();
+                if (data.success) {
+                    emailjsConfig = data.config;
+                    emailjs.init(emailjsConfig.publicKey);
+                }
+            } catch (e) {
+                console.error('Erreur chargement config EmailJS:', e);
+            }
+        });
+        
+        // Affiche un onglet
+        function showTab(tab) {
+            // Cache tous les formulaires
+            document.getElementById('form-login').classList.add('hidden');
+            document.getElementById('form-register').classList.add('hidden');
+            document.getElementById('form-verify').classList.add('hidden');
+            document.getElementById('form-forgot').classList.add('hidden');
+            
+            // Désactive tous les tabs
+            document.getElementById('tab-login').classList.remove('active');
+            document.getElementById('tab-login').classList.add('text-gray-400');
+            document.getElementById('tab-register').classList.remove('active');
+            document.getElementById('tab-register').classList.add('text-gray-400');
+            
+            // Cache les alertes
+            hideAlerts();
+            
+            // Affiche le formulaire approprié
+            if (tab === 'login') {
+                document.getElementById('form-login').classList.remove('hidden');
+                document.getElementById('tab-login').classList.add('active');
+                document.getElementById('tab-login').classList.remove('text-gray-400');
+            } else if (tab === 'register') {
+                document.getElementById('form-register').classList.remove('hidden');
+                document.getElementById('tab-register').classList.add('active');
+                document.getElementById('tab-register').classList.remove('text-gray-400');
+            } else if (tab === 'verify') {
+                document.getElementById('form-verify').classList.remove('hidden');
+            } else if (tab === 'forgot') {
+                document.getElementById('form-forgot').classList.remove('hidden');
+            }
+        }
+        
+        // Affiche le formulaire mot de passe oublié
+        function showForgotPassword() {
+            showTab('forgot');
+        }
+        
+        // Toggle visibilité mot de passe
+        function togglePassword(inputId) {
+            const input = document.getElementById(inputId);
+            const icon = input.nextElementSibling.querySelector('i');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+        
+        // Affiche une erreur
+        function showError(message) {
+            const alert = document.getElementById('alert-error');
+            document.getElementById('error-message').textContent = message;
+            alert.style.display = 'block';
+            document.getElementById('alert-success').style.display = 'none';
+        }
+        
+        // Affiche un succès
+        function showSuccess(message) {
+            const alert = document.getElementById('alert-success');
+            document.getElementById('success-message').textContent = message;
+            alert.style.display = 'block';
+            document.getElementById('alert-error').style.display = 'none';
+        }
+        
+        // Cache les alertes
+        function hideAlerts() {
+            document.getElementById('alert-error').style.display = 'none';
+            document.getElementById('alert-success').style.display = 'none';
+        }
+        
+        // Active/désactive le loading sur un bouton
+        function setLoading(buttonId, loading) {
+            const btn = document.getElementById(buttonId);
+            if (loading) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner"></span>Chargement...';
+            } else {
+                btn.disabled = false;
+                // Restaure le texte original selon le bouton
+                const texts = {
+                    'btn-login': '<i class="fas fa-sign-in-alt mr-2"></i>Se connecter',
+                    'btn-register': '<i class="fas fa-user-plus mr-2"></i>Créer mon compte',
+                    'btn-verify': '<i class="fas fa-check mr-2"></i>Vérifier',
+                    'btn-forgot': '<i class="fas fa-paper-plane mr-2"></i>Envoyer'
+                };
+                btn.innerHTML = texts[buttonId] || 'Valider';
+            }
+        }
+        
+        // Envoie un email via EmailJS
+        async function sendVerificationEmail(emailData) {
+            if (!emailjsConfig) {
+                console.error('EmailJS non configuré');
+                return false;
+            }
+            
+            console.log('Envoi email avec:', {
+                serviceId: emailData.serviceId,
+                templateId: emailData.templateId,
+                params: emailData.templateParams
+            });
+            
+            try {
+                const result = await emailjs.send(
+                    emailData.serviceId,
+                    emailData.templateId,
+                    emailData.templateParams
+                );
+                console.log('Email envoyé:', result);
+                return true;
+            } catch (error) {
+                console.error('Erreur envoi email:', error);
+                console.error('Détails:', error.text || error.message || JSON.stringify(error));
+                // Affiche le code en fallback
+                alert('Code de vérification: ' + emailData.templateParams.verification_code + '\n\n(Email non envoyé - vérifiez la config EmailJS)');
+                return false;
+            }
+        }
+        
+        // Gère la connexion
+        async function handleLogin(event) {
+            event.preventDefault();
+            hideAlerts();
+            setLoading('btn-login', true);
+            
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    localStorage.setItem('authToken', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    showSuccess('Connexion réussie! Redirection...');
+                    setTimeout(() => {
+                        window.location.href = '/dashboard.html';
+                    }, 1000);
+                } else if (data.needsVerification) {
+                    // Email non vérifié, affiche le formulaire de vérification
+                    pendingVerificationEmail = email;
+                    pendingEmailData = data.emailData;
+                    document.getElementById('verify-email-display').textContent = email;
+                    showTab('verify');
+                    
+                    // Envoie l'email de vérification
+                    if (pendingEmailData) {
+                        await sendVerificationEmail(pendingEmailData);
+                    }
+                    showSuccess('Un code de vérification a été envoyé à votre email.');
+                } else {
+                    showError(data.error || 'Erreur de connexion');
+                }
+            } catch (error) {
+                showError('Erreur de connexion au serveur');
+            } finally {
+                setLoading('btn-login', false);
+            }
+        }
+        
+        // Gère l'inscription
+        async function handleRegister(event) {
+            event.preventDefault();
+            hideAlerts();
+            
+            const username = document.getElementById('register-username').value;
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            const passwordConfirm = document.getElementById('register-password-confirm').value;
+            
+            // Validation
+            if (password !== passwordConfirm) {
+                showError('Les mots de passe ne correspondent pas');
+                return;
+            }
+            
+            setLoading('btn-register', true);
+            
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    pendingVerificationEmail = email;
+                    pendingEmailData = data.emailData;
+                    document.getElementById('verify-email-display').textContent = email;
+                    
+                    // Envoie l'email de vérification
+                    if (pendingEmailData) {
+                        const emailSent = await sendVerificationEmail(pendingEmailData);
+                        if (emailSent) {
+                            showSuccess('Compte créé! Vérifiez votre email.');
+                        } else {
+                            showSuccess('Compte créé! Code: ' + pendingEmailData.templateParams.verification_code);
+                        }
+                    }
+                    
+                    showTab('verify');
+                } else {
+                    showError(data.error || 'Erreur lors de l\'inscription');
+                }
+            } catch (error) {
+                showError('Erreur de connexion au serveur');
+            } finally {
+                setLoading('btn-register', false);
+            }
+        }
+        
+        // Gère la vérification email
+        async function handleVerify(event) {
+            event.preventDefault();
+            hideAlerts();
+            setLoading('btn-verify', true);
+            
+            const code = document.getElementById('verify-code').value;
+            
+            try {
+                const response = await fetch('/api/auth/verify-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: pendingVerificationEmail, code })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showSuccess('Email vérifié! Vous pouvez maintenant vous connecter.');
+                    setTimeout(() => {
+                        showTab('login');
+                        document.getElementById('login-email').value = pendingVerificationEmail;
+                    }, 2000);
+                } else {
+                    showError(data.error || 'Code invalide');
+                }
+            } catch (error) {
+                showError('Erreur de connexion au serveur');
+            } finally {
+                setLoading('btn-verify', false);
+            }
+        }
+        
+        // Renvoie le code de vérification
+        async function resendVerification() {
+            hideAlerts();
+            
+            try {
+                const response = await fetch('/api/auth/resend-verification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: pendingVerificationEmail })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.emailData) {
+                    pendingEmailData = data.emailData;
+                    const emailSent = await sendVerificationEmail(pendingEmailData);
+                    if (emailSent) {
+                        showSuccess('Nouveau code envoyé!');
+                    } else {
+                        showSuccess('Code: ' + pendingEmailData.templateParams.verification_code);
+                    }
+                } else {
+                    showError(data.error || 'Erreur lors du renvoi');
+                }
+            } catch (error) {
+                showError('Erreur de connexion au serveur');
+            }
+        }
+        
+        // Gère le mot de passe oublié
+        async function handleForgotPassword(event) {
+            event.preventDefault();
+            hideAlerts();
+            setLoading('btn-forgot', true);
+            
+            const email = document.getElementById('forgot-email').value;
+            
+            try {
+                const response = await fetch('/api/auth/forgot-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (data.emailData) {
+                        await sendVerificationEmail(data.emailData);
+                    }
+                    showSuccess('Si cet email existe, un lien de réinitialisation a été envoyé.');
+                } else {
+                    showError(data.error || 'Erreur');
+                }
+            } catch (error) {
+                showError('Erreur de connexion au serveur');
+            } finally {
+                setLoading('btn-forgot', false);
+            }
+        }
+    </script>
+</body>
+</html>

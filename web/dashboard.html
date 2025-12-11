@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hyperliquid Trading Bot - Dashboard</title>
+    <link rel="stylesheet" href="dashboard.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://s3.tradingview.com/tv.js"></script>
+    <script>
+        // Protection: vérifie l'authentification
+        (function() {
+            const token = localStorage.getItem('authToken');
+            if (!token) {
+                window.location.href = '/login.html';
+                return;
+            }
+            // Vérifie le token côté serveur
+            fetch('/api/auth/me', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            }).then(r => {
+                if (!r.ok) {
+                    localStorage.removeItem('authToken');
+                    localStorage.removeItem('user');
+                    window.location.href = '/login.html';
+                }
+            }).catch(() => {
+                localStorage.removeItem('authToken');
+                window.location.href = '/login.html';
+            });
+        })();
+    </script>
+</head>
+<body>
+    <!-- Main App -->
+    <div id="app" class="app">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i data-lucide="bot"></i>
+                </div>
+                <span>Trading Bot</span>
+            </div>
+            
+            <ul class="nav-menu">
+                <li class="nav-item active" data-page="dashboard">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Tableau de bord</span>
+                </li>
+                <li class="nav-item" data-page="trading">
+                    <i data-lucide="candlestick-chart"></i>
+                    <span>Configuration Trading</span>
+                </li>
+                <li class="nav-item" data-page="scanner">
+                    <i data-lucide="scan"></i>
+                    <span>Scanner Multi-Crypto</span>
+                </li>
+                <li class="nav-item" data-page="risk">
+                    <i data-lucide="shield"></i>
+                    <span>Risk Management</span>
+                </li>
+                <li class="nav-item" data-page="history">
+                    <i data-lucide="history"></i>
+                    <span>Historique Trades</span>
+                </li>
+                <li class="nav-item" data-page="chart">
+                    <i data-lucide="line-chart"></i>
+                    <span>Graphique</span>
+                </li>
+                <li class="nav-item" data-page="api">
+                    <i data-lucide="key"></i>
+                    <span>Configuration API</span>
+                </li>
+            </ul>
+
+            <div class="sidebar-footer">
+                <div class="user-info" id="userInfo">
+                    <i data-lucide="user" style="width: 16px; height: 16px;"></i>
+                    <span id="usernameDisplay">Utilisateur</span>
+                </div>
+                <button class="logout-btn" onclick="logout()" title="Déconnexion">
+                    <i data-lucide="log-out" style="width: 16px; height: 16px;"></i>
+                </button>
+                <span class="version">v1.0.0</span>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-left">
+                    <h1 id="pageTitle">Tableau de bord</h1>
+                </div>
+                <div class="header-right">
+                    <div class="connection-status" id="connectionStatus">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Déconnecté</span>
+                    </div>
+                    <div class="bot-controls">
+                        <button id="startBotBtn" class="btn btn-success">
+                            <i data-lucide="play"></i> Démarrer
+                        </button>
+                        <button id="stopBotBtn" class="btn btn-danger hidden">
+                            <i data-lucide="square"></i> Arrêter
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dashboard Page -->
+            <section id="dashboardPage" class="page active">
+                <div class="dashboard-grid">
+                    <!-- Status Cards -->
+                    <div class="card status-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="activity"></i> Statut du Bot</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="status-indicator" id="botStatus">
+                                <span class="status-badge offline">ARRÊTÉ</span>
+                            </div>
+                            <div class="status-details">
+                                <div class="detail">
+                                    <span class="label">Mode</span>
+                                    <span class="value" id="botMode">-</span>
+                                </div>
+                                <div class="detail">
+                                    <span class="label">Symbole</span>
+                                    <span class="value" id="botSymbol">-</span>
+                                </div>
+                                <div class="detail">
+                                    <span class="label">Analyses</span>
+                                    <span class="value" id="analysisCount">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card balance-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="wallet"></i> Compte</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="balance-display">
+                                <span class="balance" id="totalBalance">-</span>
+                                <span class="label">Équité totale</span>
+                            </div>
+                            <div class="balance-stats">
+                                <div class="stat">
+                                    <span class="label">Marge libre</span>
+                                    <span class="value" id="freeMargin">-</span>
+                                </div>
+                                <div class="stat">
+                                    <span class="label">PnL non réalisé</span>
+                                    <span class="value" id="unrealizedPnl">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Daily Stats -->
+                    <div class="card stats-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="bar-chart-2"></i> Stats du Jour</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="stats-grid">
+                                <div class="stat-item">
+                                    <span class="stat-value" id="todayTrades">0</span>
+                                    <span class="stat-label">Trades</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-value" id="todayWinRate">0%</span>
+                                    <span class="stat-label">Win Rate</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-value" id="todayPnL">$0</span>
+                                    <span class="stat-label">PnL</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-value" id="currentDrawdown">0%</span>
+                                    <span class="stat-label">Drawdown</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Positions Ouvertes -->
+                    <div class="card positions-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="layers"></i> Positions Ouvertes</h3>
+                            <span class="positions-count" id="positionsCount">0</span>
+                        </div>
+                        <div class="card-body">
+                            <div id="positionsList" class="positions-list">
+                                <p class="no-position">Aucune position ouverte</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- P&L Chart -->
+                    <div class="card pnl-chart-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="line-chart"></i> Évolution P&L</h3>
+                            <div class="chart-controls">
+                                <button class="btn btn-small btn-outline active" data-period="day">Jour</button>
+                                <button class="btn btn-small btn-outline" data-period="week">Semaine</button>
+                                <button class="btn btn-small btn-outline" data-period="month">Mois</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="pnlChart" height="200"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Advanced Stats -->
+                    <div class="card advanced-stats-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="pie-chart"></i> Statistiques Avancées</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="advanced-stats-grid">
+                                <div class="stat-box">
+                                    <div class="stat-icon bullish"><i data-lucide="trending-up"></i></div>
+                                    <div class="stat-info">
+                                        <span class="stat-value" id="totalWins">0</span>
+                                        <span class="stat-label">Trades Gagnants</span>
+                                    </div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-icon bearish"><i data-lucide="trending-down"></i></div>
+                                    <div class="stat-info">
+                                        <span class="stat-value" id="totalLosses">0</span>
+                                        <span class="stat-label">Trades Perdants</span>
+                                    </div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-icon neutral"><i data-lucide="percent"></i></div>
+                                    <div class="stat-info">
+                                        <span class="stat-value" id="avgWin">$0</span>
+                                        <span class="stat-label">Gain Moyen</span>
+                                    </div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-icon neutral"><i data-lucide="percent"></i></div>
+                                    <div class="stat-info">
+                                        <span class="stat-value" id="avgLoss">$0</span>
+                                        <span class="stat-label">Perte Moyenne</span>
+                                    </div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-icon"><i data-lucide="ratio"></i></div>
+                                    <div class="stat-info">
+                                        <span class="stat-value" id="profitFactor">0</span>
+                                        <span class="stat-label">Profit Factor</span>
+                                    </div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-icon"><i data-lucide="arrow-down-up"></i></div>
+                                    <div class="stat-info">
+                                        <span class="stat-value" id="currentMaxDrawdown">0%</span>
+                                        <span class="stat-label">Max Drawdown</span>
+                                    </div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-icon"><i data-lucide="flame"></i></div>
+                                    <div class="stat-info">
+                                        <span class="stat-value" id="winStreak">0</span>
+                                        <span class="stat-label">Série Gagnante</span>
+                                    </div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-icon"><i data-lucide="snowflake"></i></div>
+                                    <div class="stat-info">
+                                        <span class="stat-value" id="lossStreak">0</span>
+                                        <span class="stat-label">Série Perdante</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <!-- Logs améliorés -->
+                    <div class="card logs-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="terminal"></i> Logs en temps réel</h3>
+                            <div class="logs-controls">
+                                <select id="logFilter" class="log-filter-select">
+                                    <option value="all">Tous</option>
+                                    <option value="trade">🎯 Trades</option>
+                                    <option value="signal">📊 Signaux</option>
+                                    <option value="error">❌ Erreurs</option>
+                                    <option value="warn">⚠️ Warnings</option>
+                                    <option value="success">✅ Succès</option>
+                                </select>
+                                <input type="text" id="logSearch" class="log-search-input" placeholder="Rechercher...">
+                                <button class="btn btn-small btn-outline" id="pauseLogs" title="Pause/Resume">
+                                    <i data-lucide="pause"></i>
+                                </button>
+                                <button class="btn btn-small btn-outline" id="clearLogs" title="Effacer">
+                                    <i data-lucide="trash-2"></i>
+                                </button>
+                                <button class="btn btn-small btn-outline" id="downloadLogs" title="Télécharger">
+                                    <i data-lucide="download"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="logs-stats">
+                                <span class="log-stat" id="logCountTotal">Total: 0</span>
+                                <span class="log-stat log-stat-error" id="logCountError">Erreurs: 0</span>
+                                <span class="log-stat log-stat-trade" id="logCountTrade">Trades: 0</span>
+                            </div>
+                            <div class="logs-container" id="logsContainer">
+                                <p class="log-placeholder">En attente de logs...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Trading Config Page -->
+            <section id="tradingPage" class="page">
+                <div class="config-grid">
+                    <!-- Configuration Principale -->
+                    <div class="card card-wide">
+                        <div class="card-header">
+                            <h3><i data-lucide="settings-2"></i> Configuration du Robot Multi-Crypto</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="tradingConfigForm">
+                                <!-- Mode de Trading (toujours automatique) -->
+                                <input type="hidden" id="configMode" value="auto">
+
+                                <!-- Timeframe -->
+                                <div class="config-section">
+                                    <h4 class="section-title"><i data-lucide="clock"></i> Timeframe d'Analyse</h4>
+                                    <div class="timeframe-selector">
+                                        <label class="timeframe-option">
+                                            <input type="radio" name="configTimeframe" value="1m">
+                                            <span class="timeframe-btn">
+                                                <strong>1m</strong>
+                                                <small>Scalping</small>
+                                            </span>
+                                        </label>
+                                        <label class="timeframe-option">
+                                            <input type="radio" name="configTimeframe" value="5m">
+                                            <span class="timeframe-btn">
+                                                <strong>5m</strong>
+                                                <small>Scalping</small>
+                                            </span>
+                                        </label>
+                                        <label class="timeframe-option">
+                                            <input type="radio" name="configTimeframe" value="15m" checked>
+                                            <span class="timeframe-btn">
+                                                <strong>15m</strong>
+                                                <small>Intraday</small>
+                                            </span>
+                                        </label>
+                                        <label class="timeframe-option">
+                                            <input type="radio" name="configTimeframe" value="30m">
+                                            <span class="timeframe-btn">
+                                                <strong>30m</strong>
+                                                <small>Intraday</small>
+                                            </span>
+                                        </label>
+                                        <label class="timeframe-option">
+                                            <input type="radio" name="configTimeframe" value="1h">
+                                            <span class="timeframe-btn">
+                                                <strong>1h</strong>
+                                                <small>Swing</small>
+                                            </span>
+                                        </label>
+                                    </div>
+                                    <div class="timeframe-info" id="timeframeInfo">
+                                        <div class="info-box">
+                                            <i data-lucide="info"></i>
+                                            <div>
+                                                <strong>15 minutes</strong> - Recommandé pour le trading intraday<br>
+                                                <span class="text-muted">TP/SL adaptés: ~1-3% | Durée moyenne: 1-4h</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Paramètres d'analyse -->
+                                <div class="config-section">
+                                    <h4 class="section-title"><i data-lucide="sliders"></i> Paramètres d'Analyse</h4>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="configInterval">
+                                                Intervalle d'analyse
+                                                <span class="tooltip-icon" data-tooltip="Fréquence à laquelle le bot analyse les cryptos">?</span>
+                                            </label>
+                                            <select id="configInterval">
+                                                <option value="30">30 secondes (agressif)</option>
+                                                <option value="60" selected>1 minute (recommandé)</option>
+                                                <option value="120">2 minutes (modéré)</option>
+                                                <option value="300">5 minutes (conservateur)</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="configLeverage">
+                                                Levier
+                                                <span class="tooltip-icon" data-tooltip="Multiplicateur de votre position. Plus le levier est élevé, plus le risque est grand">?</span>
+                                            </label>
+                                            <select id="configLeverage">
+                                                <option value="1">1x (pas de levier)</option>
+                                                <option value="2">2x</option>
+                                                <option value="3">3x</option>
+                                                <option value="5" selected>5x (recommandé)</option>
+                                                <option value="10">10x (risqué)</option>
+                                                <option value="20">20x (très risqué)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Cryptos à analyser -->
+                                <div class="config-section">
+                                    <h4 class="section-title"><i data-lucide="coins"></i> Cryptos à Analyser</h4>
+                                    <div class="form-group">
+                                        <textarea id="cryptosList" rows="2" placeholder="BTC, ETH, SOL, XRP...">BTC, ETH, SOL, DOGE, XRP, ADA, AVAX, LINK, DOT, MATIC, UNI, ATOM, LTC, BCH, APT, ARB, OP, INJ, SUI, SEI</textarea>
+                                        <span class="form-hint">Le bot analysera ces 20 cryptos et cherchera les meilleures opportunités</span>
+                                    </div>
+                                    <div class="crypto-presets">
+                                        <span class="preset-label">Presets:</span>
+                                        <button type="button" class="btn btn-small btn-outline" data-preset="top10">Top 10</button>
+                                        <button type="button" class="btn btn-small btn-outline" data-preset="top20">Top 20</button>
+                                        <button type="button" class="btn btn-small btn-outline" data-preset="altcoins">Altcoins</button>
+                                        <button type="button" class="btn btn-small btn-outline" data-preset="defi">DeFi</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Filtres de Signal -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i data-lucide="filter"></i> Filtres de Signal</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label for="maxConcurrentTrades">
+                                    Trades simultanés max
+                                    <span class="tooltip-icon" data-tooltip="Nombre maximum de positions ouvertes en même temps">?</span>
+                                </label>
+                                <input type="number" id="maxConcurrentTrades" value="3" min="1" max="10">
+                                <span class="form-hint">Limite le nombre de positions pour diversifier le risque</span>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="minWinProbability">
+                                    Probabilité de gain minimum
+                                    <span class="tooltip-icon" data-tooltip="Le bot n'ouvrira un trade que si la probabilité estimée de gain dépasse ce seuil">?</span>
+                                </label>
+                                <div class="slider-with-value">
+                                    <input type="range" id="minWinProbability" value="65" min="50" max="85" step="5">
+                                    <span class="slider-value" id="minWinProbabilityValue">65%</span>
+                                </div>
+                                <div class="range-labels">
+                                    <span>50% (plus de trades)</span>
+                                    <span>85% (moins de trades)</span>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="minScore">
+                                    Score Ichimoku minimum
+                                    <span class="tooltip-icon" data-tooltip="Score de -7 à +7 basé sur les indicateurs Ichimoku. Plus le score est élevé, plus le signal est fort">?</span>
+                                </label>
+                                <div class="slider-with-value">
+                                    <input type="range" id="minScore" value="3" min="1" max="7" step="1">
+                                    <span class="slider-value" id="minScoreValue">3</span>
+                                </div>
+                                <div class="range-labels">
+                                    <span>1 (beaucoup de signaux)</span>
+                                    <span>7 (signaux très forts)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Signaux Ichimoku -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i data-lucide="zap"></i> Signaux Ichimoku</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="section-desc">Activez/désactivez les types de signaux à détecter:</p>
+                            <div class="toggle-group">
+                                <div class="toggle-item">
+                                    <label class="toggle">
+                                        <input type="checkbox" id="signalTkCross" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <div class="toggle-info">
+                                        <span class="toggle-label">TK Cross</span>
+                                        <span class="toggle-desc">Croisement Tenkan/Kijun - Signal de retournement</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-item">
+                                    <label class="toggle">
+                                        <input type="checkbox" id="signalKumoBreakout" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <div class="toggle-info">
+                                        <span class="toggle-label">Kumo Breakout</span>
+                                        <span class="toggle-desc">Cassure du nuage - Signal fort de tendance</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-item">
+                                    <label class="toggle">
+                                        <input type="checkbox" id="signalKumoTwist" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <div class="toggle-info">
+                                        <span class="toggle-label">Kumo Twist</span>
+                                        <span class="toggle-desc">Changement de couleur du nuage - Changement de tendance</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-item">
+                                    <label class="toggle">
+                                        <input type="checkbox" id="signalKijunBounce" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <div class="toggle-info">
+                                        <span class="toggle-label">Kijun Bounce</span>
+                                        <span class="toggle-desc">Rebond sur la Kijun - Continuation de tendance</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filtres Avancés -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i data-lucide="filter"></i> Filtres Avancés</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="section-desc">Filtres supplémentaires pour améliorer la qualité des trades</p>
+                            
+                            <!-- Filtre RSI -->
+                            <div class="filter-section">
+                                <div class="toggle-item">
+                                    <label class="toggle">
+                                        <input type="checkbox" id="useRSIFilter" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <div class="toggle-info">
+                                        <span class="toggle-label">Filtre RSI</span>
+                                        <span class="toggle-desc">Évite les LONG en surachat et SHORT en survente</span>
+                                    </div>
+                                </div>
+                                <div class="rsi-settings" id="rsiSettings">
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>Surachat (pas de LONG au-dessus)</label>
+                                            <input type="number" id="rsiOverbought" value="70" min="50" max="90" step="5">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Survente (pas de SHORT en-dessous)</label>
+                                            <input type="number" id="rsiOversold" value="30" min="10" max="50" step="5">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TP/SL par Timeframe -->
+                    <div class="card card-wide">
+                        <div class="card-header">
+                            <h3><i data-lucide="target"></i> Take Profit / Stop Loss</h3>
+                        </div>
+                        <div class="card-body">
+                            <!-- Mode de gestion TP/SL -->
+                            <div class="tpsl-mode-selector">
+                                <label class="mode-option">
+                                    <input type="radio" name="tpslMode" value="auto" checked>
+                                    <span class="mode-btn">
+                                        <i data-lucide="cpu"></i>
+                                        <strong>Ichimoku+</strong>
+                                        <small>Ichimoku + EMA + Bollinger</small>
+                                    </span>
+                                </label>
+                                <label class="mode-option">
+                                    <input type="radio" name="tpslMode" value="ichimoku_pure">
+                                    <span class="mode-btn">
+                                        <i data-lucide="layers"></i>
+                                        <strong>Ichimoku Pur</strong>
+                                        <small>100% Ichimoku uniquement</small>
+                                    </span>
+                                </label>
+                                <label class="mode-option">
+                                    <input type="radio" name="tpslMode" value="atr">
+                                    <span class="mode-btn">
+                                        <i data-lucide="activity"></i>
+                                        <strong>ATR Dynamique</strong>
+                                        <small>Adapté à la volatilité</small>
+                                    </span>
+                                </label>
+                                <label class="mode-option">
+                                    <input type="radio" name="tpslMode" value="percent">
+                                    <span class="mode-btn">
+                                        <i data-lucide="percent"></i>
+                                        <strong>Pourcentage</strong>
+                                        <small>SL/TP fixes en %</small>
+                                    </span>
+                                </label>
+                            </div>
+                            
+                            <!-- Section Ichimoku+ (auto) -->
+                            <div class="tpsl-section" id="tpslAutoSection">
+                                <div class="info-banner info-small">
+                                    <i data-lucide="info"></i>
+                                    <div>
+                                        <p><strong>Mode Ichimoku+:</strong> TP/SL basés sur Ichimoku (priorité), avec fallback sur EMA200 et Bollinger si nécessaire. Le plus flexible.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Section Ichimoku Pur -->
+                            <div class="tpsl-section hidden" id="tpslIchimokuPureSection">
+                                <div class="info-banner info-small">
+                                    <i data-lucide="layers"></i>
+                                    <div>
+                                        <p><strong>Mode Ichimoku Pur:</strong> TP/SL calculés <u>uniquement</u> avec les niveaux Ichimoku (Kijun, Kumo). Si aucun niveau trouvé, utilise le % par défaut du timeframe.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Section ATR Dynamique -->
+                            <div class="tpsl-section hidden" id="tpslATRSection">
+                                <div class="info-banner info-small">
+                                    <i data-lucide="activity"></i>
+                                    <div>
+                                        <p><strong>Mode ATR:</strong> SL/TP basés sur l'ATR (Average True Range). S'adapte automatiquement à la volatilité du marché.</p>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="atrMultiplierSL">
+                                            Multiplicateur SL (ATR)
+                                            <span class="tooltip-icon" data-tooltip="SL = Prix ± (ATR × multiplicateur)">?</span>
+                                        </label>
+                                        <div class="slider-with-value">
+                                            <input type="range" id="atrMultiplierSL" value="1.5" min="0.5" max="4" step="0.1">
+                                            <span class="slider-value" id="atrMultiplierSLValue">1.5x ATR</span>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="atrMultiplierTP">
+                                            Multiplicateur TP (ATR)
+                                            <span class="tooltip-icon" data-tooltip="TP = Prix ± (ATR × multiplicateur)">?</span>
+                                        </label>
+                                        <div class="slider-with-value">
+                                            <input type="range" id="atrMultiplierTP" value="2.5" min="1" max="6" step="0.1">
+                                            <span class="slider-value success" id="atrMultiplierTPValue">2.5x ATR</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="rrr-preview">
+                                    <span>Risk/Reward Ratio: </span>
+                                    <strong id="atrRRR">1:1.67</strong>
+                                </div>
+                            </div>
+                            
+                            <!-- Section Pourcentage -->
+                            <div class="tpsl-section hidden" id="tpslPercentSection">
+                                <div class="info-banner info-small">
+                                    <i data-lucide="percent"></i>
+                                    <div>
+                                        <p><strong>Mode Pourcentage:</strong> SL/TP fixes en % du prix d'entrée. Simple, prévisible et facile à backtester.</p>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="percentSL">
+                                            Stop Loss (%)
+                                            <span class="tooltip-icon" data-tooltip="Perte maximum en % du prix d'entrée">?</span>
+                                        </label>
+                                        <div class="slider-with-value">
+                                            <input type="range" id="percentSL" value="1" min="0.2" max="10" step="0.1">
+                                            <span class="slider-value danger" id="percentSLValue">-1%</span>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="percentTP">
+                                            Take Profit (%)
+                                            <span class="tooltip-icon" data-tooltip="Gain cible en % du prix d'entrée">?</span>
+                                        </label>
+                                        <div class="slider-with-value">
+                                            <input type="range" id="percentTP" value="2" min="0.5" max="20" step="0.1">
+                                            <span class="slider-value success" id="percentTPValue">+2%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="rrr-preview">
+                                    <span>Risk/Reward Ratio: </span>
+                                    <strong id="percentRRR">1:2</strong>
+                                </div>
+                            </div>
+                            
+                        </div>
+                    </div>
+
+                    <!-- Bouton Sauvegarder -->
+                    <div class="card action-card">
+                        <button class="btn btn-primary btn-full" id="saveTradingConfig">
+                            <i data-lucide="save"></i> Sauvegarder la configuration
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Scanner Multi-Crypto Page -->
+            <section id="scannerPage" class="page">
+                <div class="scanner-layout">
+                    <!-- Scanner Controls -->
+                    <div class="scanner-header">
+                        <div class="scanner-controls">
+                            <button class="btn btn-primary" id="startScanBtn">
+                                <i data-lucide="scan"></i> Lancer le Scan
+                            </button>
+                            <button class="btn btn-outline" id="autoScanBtn">
+                                <i data-lucide="refresh-cw"></i> Auto-Scan
+                            </button>
+                            <select id="scanTimeframe" class="select-inline">
+                                <option value="1m">1 min</option>
+                                <option value="5m">5 min</option>
+                                <option value="15m" selected>15 min</option>
+                                <option value="30m">30 min</option>
+                                <option value="1h">1 heure</option>
+                                <option value="4h">4 heures</option>
+                            </select>
+                        </div>
+                        <div class="scanner-summary" id="scannerSummary">
+                            <span class="summary-item"><strong id="totalScanned">0</strong> analysés</span>
+                            <span class="summary-item bullish"><i data-lucide="trending-up"></i> <strong id="bullishCount">0</strong></span>
+                            <span class="summary-item bearish"><i data-lucide="trending-down"></i> <strong id="bearishCount">0</strong></span>
+                            <span class="summary-item tradeable"><i data-lucide="zap"></i> <strong id="tradeableCount">0</strong> signaux</span>
+                        </div>
+                    </div>
+
+                    <!-- Scanner Results Table -->
+                    <div class="card scanner-results-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="list"></i> Résultats d'Analyse - Top 20 Cryptos</h3>
+                            <div class="sort-controls">
+                                <label>Trier par:</label>
+                                <select id="sortBy">
+                                    <option value="score">Score Ichimoku</option>
+                                    <option value="change24h">Variation 24h</option>
+                                    <option value="symbol">Symbole</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="scanner-table-container">
+                                <table class="scanner-table" id="scannerTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Symbole</th>
+                                            <th>Prix</th>
+                                            <th>24h</th>
+                                            <th>Score</th>
+                                            <th>Direction</th>
+                                            <th>Signal</th>
+                                            <th>Win %</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="scannerTableBody">
+                                        <tr>
+                                            <td colspan="8" class="loading-cell">
+                                                <p>Cliquez sur "Lancer le Scan" pour analyser les cryptos</p>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Best Opportunities -->
+                    <div class="opportunities-grid">
+                        <div class="card">
+                            <div class="card-header bullish-header">
+                                <h3><i data-lucide="trending-up"></i> Opportunités LONG</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="bullishOpportunities" class="opportunities-list">
+                                    <p class="no-opportunities">Aucune opportunité détectée</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header bearish-header">
+                                <h3><i data-lucide="trending-down"></i> Opportunités SHORT</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="bearishOpportunities" class="opportunities-list">
+                                    <p class="no-opportunities">Aucune opportunité détectée</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Risk Management Page -->
+            <section id="riskPage" class="page">
+                <div class="config-grid">
+                    <!-- Explication Risk Management -->
+                    <div class="card card-wide info-card">
+                        <div class="card-body">
+                            <div class="info-banner">
+                                <i data-lucide="shield-check"></i>
+                                <div>
+                                    <h4>Gestion du Risque</h4>
+                                    <p>Ces paramètres protègent votre capital. Le bot s'arrêtera automatiquement si les limites sont atteintes.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gestion du Capital -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i data-lucide="wallet"></i> Gestion du Capital</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="riskConfigForm">
+                                <div class="form-group">
+                                    <label for="riskPerTrade">
+                                        Risque par trade
+                                        <span class="tooltip-icon" data-tooltip="Pourcentage de votre capital que vous êtes prêt à perdre sur UN trade. Recommandé: 1-2%">?</span>
+                                    </label>
+                                    <div class="slider-with-value">
+                                        <input type="range" id="riskPerTrade" value="1" min="0" max="100" step="0.5">
+                                        <span class="slider-value" id="riskPerTradeValue">1%</span>
+                                    </div>
+                                    <div class="range-labels">
+                                        <span>0%</span>
+                                        <span>100%</span>
+                                    </div>
+                                    <div class="risk-example" id="riskExample">
+                                        <i data-lucide="calculator"></i>
+                                        <span>Avec 100$ de capital, vous risquez <strong>1$</strong> par trade</span>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="maxPositionSize">
+                                        Taille position max
+                                        <span class="tooltip-icon" data-tooltip="Taille maximale d'une seule position en % de votre capital total">?</span>
+                                    </label>
+                                    <div class="slider-with-value">
+                                        <input type="range" id="maxPositionSize" value="10" min="0" max="100" step="1">
+                                        <span class="slider-value" id="maxPositionSizeValue">10%</span>
+                                    </div>
+                                    <div class="range-labels">
+                                        <span>0%</span>
+                                        <span>100%</span>
+                                    </div>
+                                    <span class="form-hint">Limite la taille d'une position pour éviter la surexposition</span>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Protection Automatique -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i data-lucide="shield-alert"></i> Protection Automatique</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label for="dailyLossLimit">
+                                    Limite perte journalière
+                                    <span class="tooltip-icon" data-tooltip="Le bot s'arrête automatiquement si vous perdez ce % de votre capital en une journée. 0 = désactivé (pas de limite)">?</span>
+                                </label>
+                                <div class="slider-with-value">
+                                    <input type="range" id="dailyLossLimit" value="5" min="0" max="100" step="1">
+                                    <span class="slider-value danger" id="dailyLossLimitValue">5%</span>
+                                </div>
+                                <div class="range-labels">
+                                    <span>OFF</span>
+                                    <span>100%</span>
+                                </div>
+                                <span class="form-hint" id="dailyLossHint">Le bot s'arrête après 5% de perte du capital</span>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="maxDrawdown">
+                                    Drawdown maximum
+                                    <span class="tooltip-icon" data-tooltip="Perte maximale depuis le plus haut niveau de capital. Le bot s'arrête si atteint">?</span>
+                                </label>
+                                <div class="slider-with-value">
+                                    <input type="range" id="maxDrawdown" value="20" min="0" max="100" step="1">
+                                    <span class="slider-value danger" id="maxDrawdownValue">20%</span>
+                                </div>
+                                <div class="range-labels">
+                                    <span>0%</span>
+                                    <span>100%</span>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="maxTradesPerDay">
+                                        Max trades / jour
+                                        <span class="tooltip-icon" data-tooltip="Nombre maximum de trades que le bot peut exécuter en 24h. 0 = illimité">?</span>
+                                    </label>
+                                    <select id="maxTradesPerDay">
+                                        <option value="0">Illimité</option>
+                                        <option value="10">10 trades</option>
+                                        <option value="20">20 trades</option>
+                                        <option value="50" selected>50 trades</option>
+                                        <option value="100">100 trades</option>
+                                        <option value="200">200 trades</option>
+                                        <option value="500">500 trades</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="maxConsecutiveLosses">
+                                        Max pertes consécutives
+                                        <span class="tooltip-icon" data-tooltip="Le bot fait une pause après X pertes de suite pour éviter le tilt">?</span>
+                                    </label>
+                                    <select id="maxConsecutiveLosses">
+                                        <option value="0">Désactivé</option>
+                                        <option value="3">3 pertes</option>
+                                        <option value="5" selected>5 pertes</option>
+                                        <option value="10">10 pertes</option>
+                                        <option value="15">15 pertes</option>
+                                        <option value="20">20 pertes</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ratio Risque/Rendement -->
+                    <div class="card card-wide">
+                        <div class="card-header">
+                            <h3><i data-lucide="scale"></i> Qualité des Trades (Risk/Reward)</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-banner info-small mb-3">
+                                <i data-lucide="lightbulb"></i>
+                                <div>
+                                    <p><strong>Qu'est-ce que le Risk/Reward Ratio (RRR) ?</strong></p>
+                                    <p>C'est le rapport entre le gain potentiel (TP) et la perte potentielle (SL). Un RRR de 2:1 signifie que vous visez 2$ de gain pour chaque 1$ risqué. Même avec un winrate de 40%, un RRR de 2:1 vous rend profitable !</p>
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="minRiskRewardRatio">
+                                        Ratio minimum requis
+                                        <span class="tooltip-icon" data-tooltip="Le bot refuse les trades dont le RRR est inférieur à cette valeur. 0 = accepte tous les trades">?</span>
+                                    </label>
+                                    <div class="rrr-input-group">
+                                        <input type="number" id="minRiskRewardRatio" value="1.5" min="0" max="10" step="0.1" class="rrr-input">
+                                        <span class="rrr-suffix">: 1</span>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Presets rapides</label>
+                                    <div class="rrr-presets">
+                                        <button type="button" class="rrr-preset" data-value="0">OFF</button>
+                                        <button type="button" class="rrr-preset" data-value="1">1:1</button>
+                                        <button type="button" class="rrr-preset active" data-value="1.5">1.5:1</button>
+                                        <button type="button" class="rrr-preset" data-value="2">2:1</button>
+                                        <button type="button" class="rrr-preset" data-value="2.5">2.5:1</button>
+                                        <button type="button" class="rrr-preset" data-value="3">3:1</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="rrr-details-grid">
+                                <div class="rrr-detail-card">
+                                    <div class="rrr-detail-header">Exemple concret</div>
+                                    <div class="rrr-detail-body" id="rrrExample">
+                                        <p>Avec un RRR de <strong>1.5:1</strong> :</p>
+                                        <ul>
+                                            <li>Stop Loss : -10$ (risque)</li>
+                                            <li>Take Profit : +15$ minimum (gain)</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="rrr-detail-card">
+                                    <div class="rrr-detail-header">Winrate requis pour être profitable</div>
+                                    <div class="rrr-detail-body" id="rrrWinrate">
+                                        <p>Avec un RRR de <strong>1.5:1</strong> :</p>
+                                        <p class="rrr-winrate-value">Winrate minimum : <strong>40%</strong></p>
+                                        <small>Formule : 1 / (1 + RRR) = 1 / 2.5 = 40%</small>
+                                    </div>
+                                </div>
+                                <div class="rrr-detail-card">
+                                    <div class="rrr-detail-header">Impact sur les trades</div>
+                                    <div class="rrr-detail-body">
+                                        <ul>
+                                            <li><strong>RRR élevé (2+)</strong> : Moins de trades, mais plus rentables</li>
+                                            <li><strong>RRR faible (1-1.5)</strong> : Plus de trades, besoin d'un bon winrate</li>
+                                            <li><strong>RRR = 0</strong> : Tous les signaux sont acceptés</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="card action-card">
+                        <button class="btn btn-primary btn-full mb-2" id="saveRiskConfig">
+                            <i data-lucide="save"></i> Sauvegarder la configuration
+                        </button>
+                        <button class="btn btn-outline btn-full mb-2" id="resetDailyStats">
+                            <i data-lucide="rotate-ccw"></i> Réinitialiser les stats du jour
+                        </button>
+                        <button class="btn btn-warning btn-full" id="restartRiskBot">
+                            <i data-lucide="play"></i> Reprendre le trading (après pause)
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- History Page -->
+            <section id="historyPage" class="page">
+                <div class="history-container">
+                    <!-- Filtres -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i data-lucide="filter"></i> Filtres</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="history-filters">
+                                <div class="filter-group">
+                                    <label>Période</label>
+                                    <select id="historyPeriod">
+                                        <option value="today">Aujourd'hui</option>
+                                        <option value="week" selected>7 derniers jours</option>
+                                        <option value="month">30 derniers jours</option>
+                                        <option value="all">Tout</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label>Symbole</label>
+                                    <select id="historySymbol">
+                                        <option value="all">Tous</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label>Résultat</label>
+                                    <select id="historyResult">
+                                        <option value="all">Tous</option>
+                                        <option value="win">Gagnants</option>
+                                        <option value="loss">Perdants</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label>Direction</label>
+                                    <select id="historyDirection">
+                                        <option value="all">Toutes</option>
+                                        <option value="long">Long</option>
+                                        <option value="short">Short</option>
+                                    </select>
+                                </div>
+                                <button class="btn btn-primary" id="applyHistoryFilters">
+                                    <i data-lucide="search"></i> Appliquer
+                                </button>
+                                <button class="btn btn-secondary" id="exportHistory">
+                                    <i data-lucide="download"></i> Exporter CSV
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Statistiques résumées -->
+                    <div class="history-stats-row">
+                        <div class="history-stat-card">
+                            <span class="stat-label">Total Trades</span>
+                            <span class="stat-value" id="historyTotalTrades">0</span>
+                        </div>
+                        <div class="history-stat-card win">
+                            <span class="stat-label">Gagnants</span>
+                            <span class="stat-value" id="historyWins">0</span>
+                        </div>
+                        <div class="history-stat-card loss">
+                            <span class="stat-label">Perdants</span>
+                            <span class="stat-value" id="historyLosses">0</span>
+                        </div>
+                        <div class="history-stat-card">
+                            <span class="stat-label">Win Rate</span>
+                            <span class="stat-value" id="historyWinRate">0%</span>
+                        </div>
+                        <div class="history-stat-card" id="historyPnLCard">
+                            <span class="stat-label">P&L Total</span>
+                            <span class="stat-value" id="historyTotalPnL">$0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- Tableau des trades -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i data-lucide="list"></i> Historique des Trades</h3>
+                            <span class="trade-count" id="historyCount">0 trades</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-container">
+                                <table class="history-table" id="historyTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Symbole</th>
+                                            <th>Direction</th>
+                                            <th>Entrée</th>
+                                            <th>Sortie</th>
+                                            <th>Taille</th>
+                                            <th>P&L</th>
+                                            <th>Durée</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="historyTableBody">
+                                        <tr>
+                                            <td colspan="8" class="no-data">Chargement...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Chart Page -->
+            <section id="chartPage" class="page">
+                <div class="chart-page-container">
+                    <!-- Sélecteur de symbole -->
+                    <div class="chart-controls-bar">
+                        <div class="chart-symbol-selector">
+                            <label>Symbole</label>
+                            <select id="chartSymbol">
+                                <option value="BTC">BTC</option>
+                                <option value="ETH">ETH</option>
+                                <option value="SOL">SOL</option>
+                                <option value="DOGE">DOGE</option>
+                                <option value="XRP">XRP</option>
+                                <option value="ADA">ADA</option>
+                                <option value="AVAX">AVAX</option>
+                                <option value="LINK">LINK</option>
+                                <option value="DOT">DOT</option>
+                                <option value="MATIC">MATIC</option>
+                            </select>
+                        </div>
+                        <div class="chart-timeframe-selector">
+                            <label>Timeframe</label>
+                            <div class="timeframe-buttons">
+                                <button class="tf-btn" data-tf="1">1m</button>
+                                <button class="tf-btn" data-tf="5">5m</button>
+                                <button class="tf-btn active" data-tf="15">15m</button>
+                                <button class="tf-btn" data-tf="60">1H</button>
+                                <button class="tf-btn" data-tf="240">4H</button>
+                                <button class="tf-btn" data-tf="D">1D</button>
+                            </div>
+                        </div>
+                        <div class="chart-indicators">
+                            <label>
+                                <input type="checkbox" id="showIchimoku" checked>
+                                Ichimoku
+                            </label>
+                            <label>
+                                <input type="checkbox" id="showVolume" checked>
+                                Volume
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- TradingView Widget -->
+                    <div class="tradingview-container">
+                        <div id="tradingview_widget"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- API Config Page -->
+            <section id="apiPage" class="page">
+                <div class="config-grid">
+                    <!-- Liste des Wallets -->
+                    <div class="card wallets-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="wallet"></i> Mes Wallets</h3>
+                            <span class="wallet-count" id="walletCount">0</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="wallets-list" id="walletsList">
+                                <div class="empty-state">
+                                    <i data-lucide="wallet"></i>
+                                    <p>Aucun wallet enregistré</p>
+                                </div>
+                            </div>
+                            <button class="btn btn-outline btn-full mt-2" id="loadAllWallets">
+                                <i data-lucide="refresh-cw"></i> Charger les Wallets Sauvegardés
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Ajouter un Wallet -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i data-lucide="plus-circle"></i> Ajouter un Wallet</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-info">
+                                <i data-lucide="info"></i>
+                                <p>Ajoutez plusieurs wallets et basculez entre eux facilement. Vos clés sont chiffrées en AES-256.</p>
+                            </div>
+                            <form id="addWalletForm">
+                                <div class="form-group">
+                                    <label for="walletName">Nom du Wallet</label>
+                                    <input type="text" id="walletName" placeholder="Ex: Trading Principal, Scalping, Test...">
+                                    <span class="form-hint">Donnez un nom pour identifier facilement ce wallet</span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="secretPhrase">Secret Phrase / Clé Privée</label>
+                                    <textarea id="secretPhrase" rows="3" placeholder="Entrez votre clé privée (0x...) ou seed phrase (12+ mots)"></textarea>
+                                    <span class="form-hint">Clé pour signer les ordres. Ne partagez jamais cette information!</span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="tradingWalletAddress">Adresse de Trading (optionnel)</label>
+                                    <input type="text" id="tradingWalletAddress" placeholder="0x... (si différente de l'API wallet)">
+                                    <span class="form-hint">Laissez vide si identique à l'adresse de l'API wallet</span>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-full">
+                                    <i data-lucide="plus"></i> Ajouter ce Wallet
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Wallet Actif -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i data-lucide="check-circle"></i> Wallet Actif</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="active-wallet-info" id="activeWalletInfo">
+                                <div class="connection-item">
+                                    <span class="label">Nom</span>
+                                    <span class="value" id="activeWalletName">-</span>
+                                </div>
+                                <div class="connection-item">
+                                    <span class="label">Statut</span>
+                                    <span class="value" id="apiAuthStatus">Non connecté</span>
+                                </div>
+                                <div class="connection-item">
+                                    <span class="label">Adresse API</span>
+                                    <span class="value mono" id="walletAddress">-</span>
+                                </div>
+                                <div class="connection-item">
+                                    <span class="label">Adresse Trading</span>
+                                    <span class="value mono" id="tradingAddress">-</span>
+                                </div>
+                                <div class="connection-item">
+                                    <span class="label">Solde Perps</span>
+                                    <span class="value" id="perpsBalance">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card action-card">
+                        <button class="btn btn-outline btn-full mb-2" id="testConnection">
+                            <i data-lucide="wifi"></i> Tester la Connexion
+                        </button>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i data-lucide="book-open"></i> Guide d'authentification</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="guide-content">
+                                <h4>Comment obtenir vos identifiants:</h4>
+                                <ol>
+                                    <li>Connectez-vous à <a href="https://app.hyperliquid.xyz" target="_blank">Hyperliquid</a></li>
+                                    <li>Allez dans Settings → API</li>
+                                    <li>Exportez votre clé privée ou utilisez la seed phrase de votre wallet</li>
+                                </ol>
+                                <h4>Formats acceptés:</h4>
+                                <ul>
+                                    <li><strong>Clé privée hex:</strong> 0x... (66 caractères)</li>
+                                    <li><strong>Seed phrase:</strong> 12 ou 24 mots séparés par des espaces</li>
+                                </ul>
+                                <div class="alert alert-warning">
+                                    <i data-lucide="alert-triangle"></i>
+                                    <p>Utilisez de préférence un wallet dédié au trading avec des fonds limités.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>
