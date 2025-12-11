@@ -456,6 +456,8 @@ function updateDashboard(data) {
         document.getElementById('stopBotBtn').classList.remove('hidden');
         // Affiche les indicateurs verts sur les paramètres actifs
         updateActiveParamIndicators(data.bot.config);
+        // Affiche la carte des réglages actifs
+        updateActiveConfigCard(data.bot.config);
     } else {
         botStatus.textContent = 'ARRÊTÉ';
         botStatus.className = 'status-badge offline';
@@ -463,6 +465,8 @@ function updateDashboard(data) {
         document.getElementById('stopBotBtn').classList.add('hidden');
         // Cache tous les indicateurs verts
         hideAllActiveParamIndicators();
+        // Cache la carte des réglages actifs
+        hideActiveConfigCard();
     }
 
     document.getElementById('botMode').textContent = data.bot.mode?.toUpperCase() || '-';
@@ -2948,5 +2952,63 @@ function hideAllActiveParamIndicators() {
     document.querySelectorAll('.active-param-indicator').forEach(el => {
         el.classList.remove('visible');
     });
+}
+
+// ==================== ACTIVE CONFIG CARD ====================
+
+/**
+ * Met à jour la carte des réglages actifs sur le tableau de bord
+ * @param {Object} config - Configuration actuelle du bot
+ */
+function updateActiveConfigCard(config) {
+    if (!config) return;
+    
+    const card = document.getElementById('activeConfigCard');
+    if (!card) return;
+    
+    // Affiche la carte
+    card.style.display = 'block';
+    
+    // Timeframes
+    const timeframes = config.multiTimeframeMode && config.mtfTimeframes?.length > 0 
+        ? config.mtfTimeframes.join(', ') 
+        : (config.timeframes?.join(', ') || '15m');
+    document.getElementById('activeTimeframe').textContent = timeframes;
+    
+    // Mode MTF
+    document.getElementById('activeMTF').textContent = config.multiTimeframeMode ? 'ON' : 'OFF';
+    
+    // Score min
+    document.getElementById('activeMinScore').textContent = config.minScore || 4;
+    
+    // Win Prob min
+    const winProb = config.minWinProbability ? (config.minWinProbability * 100).toFixed(0) + '%' : '60%';
+    document.getElementById('activeWinProb').textContent = winProb;
+    
+    // TP/SL
+    const tp = config.defaultTP || 1;
+    const sl = config.defaultSL || 0.5;
+    document.getElementById('activeTPSL').textContent = `TP: ${tp}% / SL: ${sl}%`;
+    
+    // RRR min
+    const rrr = config.minRiskRewardRatio !== undefined ? config.minRiskRewardRatio : 0.5;
+    document.getElementById('activeRRR').textContent = rrr === 0 ? 'OFF' : rrr + ':1';
+    
+    // Intervalle
+    const interval = config.analysisInterval ? (config.analysisInterval / 1000) + 's' : '30s';
+    document.getElementById('activeInterval').textContent = interval;
+    
+    // Levier
+    document.getElementById('activeLeverage').textContent = (config.leverage || 5) + 'x';
+}
+
+/**
+ * Cache la carte des réglages actifs
+ */
+function hideActiveConfigCard() {
+    const card = document.getElementById('activeConfigCard');
+    if (card) {
+        card.style.display = 'none';
+    }
 }
 
