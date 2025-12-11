@@ -43,37 +43,37 @@ class TradeEngine {
         this.TIMEFRAME_PRESETS = {
             '1m': {
                 name: 'Ultra Scalping',
-                minScore: 4,              // Score Ichimoku minimum
-                minWinProbability: 0.60,  // Probabilité minimum (60%)
-                minConfluence: 2,         // Confluence minimum
-                rsiLongMax: 80,           // RSI max pour LONG
-                rsiShortMin: 20,          // RSI min pour SHORT
-                adxMin: 8,                // ADX minimum (très bas pour 1m)
-                minRRR: 0.5,              // RRR minimum très bas pour scalping rapide
+                minScore: 3,              // Score Ichimoku minimum (assoupli)
+                minWinProbability: 0.50,  // Probabilité minimum (50%) - très souple
+                minConfluence: 1,         // Confluence minimum (assoupli)
+                rsiLongMax: 85,           // RSI max pour LONG (assoupli)
+                rsiShortMin: 15,          // RSI min pour SHORT (assoupli)
+                adxMin: 5,                // ADX minimum (très bas pour 1m)
+                minRRR: 0.3,              // RRR minimum très bas pour scalping rapide
                 analysisInterval: 30000,  // Analyse toutes les 30s
                 description: 'Trades rapides, filtres souples pour capturer les mouvements'
             },
             '5m': {
                 name: 'Scalping',
-                minScore: 4,
-                minWinProbability: 0.62,
-                minConfluence: 2,
-                rsiLongMax: 75,
-                rsiShortMin: 25,
-                adxMin: 10,
-                minRRR: 0.7,              // RRR assoupli pour scalping
+                minScore: 3,              // Assoupli
+                minWinProbability: 0.52,  // Assoupli
+                minConfluence: 1,         // Assoupli
+                rsiLongMax: 80,           // Assoupli
+                rsiShortMin: 20,          // Assoupli
+                adxMin: 8,                // Assoupli
+                minRRR: 0.5,              // RRR assoupli pour scalping
                 analysisInterval: 60000,  // Analyse toutes les 1min
                 description: 'Scalping classique, bon équilibre vitesse/qualité'
             },
             '15m': {
                 name: 'Intraday',
                 minScore: 3,
-                minWinProbability: 0.65,
+                minWinProbability: 0.55,  // Assoupli
                 minConfluence: 2,
-                rsiLongMax: 70,
-                rsiShortMin: 30,
-                adxMin: 15,
-                minRRR: 1.0,              // RRR standard
+                rsiLongMax: 75,           // Assoupli
+                rsiShortMin: 25,          // Assoupli
+                adxMin: 10,               // Assoupli
+                minRRR: 0.7,              // RRR assoupli
                 analysisInterval: 60000,
                 description: 'Trading intraday, filtres équilibrés'
             },
@@ -1771,21 +1771,24 @@ class TradeEngine {
         const absScore = Math.abs(score);
         let baseProbability;
         
-        if (absScore >= 7) baseProbability = 0.75;      // Score parfait 7/7
-        else if (absScore >= 6) baseProbability = 0.72; // Score excellent 6/7
-        else if (absScore >= 5) baseProbability = 0.68; // Score très bon 5/7
-        else if (absScore >= 4) baseProbability = 0.64; // Score bon 4/7
-        else if (absScore >= 3) baseProbability = 0.58; // Score moyen 3/7
-        else if (absScore >= 2) baseProbability = 0.52; // Score faible mais tradeable
-        else baseProbability = 0.45;                    // Score très faible
+        // Probabilités de base ASSOUPLIES pour générer plus de trades
+        if (absScore >= 7) baseProbability = 0.78;      // Score parfait 7/7
+        else if (absScore >= 6) baseProbability = 0.74; // Score excellent 6/7
+        else if (absScore >= 5) baseProbability = 0.70; // Score très bon 5/7
+        else if (absScore >= 4) baseProbability = 0.66; // Score bon 4/7
+        else if (absScore >= 3) baseProbability = 0.62; // Score moyen 3/7
+        else if (absScore >= 2) baseProbability = 0.58; // Score faible mais tradeable
+        else if (absScore >= 1) baseProbability = 0.54; // Score minimal
+        else baseProbability = 0.50;                    // Score nul - 50/50
         
         // ===== CONFIANCE ASSOUPLIE POUR SCALPING =====
         // En scalping, même une confiance low peut être tradeable avec d'autres confirmations
+        // Bonus confiance AUGMENTÉS
         const confidenceBonus = {
-            'high': 0.10,    // +10% si confiance haute
-            'medium': 0.06,  // +6% si confiance moyenne
-            'low': 0.02      // +2% même en confiance basse (scalping rapide)
-        }[confidence] || 0.02;
+            'high': 0.12,    // +12% si confiance haute
+            'medium': 0.08,  // +8% si confiance moyenne
+            'low': 0.04      // +4% même en confiance basse (scalping rapide)
+        }[confidence] || 0.04;
         
         // ===== BONUS QUALITÉ ASSOUPLI =====
         let qualityBonus = 0;
