@@ -33,7 +33,7 @@ class RiskManager {
             maxTradesPerDay: 10,        // Nombre max de trades par jour
             maxDrawdown: 20,           // Drawdown max en %
             maxPositionSize: 10,       // Taille max de position en % du capital
-            minRiskRewardRatio: 1.0,   // Ratio risque/rendement minimum (assoupli)
+            minRiskRewardRatio: 0.5,   // Ratio risque/rendement minimum (assoupli pour scalping)
             maxConsecutiveLosses: 3,   // Arrêt après X pertes consécutives
             useLeverage: true,         // Utiliser le levier
             maxLeverage: 10,           // Levier maximum

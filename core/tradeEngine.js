@@ -49,6 +49,7 @@ class TradeEngine {
                 rsiLongMax: 80,           // RSI max pour LONG
                 rsiShortMin: 20,          // RSI min pour SHORT
                 adxMin: 8,                // ADX minimum (très bas pour 1m)
+                minRRR: 0.5,              // RRR minimum très bas pour scalping rapide
                 analysisInterval: 30000,  // Analyse toutes les 30s
                 description: 'Trades rapides, filtres souples pour capturer les mouvements'
             },
@@ -60,6 +61,7 @@ class TradeEngine {
                 rsiLongMax: 75,
                 rsiShortMin: 25,
                 adxMin: 10,
+                minRRR: 0.7,              // RRR assoupli pour scalping
                 analysisInterval: 60000,  // Analyse toutes les 1min
                 description: 'Scalping classique, bon équilibre vitesse/qualité'
             },
@@ -71,6 +73,7 @@ class TradeEngine {
                 rsiLongMax: 70,
                 rsiShortMin: 30,
                 adxMin: 15,
+                minRRR: 1.0,              // RRR standard
                 analysisInterval: 60000,
                 description: 'Trading intraday, filtres équilibrés'
             },
@@ -82,6 +85,7 @@ class TradeEngine {
                 rsiLongMax: 70,
                 rsiShortMin: 30,
                 adxMin: 18,
+                minRRR: 1.0,
                 analysisInterval: 120000, // Analyse toutes les 2min
                 description: 'Intraday avec plus de confirmation'
             },
@@ -93,6 +97,7 @@ class TradeEngine {
                 rsiLongMax: 70,
                 rsiShortMin: 30,
                 adxMin: 20,
+                minRRR: 1.2,
                 analysisInterval: 180000, // Analyse toutes les 3min
                 description: 'Swing trading court terme, filtres stricts'
             },
@@ -104,6 +109,7 @@ class TradeEngine {
                 rsiLongMax: 68,
                 rsiShortMin: 32,
                 adxMin: 22,
+                minRRR: 1.5,
                 analysisInterval: 300000, // Analyse toutes les 5min
                 description: 'Swing trading, haute qualité de signal'
             },
@@ -115,6 +121,7 @@ class TradeEngine {
                 rsiLongMax: 65,
                 rsiShortMin: 35,
                 adxMin: 20,
+                minRRR: 2.0,
                 analysisInterval: 600000, // Analyse toutes les 10min
                 description: 'Position trading, signaux très fiables'
             }
@@ -259,7 +266,13 @@ class TradeEngine {
         this.config.presetAdxMin = preset.adxMin;
         this.config.presetMinConfluence = preset.minConfluence;
         
-        this.log(`Preset ${preset.name}: Score>=${preset.minScore}, WinProb>=${(preset.minWinProbability*100).toFixed(0)}%, RSI LONG<=${preset.rsiLongMax}, ADX>=${preset.adxMin}`, 'info');
+        // Applique le RRR minimum du preset au riskManager
+        if (riskManager && preset.minRRR !== undefined) {
+            riskManager.config.minRiskRewardRatio = preset.minRRR;
+            this.log(`RRR minimum ajusté: ${preset.minRRR}`, 'info');
+        }
+        
+        this.log(`Preset ${preset.name}: Score>=${preset.minScore}, WinProb>=${(preset.minWinProbability*100).toFixed(0)}%, RSI LONG<=${preset.rsiLongMax}, ADX>=${preset.adxMin}, RRR>=${preset.minRRR}`, 'info');
         
         return preset;
     }
