@@ -485,6 +485,16 @@ class TradeEngine {
         // L'analyse avancée est maintenant intégrée dans signalDetector.analyze()
         const advancedAnalysis = analysis.indicators;
         
+        // ===== FUNDING RATE - SECRET ULTIME =====
+        // Funding très négatif = trop de shorts = squeeze probable vers le haut
+        // Funding très positif = trop de longs = dump probable vers le bas
+        let fundingRate = { rate: 0, signal: 'neutral', strength: 0 };
+        try {
+            fundingRate = await api.getFundingRate(symbol);
+        } catch (e) {
+            // Ignore les erreurs de funding rate
+        }
+        
         // Calcul du changement 24h
         const change24h = candles.length >= 24
             ? ((currentPrice - candles[candles.length - 24].close) / candles[candles.length - 24].close) * 100
@@ -512,27 +522,65 @@ class TradeEngine {
         const ema200Position = advancedAnalysis?.ema200?.position || 'neutral';
         const signalDirection = analysis.finalSignal?.action === 'BUY' ? 'long' : 'short';
         
-        // Momentum aligné - OPTIMISÉ CRYPTO SCALPING
-        // LONG: RSI entre 25-65 (zone d'achat idéale, pas en surachat)
-        // SHORT: RSI entre 35-75 (zone de vente idéale, pas en survente)
-        // + MACD doit confirmer la direction
+        // ===== VWAP + CVD + RSI - COMBO SCALPING PRO =====
+        const vwap = advancedAnalysis?.vwap || {};
+        const cvd = advancedAnalysis?.cvd || {};
+        const vwapPosition = vwap.position || 'neutral'; // 'above' ou 'below'
+        const cvdTrend = cvd.trend || 'neutral'; // 'bullish', 'bearish', 'neutral'
+        const cvdDivergence = cvd.divergence || 'none';
+        
+        // Momentum aligné - OPTIMISÉ CRYPTO SCALPING avec VWAP + CVD + Funding
+        // LONG: RSI entre 25-65 + Prix au-dessus VWAP + CVD bullish
+        // SHORT: RSI entre 35-75 + Prix en-dessous VWAP + CVD bearish
+        // + Funding Rate comme bonus/malus
         let momentumAligned = true;
+        let fundingBonus = 0;
+        
         if (signalDirection === 'long') {
             // Zone RSI idéale pour LONG: 25-65 (acheter avant surachat)
             const rsiOK = rsi >= 25 && rsi <= 65;
             // MACD doit être positif OU en train de monter
             const macdOK = macdHistogram > -0.3 || (advancedAnalysis?.macd?.crossover === 'bullish');
-            // Bonus si prix au-dessus EMA courte
+            // VWAP: prix au-dessus = biais haussier
+            const vwapOK = vwapPosition === 'above';
+            // CVD: tendance haussière = pression acheteuse
+            const cvdOK = cvdTrend === 'bullish' || cvdDivergence === 'bullish';
+            // EMA comme backup
             const emaOK = ema200Position === 'above';
-            momentumAligned = rsiOK && (macdOK || emaOK);
+            
+            // Funding Rate négatif = SHORT SQUEEZE probable = BONUS pour LONG
+            if (fundingRate.signal === 'bullish') {
+                fundingBonus = Math.round(fundingRate.strength * 2); // +1 à +2 points
+                this.log(`${symbol}: Funding négatif (${(fundingRate.rate * 100).toFixed(3)}%) - Short squeeze probable! +${fundingBonus} bonus`, 'info');
+            } else if (fundingRate.signal === 'bearish') {
+                fundingBonus = -1; // Malus si funding très positif
+            }
+            
+            // Combo gagnant: RSI OK + (VWAP OU CVD OU MACD OU EMA)
+            momentumAligned = rsiOK && (vwapOK || cvdOK || macdOK || emaOK);
+            
         } else if (signalDirection === 'short') {
             // Zone RSI idéale pour SHORT: 35-75 (vendre avant survente)
             const rsiOK = rsi >= 35 && rsi <= 75;
             // MACD doit être négatif OU en train de descendre
             const macdOK = macdHistogram < 0.3 || (advancedAnalysis?.macd?.crossover === 'bearish');
-            // Bonus si prix en-dessous EMA courte
+            // VWAP: prix en-dessous = biais baissier
+            const vwapOK = vwapPosition === 'below';
+            // CVD: tendance baissière = pression vendeuse
+            const cvdOK = cvdTrend === 'bearish' || cvdDivergence === 'bearish';
+            // EMA comme backup
             const emaOK = ema200Position === 'below';
-            momentumAligned = rsiOK && (macdOK || emaOK);
+            
+            // Funding Rate positif = LONG SQUEEZE probable = BONUS pour SHORT
+            if (fundingRate.signal === 'bearish') {
+                fundingBonus = Math.round(fundingRate.strength * 2); // +1 à +2 points
+                this.log(`${symbol}: Funding positif (${(fundingRate.rate * 100).toFixed(3)}%) - Long squeeze probable! +${fundingBonus} bonus`, 'info');
+            } else if (fundingRate.signal === 'bullish') {
+                fundingBonus = -1; // Malus si funding très négatif
+            }
+            
+            // Combo gagnant: RSI OK + (VWAP OU CVD OU MACD OU EMA)
+            momentumAligned = rsiOK && (vwapOK || cvdOK || macdOK || emaOK);
         }
         
         // ===== FILTRE CONFLUENCE MINIMUM =====
@@ -540,8 +588,8 @@ class TradeEngine {
         const minConfluence = timeframe === '5m' ? 3 : (timeframe === '1m' ? 4 : 2);
         const hasMinConfluence = confluence >= minConfluence;
         
-        // Calcul de la probabilité de gain (amélioré avec les nouveaux indicateurs)
-        const winProbability = this.calculateWinProbability(ichimokuScore, analysis.finalSignal?.confidence, signalQuality);
+        // Calcul de la probabilité de gain (amélioré avec VWAP, CVD et Funding Rate)
+        const winProbability = this.calculateWinProbability(ichimokuScore, analysis.finalSignal?.confidence, signalQuality, fundingBonus);
         const minWinProb = this.config.minWinProbability || 0.65;
         
         // ===== NOUVEAUX FILTRES DE SÉCURITÉ =====
@@ -755,6 +803,15 @@ class TradeEngine {
             bearishSignals: advancedAnalysis?.bearishSignals || 0,
             // Recommandation
             recommendation: analysis.recommendation,
+            // ===== FUNDING RATE =====
+            fundingRate: {
+                rate: fundingRate.rate,
+                ratePercent: fundingRate.ratePercent,
+                signal: fundingRate.signal,
+                strength: fundingRate.strength,
+                bonus: fundingBonus,
+                description: fundingRate.description
+            },
             timestamp: Date.now()
         };
     }
@@ -1230,13 +1287,14 @@ class TradeEngine {
     }
     
     /**
-     * Calcule la probabilité de gain basée sur le score Ichimoku ET le score de qualité
-     * @param {number} score - Score Ichimoku
-     * @param {string} confidence - Niveau de confiance
+     * Calcule la probabilité de gain basée sur le score et la confiance
+     * @param {number} score 
+     * @param {string} confidence 
      * @param {Object} signalQuality - Score de qualité du signal (nouveau)
+     * @param {number} fundingBonus - Bonus/malus du funding rate
      * @returns {number}
      */
-    calculateWinProbability(score, confidence, signalQuality = null) {
+    calculateWinProbability(score, confidence, signalQuality = null, fundingBonus = 0) {
         // ===== OPTIMISÉ POUR SCALPING 1m/5m =====
         // Base probability selon le score Ichimoku (-7 à +7)
         // Ajusté pour scalping: scores moyens donnent plus de chances
@@ -1289,10 +1347,15 @@ class TradeEngine {
         else if (absScore >= 5) scoreBonus = 0.03; // +3% pour 5/7
         else if (absScore >= 4) scoreBonus = 0.02; // +2% pour 4/7
         
-        // Probabilité finale (plafonnée à 92% pour scalping)
-        const finalProbability = Math.min(0.92, baseProbability + confidenceBonus + qualityBonus + scoreBonus);
+        // ===== BONUS FUNDING RATE - SECRET ULTIME =====
+        // Funding très négatif + LONG = short squeeze probable = +5% bonus
+        // Funding très positif + SHORT = long squeeze probable = +5% bonus
+        const fundingBonusPercent = fundingBonus * 0.025; // +2.5% par point de bonus (max +5%)
         
-        this.log(`Win probability: base=${(baseProbability*100).toFixed(0)}% + conf=${(confidenceBonus*100).toFixed(0)}% + quality=${(qualityBonus*100).toFixed(0)}% + score=${(scoreBonus*100).toFixed(0)}% = ${(finalProbability*100).toFixed(0)}%`, 'debug');
+        // Probabilité finale (plafonnée à 92% pour scalping)
+        const finalProbability = Math.min(0.92, baseProbability + confidenceBonus + qualityBonus + scoreBonus + fundingBonusPercent);
+        
+        this.log(`Win probability: base=${(baseProbability*100).toFixed(0)}% + conf=${(confidenceBonus*100).toFixed(0)}% + quality=${(qualityBonus*100).toFixed(0)}% + score=${(scoreBonus*100).toFixed(0)}% + funding=${(fundingBonusPercent*100).toFixed(0)}% = ${(finalProbability*100).toFixed(0)}%`, 'debug');
         
         return finalProbability;
     }

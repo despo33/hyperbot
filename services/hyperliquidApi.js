@@ -975,6 +975,82 @@ class HyperliquidApi {
             endTime
         });
     }
+
+    /**
+     * Récupère les funding rates actuels pour tous les assets
+     * @returns {Promise<Object>} Map symbol -> fundingRate
+     */
+    async getFundingRates() {
+        try {
+            const meta = await this.getMeta();
+            const fundingRates = {};
+            
+            if (meta && meta.universe) {
+                for (const asset of meta.universe) {
+                    // Le funding rate est dans les métadonnées
+                    fundingRates[asset.name] = {
+                        rate: parseFloat(asset.funding || 0),
+                        // Funding rate annualisé pour référence
+                        annualized: parseFloat(asset.funding || 0) * 3 * 365 * 100
+                    };
+                }
+            }
+            
+            return fundingRates;
+        } catch (error) {
+            console.error('Erreur récupération funding rates:', error.message);
+            return {};
+        }
+    }
+
+    /**
+     * Récupère le funding rate pour un symbole spécifique
+     * @param {string} symbol 
+     * @returns {Promise<Object>} { rate, annualized, signal }
+     */
+    async getFundingRate(symbol) {
+        try {
+            const rates = await this.getFundingRates();
+            const rate = rates[symbol]?.rate || 0;
+            
+            // Analyse du funding rate pour signal de trading
+            // Funding très négatif = trop de shorts = squeeze probable vers le haut
+            // Funding très positif = trop de longs = dump probable vers le bas
+            let signal = 'neutral';
+            let strength = 0;
+            
+            if (rate <= -0.001) { // -0.1% ou moins
+                signal = 'bullish'; // Squeeze short probable
+                strength = Math.min(1, Math.abs(rate) / 0.003); // Max à -0.3%
+            } else if (rate >= 0.001) { // +0.1% ou plus
+                signal = 'bearish'; // Dump probable
+                strength = Math.min(1, rate / 0.003);
+            }
+            
+            return {
+                rate,
+                ratePercent: rate * 100,
+                annualized: rate * 3 * 365 * 100,
+                signal,
+                strength,
+                description: this.describeFundingRate(rate)
+            };
+        } catch (error) {
+            return { rate: 0, signal: 'neutral', strength: 0 };
+        }
+    }
+
+    /**
+     * Décrit le funding rate en texte
+     */
+    describeFundingRate(rate) {
+        const pct = (rate * 100).toFixed(4);
+        if (rate <= -0.001) return `Très négatif (${pct}%) - Short squeeze probable`;
+        if (rate <= -0.0005) return `Négatif (${pct}%) - Légèrement bullish`;
+        if (rate >= 0.001) return `Très positif (${pct}%) - Liquidation longs probable`;
+        if (rate >= 0.0005) return `Positif (${pct}%) - Légèrement bearish`;
+        return `Neutre (${pct}%)`;
+    }
 }
 
 // Export singleton
