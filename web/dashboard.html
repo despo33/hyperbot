@@ -339,39 +339,44 @@
 
                                 <!-- Timeframe -->
                                 <div class="config-section">
-                                    <h4 class="section-title"><i data-lucide="clock"></i> Timeframe d'Analyse</h4>
+                                    <h4 class="section-title"><i data-lucide="clock"></i> Timeframe d'Analyse <span class="active-param-indicator" id="activeTimeframeIndicator"></span></h4>
                                     <div class="timeframe-selector">
                                         <label class="timeframe-option">
                                             <input type="radio" name="configTimeframe" value="1m">
-                                            <span class="timeframe-btn">
+                                            <span class="timeframe-btn" data-tf="1m">
+                                                <span class="active-param-indicator" data-active-tf="1m"></span>
                                                 <strong>1m</strong>
                                                 <small>Scalping</small>
                                             </span>
                                         </label>
                                         <label class="timeframe-option">
                                             <input type="radio" name="configTimeframe" value="5m">
-                                            <span class="timeframe-btn">
+                                            <span class="timeframe-btn" data-tf="5m">
+                                                <span class="active-param-indicator" data-active-tf="5m"></span>
                                                 <strong>5m</strong>
                                                 <small>Scalping</small>
                                             </span>
                                         </label>
                                         <label class="timeframe-option">
                                             <input type="radio" name="configTimeframe" value="15m" checked>
-                                            <span class="timeframe-btn">
+                                            <span class="timeframe-btn" data-tf="15m">
+                                                <span class="active-param-indicator" data-active-tf="15m"></span>
                                                 <strong>15m</strong>
                                                 <small>Intraday</small>
                                             </span>
                                         </label>
                                         <label class="timeframe-option">
                                             <input type="radio" name="configTimeframe" value="30m">
-                                            <span class="timeframe-btn">
+                                            <span class="timeframe-btn" data-tf="30m">
+                                                <span class="active-param-indicator" data-active-tf="30m"></span>
                                                 <strong>30m</strong>
                                                 <small>Intraday</small>
                                             </span>
                                         </label>
                                         <label class="timeframe-option">
                                             <input type="radio" name="configTimeframe" value="1h">
-                                            <span class="timeframe-btn">
+                                            <span class="timeframe-btn" data-tf="1h">
+                                                <span class="active-param-indicator" data-active-tf="1h"></span>
                                                 <strong>1h</strong>
                                                 <small>Swing</small>
                                             </span>

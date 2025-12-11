@@ -454,11 +454,15 @@ function updateDashboard(data) {
         botStatus.className = 'status-badge online';
         document.getElementById('startBotBtn').classList.add('hidden');
         document.getElementById('stopBotBtn').classList.remove('hidden');
+        // Affiche les indicateurs verts sur les paramètres actifs
+        updateActiveParamIndicators(data.bot.config);
     } else {
         botStatus.textContent = 'ARRÊTÉ';
         botStatus.className = 'status-badge offline';
         document.getElementById('startBotBtn').classList.remove('hidden');
         document.getElementById('stopBotBtn').classList.add('hidden');
+        // Cache tous les indicateurs verts
+        hideAllActiveParamIndicators();
     }
 
     document.getElementById('botMode').textContent = data.bot.mode?.toUpperCase() || '-';
@@ -2901,4 +2905,48 @@ document.querySelectorAll('.tf-btn').forEach(btn => {
         updateTradingViewChart();
     });
 });
+
+// ==================== ACTIVE PARAM INDICATORS ====================
+
+/**
+ * Met à jour les indicateurs verts sur les paramètres actifs du bot
+ * @param {Object} config - Configuration actuelle du bot
+ */
+function updateActiveParamIndicators(config) {
+    if (!config) return;
+    
+    // Cache tous les indicateurs d'abord
+    document.querySelectorAll('.active-param-indicator').forEach(el => {
+        el.classList.remove('visible');
+    });
+    
+    // Timeframe actif
+    const activeTimeframes = config.multiTimeframeMode && config.mtfTimeframes?.length > 0 
+        ? config.mtfTimeframes 
+        : config.timeframes || ['15m'];
+    
+    activeTimeframes.forEach(tf => {
+        const tfIndicator = document.querySelector(`[data-active-tf="${tf}"]`);
+        if (tfIndicator) tfIndicator.classList.add('visible');
+    });
+    
+    // Indicateur général timeframe
+    const tfMainIndicator = document.getElementById('activeTimeframeIndicator');
+    if (tfMainIndicator) tfMainIndicator.classList.add('visible');
+    
+    // Mode MTF actif
+    if (config.multiTimeframeMode) {
+        const mtfIndicator = document.getElementById('activeMTFIndicator');
+        if (mtfIndicator) mtfIndicator.classList.add('visible');
+    }
+}
+
+/**
+ * Cache tous les indicateurs de paramètres actifs
+ */
+function hideAllActiveParamIndicators() {
+    document.querySelectorAll('.active-param-indicator').forEach(el => {
+        el.classList.remove('visible');
+    });
+}
 

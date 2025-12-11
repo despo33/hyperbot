@@ -4274,3 +4274,45 @@ input[type="range"]::-moz-range-thumb {
     width: 16px;
     height: 16px;
 }
+
+/* ==================== ACTIVE PARAM INDICATOR ==================== */
+.active-param-indicator {
+    display: none;
+    width: 8px;
+    height: 8px;
+    background: var(--accent-success);
+    border-radius: 50%;
+    margin-left: 8px;
+    animation: pulse-green 1.5s infinite;
+    box-shadow: 0 0 6px var(--accent-success);
+}
+
+.active-param-indicator.visible {
+    display: inline-block;
+}
+
+@keyframes pulse-green {
+    0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--accent-success); }
+    50% { opacity: 0.6; box-shadow: 0 0 12px var(--accent-success); }
+}
+
+/* Indicateur sur les timeframes */
+.timeframe-btn .active-param-indicator {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+}
+
+.timeframe-option {
+    position: relative;
+}
+
+/* Indicateur sur les labels de section */
+.section-title .active-param-indicator {
+    vertical-align: middle;
+}
+
+/* Indicateur sur les form-group labels */
+.form-group > label .active-param-indicator {
+    vertical-align: middle;
+}
