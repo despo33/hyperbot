@@ -553,24 +553,33 @@ class TradeEngine {
                 ? this.config.symbols
                 : [this.config.symbol];
             
+            // Détermine les timeframes à analyser
+            // En mode MTF, on analyse tous les TF sélectionnés indépendamment
+            const timeframesToAnalyze = this.config.multiTimeframeMode && this.config.mtfTimeframes?.length > 0
+                ? this.config.mtfTimeframes
+                : this.config.timeframes;
+            
             const opportunities = [];
             
-            // Analyse chaque symbole
+            // Analyse chaque symbole sur chaque timeframe
             for (const symbol of symbols) {
-                try {
-                    const analysis = await this.analyzeSymbol(symbol);
-                    
-                    if (analysis.success) {
-                        // Stocke l'analyse
-                        this.state.multiAnalysis.set(symbol, analysis);
+                for (const timeframe of timeframesToAnalyze) {
+                    try {
+                        const analysis = await this.analyzeSymbolOnTimeframe(symbol, timeframe);
                         
-                        // Si opportunité détectée
-                        if (analysis.tradeable) {
-                            opportunities.push(analysis);
+                        if (analysis.success) {
+                            // Stocke l'analyse avec clé symbol_timeframe
+                            const key = `${symbol}_${timeframe}`;
+                            this.state.multiAnalysis.set(key, analysis);
+                            
+                            // Si opportunité détectée
+                            if (analysis.tradeable) {
+                                opportunities.push(analysis);
+                            }
                         }
+                    } catch (e) {
+                        // Continue avec les autres symboles/timeframes
                     }
-                } catch (e) {
-                    // Continue avec les autres symboles
                 }
             }
             
@@ -602,7 +611,9 @@ class TradeEngine {
             
             // Log résumé
             const duration = Date.now() - startTime;
-            this.log(`Analyse #${this.state.analysisCount} - ${symbols.length} cryptos (${duration}ms) - ${opportunities.length} opportunités`, 'info');
+            const tfCount = timeframesToAnalyze.length;
+            const totalAnalyses = symbols.length * tfCount;
+            this.log(`Analyse #${this.state.analysisCount} - ${symbols.length} cryptos x ${tfCount} TF (${totalAnalyses} analyses, ${duration}ms) - ${opportunities.length} opportunités`, 'signal');
             
             // Émet l'événement
             this.emit('onAnalysis', {
@@ -623,11 +634,145 @@ class TradeEngine {
     }
     
     /**
-     * Analyse un symbole spécifique
+     * Analyse un symbole sur un timeframe spécifique (pour mode MTF indépendant)
+     * @param {string} symbol 
+     * @param {string} timeframe 
+     * @returns {Promise<Object>}
+     */
+    async analyzeSymbolOnTimeframe(symbol, timeframe) {
+        // Récupère le preset pour ce timeframe
+        const preset = this.getTimeframePreset(timeframe);
+        const tpsl = this.TIMEFRAME_TPSL[timeframe] || { tp: 2.0, sl: 1.0 };
+        
+        const candles = await priceFetcher.getCandles(symbol, timeframe, 250);
+        
+        if (!candles || candles.length < 60) {
+            return { success: false, symbol, timeframe, error: 'Données insuffisantes' };
+        }
+        
+        const currentPrice = candles[candles.length - 1].close;
+        
+        // Analyse avec signalDetector
+        const analysis = signalDetector.analyze(candles, {}, timeframe);
+        
+        if (!analysis || !analysis.ichimokuScore) {
+            return { success: false, symbol, timeframe, error: 'Analyse échouée' };
+        }
+        
+        const ichimokuScore = analysis.ichimokuScore.score || 0;
+        const absIchimokuScore = Math.abs(ichimokuScore);
+        const signalDirection = ichimokuScore > 0 ? 'long' : ichimokuScore < 0 ? 'short' : null;
+        
+        // Indicateurs
+        const rsi = analysis.indicators?.rsi?.value || 50;
+        const macd = analysis.indicators?.macd || {};
+        const adx = analysis.indicators?.adx || {};
+        const vwap = analysis.indicators?.vwap || {};
+        const cvd = analysis.indicators?.cvd || {};
+        
+        // Confluence
+        let confluence = 0;
+        if (analysis.indicators?.rsi?.signal) confluence++;
+        if (analysis.indicators?.macd?.signal) confluence++;
+        if (analysis.indicators?.adx?.trending) confluence++;
+        if (analysis.indicators?.vwap?.signal) confluence++;
+        if (analysis.indicators?.cvd?.signal) confluence++;
+        
+        // Vérifie les filtres avec les presets du timeframe
+        const hasStrongScore = absIchimokuScore >= preset.minScore;
+        const hasMinConfluence = confluence >= preset.minConfluence;
+        
+        // Filtre RSI selon le preset
+        let rsiOK = true;
+        if (signalDirection === 'long') {
+            rsiOK = rsi <= preset.rsiLongMax;
+        } else if (signalDirection === 'short') {
+            rsiOK = rsi >= preset.rsiShortMin;
+        }
+        
+        // Filtre ADX
+        const adxValue = adx.value || 0;
+        const adxOK = adxValue === 0 || adxValue >= preset.adxMin; // 0 = calcul échoué, on ignore
+        
+        // Calcul probabilité de gain
+        const winProbability = this.calculateWinProbability(analysis, confluence, 0);
+        const meetsWinProb = winProbability >= preset.minWinProbability;
+        
+        // Signal tradeable ?
+        const tradeable = signalDirection && hasStrongScore && hasMinConfluence && rsiOK && adxOK && meetsWinProb;
+        
+        // Qualité du signal
+        let signalQuality = { score: 0, grade: 'D' };
+        if (tradeable) {
+            let qualityScore = 0;
+            if (absIchimokuScore >= 6) qualityScore += 30;
+            else if (absIchimokuScore >= 5) qualityScore += 20;
+            else if (absIchimokuScore >= 4) qualityScore += 10;
+            if (confluence >= 4) qualityScore += 25;
+            else if (confluence >= 3) qualityScore += 15;
+            else if (confluence >= 2) qualityScore += 5;
+            if (winProbability >= 0.80) qualityScore += 20;
+            else if (winProbability >= 0.70) qualityScore += 10;
+            
+            signalQuality.score = qualityScore;
+            signalQuality.grade = qualityScore >= 60 ? 'A' : qualityScore >= 40 ? 'B' : qualityScore >= 20 ? 'C' : 'D';
+        }
+        
+        return {
+            success: true,
+            symbol,
+            timeframe,
+            price: currentPrice,
+            score: ichimokuScore,
+            direction: signalDirection,
+            signal: signalDirection === 'long' ? 'BUY' : signalDirection === 'short' ? 'SELL' : null,
+            tradeable,
+            winProbability,
+            confluence,
+            signalQuality,
+            indicators: {
+                rsi: { value: rsi, ok: rsiOK },
+                adx: { value: adxValue, ok: adxOK },
+                macd,
+                vwap,
+                cvd
+            },
+            preset: preset.name,
+            tpsl: { tp: tpsl.tp, sl: tpsl.sl },
+            minRRR: preset.minRRR,
+            rejectReason: !tradeable ? this.getRejectReason(signalDirection, hasStrongScore, hasMinConfluence, rsiOK, adxOK, meetsWinProb, preset) : null
+        };
+    }
+    
+    /**
+     * Retourne la raison du rejet
+     */
+    getRejectReason(direction, hasScore, hasConf, rsiOK, adxOK, winProbOK, preset) {
+        if (!direction) return 'Pas de signal directionnel';
+        if (!hasScore) return `Score insuffisant (min: ${preset.minScore})`;
+        if (!hasConf) return `Confluence insuffisante (min: ${preset.minConfluence})`;
+        if (!rsiOK) return 'RSI hors limites';
+        if (!adxOK) return `ADX trop faible (min: ${preset.adxMin})`;
+        if (!winProbOK) return `Probabilité trop faible (min: ${(preset.minWinProbability*100).toFixed(0)}%)`;
+        return 'Inconnu';
+    }
+
+    /**
+     * Analyse un symbole spécifique (méthode legacy pour compatibilité)
      * @param {string} symbol 
      * @returns {Promise<Object>}
      */
     async analyzeSymbol(symbol) {
+        const timeframe = this.config.timeframes[0];
+        return this.analyzeSymbolOnTimeframe(symbol, timeframe);
+    }
+    
+    /**
+     * Analyse un symbole spécifique (ancienne méthode complète)
+     * @param {string} symbol 
+     * @returns {Promise<Object>}
+     */
+    async analyzeSymbolFull(symbol) {
         const timeframe = this.config.timeframes[0];
         const candles = await priceFetcher.getCandles(symbol, timeframe, 250); // Plus de données pour EMA200
         
@@ -1211,7 +1356,7 @@ class TradeEngine {
             
             // ÉTAPE 3: Filtre les opportunités
             const validOpportunities = opportunities.filter(opp => {
-                // BLOQUE si position existe
+                // BLOQUE si position existe sur ce symbole
                 if (symbolsWithPosition.has(opp.symbol)) return false;
                 // BLOQUE si trade en cours sur ce symbole
                 if (this.state.tradingLocks.has(opp.symbol)) return false;
@@ -1226,13 +1371,14 @@ class TradeEngine {
             const opp = validOpportunities[0];
             
             // Vérifie que le signal existe
-            if (!opp.signal || !opp.signal.action) {
+            if (!opp.signal) {
                 const action = opp.score >= 3 ? 'BUY' : opp.score <= -3 ? 'SELL' : null;
                 if (!action) return;
-                opp.signal = { action, confidence: 'medium' };
+                opp.signal = action;
             }
             
-            this.log(`🎯 Opportunité ${opp.symbol}: ${opp.signal.action} (score: ${opp.score})`, 'signal');
+            const tfInfo = opp.timeframe ? ` [${opp.timeframe}]` : '';
+            this.log(`🎯 Opportunité ${opp.symbol}${tfInfo}: ${opp.signal} (score: ${opp.score})`, 'signal');
             
             // Exécute le trade (avec verrou)
             await this.executeTradeForSymbol(opp);
@@ -1252,10 +1398,17 @@ class TradeEngine {
         const { symbol, price, levels } = opportunity;
         const signal = opportunity.signal || {};
         
+        // Utilise le timeframe de l'opportunité (mode MTF) ou le timeframe par défaut
+        const timeframe = opportunity.timeframe || this.config.timeframes[0];
+        
+        // Récupère les TP/SL et RRR du timeframe de l'opportunité
+        const oppTpsl = opportunity.tpsl || this.TIMEFRAME_TPSL[timeframe] || { tp: 2.0, sl: 1.0 };
+        const oppMinRRR = opportunity.minRRR || this.getTimeframePreset(timeframe).minRRR || 0.5;
+        
         // Récupère les candles pour les filtres RSI et MTF
         let candles = null;
         try {
-            candles = await priceFetcher.getCandles(symbol, this.config.timeframes[0], 100);
+            candles = await priceFetcher.getCandles(symbol, timeframe, 100);
         } catch (e) {
             this.log(`${symbol}: Impossible de récupérer les candles pour filtres: ${e.message}`, 'warn');
         }
