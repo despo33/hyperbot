@@ -38,6 +38,88 @@ class TradeEngine {
             '1d': { tp: 10.0, sl: 5.0 }
         };
         
+        // ===== PRESETS DE FILTRES PAR TIMEFRAME =====
+        // Réglages optimisés automatiquement selon le timeframe choisi
+        this.TIMEFRAME_PRESETS = {
+            '1m': {
+                name: 'Ultra Scalping',
+                minScore: 4,              // Score Ichimoku minimum
+                minWinProbability: 0.60,  // Probabilité minimum (60%)
+                minConfluence: 2,         // Confluence minimum
+                rsiLongMax: 80,           // RSI max pour LONG
+                rsiShortMin: 20,          // RSI min pour SHORT
+                adxMin: 8,                // ADX minimum (très bas pour 1m)
+                analysisInterval: 30000,  // Analyse toutes les 30s
+                description: 'Trades rapides, filtres souples pour capturer les mouvements'
+            },
+            '5m': {
+                name: 'Scalping',
+                minScore: 4,
+                minWinProbability: 0.62,
+                minConfluence: 2,
+                rsiLongMax: 75,
+                rsiShortMin: 25,
+                adxMin: 10,
+                analysisInterval: 60000,  // Analyse toutes les 1min
+                description: 'Scalping classique, bon équilibre vitesse/qualité'
+            },
+            '15m': {
+                name: 'Intraday',
+                minScore: 3,
+                minWinProbability: 0.65,
+                minConfluence: 2,
+                rsiLongMax: 70,
+                rsiShortMin: 30,
+                adxMin: 15,
+                analysisInterval: 60000,
+                description: 'Trading intraday, filtres équilibrés'
+            },
+            '30m': {
+                name: 'Intraday+',
+                minScore: 3,
+                minWinProbability: 0.65,
+                minConfluence: 2,
+                rsiLongMax: 70,
+                rsiShortMin: 30,
+                adxMin: 18,
+                analysisInterval: 120000, // Analyse toutes les 2min
+                description: 'Intraday avec plus de confirmation'
+            },
+            '1h': {
+                name: 'Swing Court',
+                minScore: 3,
+                minWinProbability: 0.68,
+                minConfluence: 2,
+                rsiLongMax: 70,
+                rsiShortMin: 30,
+                adxMin: 20,
+                analysisInterval: 180000, // Analyse toutes les 3min
+                description: 'Swing trading court terme, filtres stricts'
+            },
+            '4h': {
+                name: 'Swing',
+                minScore: 3,
+                minWinProbability: 0.70,
+                minConfluence: 2,
+                rsiLongMax: 68,
+                rsiShortMin: 32,
+                adxMin: 22,
+                analysisInterval: 300000, // Analyse toutes les 5min
+                description: 'Swing trading, haute qualité de signal'
+            },
+            '1d': {
+                name: 'Position',
+                minScore: 3,
+                minWinProbability: 0.72,
+                minConfluence: 2,
+                rsiLongMax: 65,
+                rsiShortMin: 35,
+                adxMin: 20,
+                analysisInterval: 600000, // Analyse toutes les 10min
+                description: 'Position trading, signaux très fiables'
+            }
+        };
+        
         // Configuration
         this.config = {
             symbols: ['BTC', 'ETH', 'SOL', 'DOGE', 'XRP', 'ADA', 'AVAX', 'LINK', 'DOT', 'MATIC', 'UNI', 'ATOM', 'LTC', 'BCH', 'APT', 'ARB', 'OP', 'INJ', 'SUI', 'SEI'],
@@ -146,11 +228,62 @@ class TradeEngine {
     }
 
     /**
+     * Retourne les presets pour un timeframe donné
+     * @param {string} timeframe 
+     * @returns {Object}
+     */
+    getTimeframePreset(timeframe) {
+        return this.TIMEFRAME_PRESETS[timeframe] || this.TIMEFRAME_PRESETS['15m'];
+    }
+    
+    /**
+     * Applique les presets automatiques du timeframe
+     * @param {string} timeframe 
+     */
+    applyTimeframePreset(timeframe) {
+        const preset = this.getTimeframePreset(timeframe);
+        const tpsl = this.TIMEFRAME_TPSL[timeframe] || { tp: 2.0, sl: 1.0 };
+        
+        this.log(`Applying preset "${preset.name}" for ${timeframe}`, 'info');
+        
+        // Applique les réglages du preset
+        this.config.minScore = preset.minScore;
+        this.config.minWinProbability = preset.minWinProbability;
+        this.config.analysisInterval = preset.analysisInterval;
+        this.config.defaultTP = tpsl.tp;
+        this.config.defaultSL = tpsl.sl;
+        
+        // Stocke les paramètres RSI et ADX du preset pour utilisation dans analyzeSymbol
+        this.config.presetRsiLongMax = preset.rsiLongMax;
+        this.config.presetRsiShortMin = preset.rsiShortMin;
+        this.config.presetAdxMin = preset.adxMin;
+        this.config.presetMinConfluence = preset.minConfluence;
+        
+        this.log(`Preset ${preset.name}: Score>=${preset.minScore}, WinProb>=${(preset.minWinProbability*100).toFixed(0)}%, RSI LONG<=${preset.rsiLongMax}, ADX>=${preset.adxMin}`, 'info');
+        
+        return preset;
+    }
+    
+    /**
      * Met à jour la configuration
      * @param {Object} newConfig 
      */
     updateConfig(newConfig) {
         this.config = { ...this.config, ...newConfig };
+        
+        // ===== APPLIQUE LES PRESETS DU TIMEFRAME =====
+        if (newConfig.timeframes && newConfig.timeframes[0]) {
+            const tf = newConfig.timeframes[0];
+            const preset = this.applyTimeframePreset(tf);
+            
+            // Si l'utilisateur n'a pas spécifié de valeurs custom, utilise le preset
+            if (newConfig.minScore === undefined) {
+                this.config.minScore = preset.minScore;
+            }
+            if (newConfig.minWinProbability === undefined) {
+                this.config.minWinProbability = preset.minWinProbability;
+            }
+        }
         
         // Détermine les TP/SL à utiliser
         let tpPercent, slPercent;
@@ -619,20 +752,23 @@ class TradeEngine {
         const cvdDivergence = cvd.divergence || 'none';
         
         // Momentum aligné - OPTIMISÉ CRYPTO SCALPING avec VWAP + CVD + Funding
-        // ASSOUPLISSEMENT: En tendance forte (score 7/7), on accepte RSI élevé
+        // Utilise les presets du timeframe pour les seuils RSI
         // + Funding Rate comme bonus/malus
         let momentumAligned = true;
         let fundingBonus = 0;
         
-        // Score Ichimoku fort = tendance confirmée, on assouplit le RSI
+        // Récupère les seuils RSI du preset (ou valeurs par défaut)
+        const presetRsiLongMax = this.config.presetRsiLongMax || 75;
+        const presetRsiShortMin = this.config.presetRsiShortMin || 25;
+        
+        // Score Ichimoku fort = tendance confirmée, on assouplit encore le RSI
         const strongTrend = absIchimokuScore >= 6;
         
         if (signalDirection === 'long') {
-            // Zone RSI pour LONG:
-            // - Normal: 25-70 (acheter avant surachat extrême)
-            // - Tendance forte (score >= 6): 25-85 (on suit la tendance)
-            const rsiMax = strongTrend ? 85 : 70;
-            const rsiOK = rsi >= 25 && rsi <= rsiMax;
+            // Zone RSI pour LONG basée sur le preset du timeframe
+            // En tendance forte, on étend encore de 10 points
+            const rsiMax = strongTrend ? Math.min(90, presetRsiLongMax + 10) : presetRsiLongMax;
+            const rsiOK = rsi >= 20 && rsi <= rsiMax;
             // MACD doit être positif OU en train de monter
             const macdOK = macdHistogram > -0.3 || (advancedAnalysis?.macd?.crossover === 'bullish');
             // VWAP: prix au-dessus = biais haussier
@@ -656,11 +792,10 @@ class TradeEngine {
                              (absIchimokuScore >= 7 && macdOK);
             
         } else if (signalDirection === 'short') {
-            // Zone RSI pour SHORT:
-            // - Normal: 30-75 (vendre avant survente)
-            // - Tendance forte (score >= 6): 15-75 (on suit la tendance)
-            const rsiMin = strongTrend ? 15 : 30;
-            const rsiOK = rsi >= rsiMin && rsi <= 75;
+            // Zone RSI pour SHORT basée sur le preset du timeframe
+            // En tendance forte, on étend encore de 10 points
+            const rsiMin = strongTrend ? Math.max(10, presetRsiShortMin - 10) : presetRsiShortMin;
+            const rsiOK = rsi >= rsiMin && rsi <= 80;
             // MACD doit être négatif OU en train de descendre
             const macdOK = macdHistogram < 0.3 || (advancedAnalysis?.macd?.crossover === 'bearish');
             // VWAP: prix en-dessous = biais baissier
@@ -685,14 +820,12 @@ class TradeEngine {
         }
         
         // ===== FILTRE CONFLUENCE MINIMUM =====
-        // ASSOUPLI: En 1m avec score fort, on réduit l'exigence de confluence
-        let minConfluence;
-        if (timeframe === '1m') {
-            minConfluence = absIchimokuScore >= 7 ? 2 : 3; // 2 si score parfait, sinon 3
-        } else if (timeframe === '5m') {
-            minConfluence = absIchimokuScore >= 6 ? 2 : 3;
-        } else {
-            minConfluence = 2;
+        // Utilise le preset du timeframe, avec assouplissement si score fort
+        const presetMinConfluence = this.config.presetMinConfluence || 2;
+        let minConfluence = presetMinConfluence;
+        // Si score Ichimoku très fort, on réduit l'exigence de confluence
+        if (absIchimokuScore >= 7) {
+            minConfluence = Math.max(1, presetMinConfluence - 1);
         }
         const hasMinConfluence = confluence >= minConfluence;
         
@@ -711,23 +844,14 @@ class TradeEngine {
         const atr = advancedAnalysis?.atr || { volatility: 'normal' };
         
         // ===== FILTRE ANTI-RANGE : ADX minimum =====
-        // ADX dynamique selon timeframe (scalping = seuils plus bas)
-        // Crypto volatile = ADX naturellement plus bas
+        // Utilise le preset du timeframe pour le seuil ADX
         // NOTE: Si ADX = 0, c'est un bug de calcul, on ignore le filtre
-        const adxThresholds = {
-            '1m': { range: 10, trend: 15 },   // Scalping: seuils très bas
-            '5m': { range: 12, trend: 18 },   // Scalping: seuils bas
-            '15m': { range: 15, trend: 22 },  // Day trading
-            '1h': { range: 18, trend: 25 },   // Intraday
-            '4h': { range: 20, trend: 28 },   // Swing
-            '1d': { range: 18, trend: 23 }    // Position
-        };
-        const adxConfig = adxThresholds[timeframe] || adxThresholds['1h'];
+        const presetAdxMin = this.config.presetAdxMin || 15;
         const adxValue = adx.value || 0;
         // Si ADX = 0, on considère que le calcul a échoué et on ne bloque pas
         const adxValid = adxValue > 0;
-        const isRangeMarket = adxValid && adxValue < adxConfig.range;
-        const isStrongTrend = adxValid && adxValue >= adxConfig.trend;
+        const isRangeMarket = adxValid && adxValue < presetAdxMin;
+        const isStrongTrend = adxValid && adxValue >= (presetAdxMin + 10);
         
         // ===== FILTRE VOLATILITÉ =====
         // Évite les trades en très faible volatilité (consolidation)
@@ -765,16 +889,11 @@ class TradeEngine {
         // Évite les trades en très faible volatilité sauf si signal fort
         const volatilityOK = !isLowVolatility || absIchimokuScore >= 5;
         
-        // ===== FILTRE TIMEFRAME ASSOUPLI =====
-        // Critères adaptés pour permettre plus de trades en tendance forte
-        let timeframeFilterOK = true;
-        if (timeframe === '5m') {
-            // En 5m: exige score >= 4 OU (score >= 3 ET confluence >= 2)
-            timeframeFilterOK = absIchimokuScore >= 4 || (absIchimokuScore >= 3 && confluence >= 2);
-        } else if (timeframe === '1m') {
-            // En 1m: exige score >= 5 OU (score >= 4 ET confluence >= 2) - ASSOUPLI pour tendances fortes
-            timeframeFilterOK = absIchimokuScore >= 5 || (absIchimokuScore >= 4 && confluence >= 2);
-        }
+        // ===== FILTRE TIMEFRAME =====
+        // Utilise le minScore du preset - le filtre est déjà géré par hasStrongIchimokuScore
+        // On vérifie juste que le score atteint le minimum du preset
+        const timeframeFilterOK = absIchimokuScore >= (this.config.minScore || 3) || 
+                                  (absIchimokuScore >= (this.config.minScore - 1) && confluence >= minConfluence);
         
         // ===== FILTRE MULTI-TIMEFRAME =====
         // Si MTF activé, vérifie que la direction est confirmée par les autres TF
