@@ -869,16 +869,18 @@ class TechnicalIndicators {
         const smoothedMinusDM = this.wilderSmooth(minusDM, period);
         const smoothedTR = this.wilderSmooth(tr, period);
 
-        // +DI et -DI
-        const plusDI = (smoothedPlusDM / smoothedTR) * 100;
-        const minusDI = (smoothedMinusDM / smoothedTR) * 100;
+        // +DI et -DI (évite division par zéro)
+        const plusDI = smoothedTR > 0 ? (smoothedPlusDM / smoothedTR) * 100 : 0;
+        const minusDI = smoothedTR > 0 ? (smoothedMinusDM / smoothedTR) * 100 : 0;
 
-        // DX
-        const dx = Math.abs(plusDI - minusDI) / (plusDI + minusDI) * 100;
+        // DX (évite division par zéro)
+        const diSum = plusDI + minusDI;
+        const dx = diSum > 0 ? (Math.abs(plusDI - minusDI) / diSum) * 100 : 0;
 
         // ADX (moyenne lissée du DX)
-        // Simplifié: on prend juste le DX actuel
-        const adx = dx;
+        // Note: Pour un vrai ADX, il faudrait lisser le DX sur plusieurs périodes
+        // Ici on utilise une approximation simplifiée
+        const adx = isNaN(dx) ? 0 : dx;
 
         // Interprétation
         let trendStrength = 'weak';
