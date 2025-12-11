@@ -14,6 +14,10 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 // Utilisateur connecté
 let currentUser = null;
 
+// Config active du bot (persiste lors de la navigation)
+let activeBotConfig = null;
+let isBotRunning = false;
+
 // ==================== AUTHENTIFICATION ====================
 
 /**
@@ -449,6 +453,13 @@ async function refreshStatus() {
 function updateDashboard(data) {
     // Statut du bot
     const botStatus = document.querySelector('#botStatus .status-badge');
+    
+    // Stocke l'état du bot globalement pour persister lors de la navigation
+    isBotRunning = data.bot.isRunning;
+    if (data.bot.config) {
+        activeBotConfig = data.bot.config;
+    }
+    
     if (data.bot.isRunning) {
         botStatus.textContent = 'EN COURS';
         botStatus.className = 'status-badge online';
@@ -467,6 +478,8 @@ function updateDashboard(data) {
         hideAllActiveParamIndicators();
         // Cache la carte des réglages actifs
         hideActiveConfigCard();
+        // Reset la config active
+        activeBotConfig = null;
     }
 
     document.getElementById('botMode').textContent = data.bot.mode?.toUpperCase() || '-';
@@ -919,11 +932,13 @@ function escapeHtml(text) {
 
 /**
  * Charge la configuration trading
+ * Si le bot est en cours d'exécution, utilise la config active
  */
 async function loadTradingConfig() {
     try {
         const data = await apiRequest('/config/trading');
-        const config = data.config;
+        // Si le bot tourne, utilise la config active, sinon la config sauvegardée
+        const config = (isBotRunning && activeBotConfig) ? activeBotConfig : data.config;
 
         // Mode (toujours auto)
         const modeEl = document.getElementById('configMode');
