@@ -325,6 +325,16 @@ router.post('/config/trading', optionalAuth, async (req, res) => {
             if (configUpdate.tpslMode) req.user.botConfig.tpslMode = configUpdate.tpslMode;
             if (configUpdate.defaultTP) req.user.botConfig.defaultTP = configUpdate.defaultTP;
             if (configUpdate.defaultSL) req.user.botConfig.defaultSL = configUpdate.defaultSL;
+            if (configUpdate.analysisInterval) req.user.botConfig.analysisInterval = configUpdate.analysisInterval;
+            if (configUpdate.atrMultiplierSL) req.user.botConfig.atrMultiplierSL = configUpdate.atrMultiplierSL;
+            if (configUpdate.atrMultiplierTP) req.user.botConfig.atrMultiplierTP = configUpdate.atrMultiplierTP;
+            if (configUpdate.useRSIFilter !== undefined) req.user.botConfig.useRSIFilter = configUpdate.useRSIFilter;
+            if (configUpdate.rsiOverbought) req.user.botConfig.rsiOverbought = configUpdate.rsiOverbought;
+            if (configUpdate.rsiOversold) req.user.botConfig.rsiOversold = configUpdate.rsiOversold;
+            // Multi-Timeframe
+            if (configUpdate.multiTimeframeMode !== undefined) req.user.botConfig.multiTimeframeMode = configUpdate.multiTimeframeMode;
+            if (configUpdate.mtfTimeframes) req.user.botConfig.mtfTimeframes = configUpdate.mtfTimeframes;
+            if (configUpdate.mtfMinConfirmation) req.user.botConfig.mtfMinConfirmation = configUpdate.mtfMinConfirmation;
             if (configUpdate.enabledSignals) {
                 req.user.botConfig.enabledSignals = { ...req.user.botConfig.enabledSignals, ...configUpdate.enabledSignals };
             }
