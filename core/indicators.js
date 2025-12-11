@@ -121,7 +121,7 @@ class TechnicalIndicators {
         const tfConfig = this.timeframeConfigs[timeframe];
         if (tfConfig) {
             this.config = { ...this.config, ...tfConfig };
-            console.log(`[INDICATORS] Config appliquée pour ${timeframe}`);
+            // Log supprimé car trop verbeux (appelé pour chaque crypto x timeframe)
         }
     }
 

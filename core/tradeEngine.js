@@ -1825,7 +1825,7 @@ class TradeEngine {
         // Probabilité finale (plafonnée à 92% pour scalping)
         const finalProbability = Math.min(0.92, baseProbability + confidenceBonus + qualityBonus + scoreBonus + fundingBonusPercent);
         
-        this.log(`Win probability: base=${(baseProbability*100).toFixed(0)}% + conf=${(confidenceBonus*100).toFixed(0)}% + quality=${(qualityBonus*100).toFixed(0)}% + score=${(scoreBonus*100).toFixed(0)}% + funding=${(fundingBonusPercent*100).toFixed(0)}% = ${(finalProbability*100).toFixed(0)}%`, 'debug');
+        // Log supprimé car trop verbeux - appelé pour chaque crypto x timeframe
         
         return finalProbability;
     }
