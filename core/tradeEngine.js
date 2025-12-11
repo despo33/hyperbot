@@ -522,7 +522,14 @@ class TradeEngine {
         this.log(`⚙️ Paramètres:`, 'info');
         this.log(`   Intervalle: ${this.config.analysisInterval / 1000}s`, 'info');
         this.log(`   Levier: ${this.config.leverage}x`, 'info');
-        this.log(`   Max positions: ${this.config.maxConcurrentTrades}`, 'trade');
+        this.log(`   Max positions: ${this.config.maxConcurrentTrades}`, 'info');
+        
+        // Risk Management
+        const riskConfig = riskManager.config;
+        this.log(`🛡️ Risk Management:`, 'info');
+        this.log(`   Risk/trade: ${riskConfig.riskPerTrade}%`, 'info');
+        this.log(`   RRR min: ${riskConfig.minRiskRewardRatio === 0 ? 'OFF' : riskConfig.minRiskRewardRatio}`, 'info');
+        this.log(`   Daily loss limit: ${riskConfig.dailyLossLimit}%`, 'info');
         this.log(`═══════════════════════════════════════`, 'info');
 
         // IMPORTANT: Synchronise avec les positions existantes sur l'exchange
@@ -1549,8 +1556,12 @@ class TradeEngine {
             });
             
             if (!sltp.meetsMinRRR) {
-                this.log(`${symbol}: RRR insuffisant (${sltp.riskRewardRatio})`, 'warn');
-                return null;
+                const minRRR = riskManager.config.minRiskRewardRatio;
+                if (minRRR > 0) {
+                    this.log(`${symbol}: RRR insuffisant (${sltp.riskRewardRatio} < ${minRRR})`, 'warn');
+                    return null;
+                }
+                // Si minRRR = 0 (OFF), on continue quand même
             }
             
             // Log la source des niveaux SL/TP
@@ -1923,10 +1934,14 @@ class TradeEngine {
                 }
             );
 
-            // Vérifie le RRR
+            // Vérifie le RRR (sauf si désactivé avec minRRR = 0)
             if (!sltp.meetsMinRRR) {
-                this.log(`❌ RRR insuffisant: ${sltp.riskRewardRatio} (min: ${riskManager.config.minRiskRewardRatio})`, 'warn');
-                return null;
+                const minRRR = riskManager.config.minRiskRewardRatio;
+                if (minRRR > 0) {
+                    this.log(`❌ RRR insuffisant: ${sltp.riskRewardRatio} (min: ${minRRR})`, 'warn');
+                    return null;
+                }
+                // Si minRRR = 0 (OFF), on continue
             }
 
             // Calcul de la taille de position
