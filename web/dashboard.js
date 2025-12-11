@@ -2985,10 +2985,16 @@ function updateActiveConfigCard(config) {
     const winProb = config.minWinProbability ? (config.minWinProbability * 100).toFixed(0) + '%' : '60%';
     document.getElementById('activeWinProb').textContent = winProb;
     
-    // TP/SL
-    const tp = config.defaultTP || 1;
-    const sl = config.defaultSL || 0.5;
-    document.getElementById('activeTPSL').textContent = `TP: ${tp}% / SL: ${sl}%`;
+    // TP/SL Mode
+    const tpslModeLabels = {
+        'auto': 'Auto (Technique)',
+        'ichimoku': 'Ichimoku',
+        'atr': 'ATR',
+        'percent': 'Pourcentage',
+        'support_resistance': 'Support/Résistance'
+    };
+    const tpslMode = config.tpslMode || 'auto';
+    document.getElementById('activeTPSL').textContent = tpslModeLabels[tpslMode] || tpslMode;
     
     // RRR min
     const rrr = config.minRiskRewardRatio !== undefined ? config.minRiskRewardRatio : 0.5;
