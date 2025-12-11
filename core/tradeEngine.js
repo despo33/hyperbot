@@ -619,15 +619,20 @@ class TradeEngine {
         const cvdDivergence = cvd.divergence || 'none';
         
         // Momentum aligné - OPTIMISÉ CRYPTO SCALPING avec VWAP + CVD + Funding
-        // LONG: RSI entre 25-65 + Prix au-dessus VWAP + CVD bullish
-        // SHORT: RSI entre 35-75 + Prix en-dessous VWAP + CVD bearish
+        // ASSOUPLISSEMENT: En tendance forte (score 7/7), on accepte RSI élevé
         // + Funding Rate comme bonus/malus
         let momentumAligned = true;
         let fundingBonus = 0;
         
+        // Score Ichimoku fort = tendance confirmée, on assouplit le RSI
+        const strongTrend = absIchimokuScore >= 6;
+        
         if (signalDirection === 'long') {
-            // Zone RSI idéale pour LONG: 25-65 (acheter avant surachat)
-            const rsiOK = rsi >= 25 && rsi <= 65;
+            // Zone RSI pour LONG:
+            // - Normal: 25-70 (acheter avant surachat extrême)
+            // - Tendance forte (score >= 6): 25-85 (on suit la tendance)
+            const rsiMax = strongTrend ? 85 : 70;
+            const rsiOK = rsi >= 25 && rsi <= rsiMax;
             // MACD doit être positif OU en train de monter
             const macdOK = macdHistogram > -0.3 || (advancedAnalysis?.macd?.crossover === 'bullish');
             // VWAP: prix au-dessus = biais haussier
@@ -646,11 +651,16 @@ class TradeEngine {
             }
             
             // Combo gagnant: RSI OK + (VWAP OU CVD OU MACD OU EMA)
-            momentumAligned = rsiOK && (vwapOK || cvdOK || macdOK || emaOK);
+            // OU tendance très forte (score 7/7) avec au moins MACD OK
+            momentumAligned = (rsiOK && (vwapOK || cvdOK || macdOK || emaOK)) || 
+                             (absIchimokuScore >= 7 && macdOK);
             
         } else if (signalDirection === 'short') {
-            // Zone RSI idéale pour SHORT: 35-75 (vendre avant survente)
-            const rsiOK = rsi >= 35 && rsi <= 75;
+            // Zone RSI pour SHORT:
+            // - Normal: 30-75 (vendre avant survente)
+            // - Tendance forte (score >= 6): 15-75 (on suit la tendance)
+            const rsiMin = strongTrend ? 15 : 30;
+            const rsiOK = rsi >= rsiMin && rsi <= 75;
             // MACD doit être négatif OU en train de descendre
             const macdOK = macdHistogram < 0.3 || (advancedAnalysis?.macd?.crossover === 'bearish');
             // VWAP: prix en-dessous = biais baissier
@@ -669,12 +679,21 @@ class TradeEngine {
             }
             
             // Combo gagnant: RSI OK + (VWAP OU CVD OU MACD OU EMA)
-            momentumAligned = rsiOK && (vwapOK || cvdOK || macdOK || emaOK);
+            // OU tendance très forte (score 7/7) avec au moins MACD OK
+            momentumAligned = (rsiOK && (vwapOK || cvdOK || macdOK || emaOK)) ||
+                             (absIchimokuScore >= 7 && macdOK);
         }
         
         // ===== FILTRE CONFLUENCE MINIMUM =====
-        // En 5m, exige plus de confluence car plus de bruit
-        const minConfluence = timeframe === '5m' ? 3 : (timeframe === '1m' ? 4 : 2);
+        // ASSOUPLI: En 1m avec score fort, on réduit l'exigence de confluence
+        let minConfluence;
+        if (timeframe === '1m') {
+            minConfluence = absIchimokuScore >= 7 ? 2 : 3; // 2 si score parfait, sinon 3
+        } else if (timeframe === '5m') {
+            minConfluence = absIchimokuScore >= 6 ? 2 : 3;
+        } else {
+            minConfluence = 2;
+        }
         const hasMinConfluence = confluence >= minConfluence;
         
         // Calcul de la probabilité de gain (amélioré avec VWAP, CVD, Funding Rate et MTF)
@@ -694,18 +713,21 @@ class TradeEngine {
         // ===== FILTRE ANTI-RANGE : ADX minimum =====
         // ADX dynamique selon timeframe (scalping = seuils plus bas)
         // Crypto volatile = ADX naturellement plus bas
+        // NOTE: Si ADX = 0, c'est un bug de calcul, on ignore le filtre
         const adxThresholds = {
-            '1m': { range: 12, trend: 18 },   // Scalping: seuils bas
-            '5m': { range: 15, trend: 22 },   // Scalping: seuils bas
-            '15m': { range: 18, trend: 25 },  // Day trading
-            '1h': { range: 20, trend: 28 },   // Intraday
-            '4h': { range: 22, trend: 30 },   // Swing
-            '1d': { range: 20, trend: 25 }    // Position
+            '1m': { range: 10, trend: 15 },   // Scalping: seuils très bas
+            '5m': { range: 12, trend: 18 },   // Scalping: seuils bas
+            '15m': { range: 15, trend: 22 },  // Day trading
+            '1h': { range: 18, trend: 25 },   // Intraday
+            '4h': { range: 20, trend: 28 },   // Swing
+            '1d': { range: 18, trend: 23 }    // Position
         };
         const adxConfig = adxThresholds[timeframe] || adxThresholds['1h'];
         const adxValue = adx.value || 0;
-        const isRangeMarket = adxValue < adxConfig.range;
-        const isStrongTrend = adxValue >= adxConfig.trend;
+        // Si ADX = 0, on considère que le calcul a échoué et on ne bloque pas
+        const adxValid = adxValue > 0;
+        const isRangeMarket = adxValid && adxValue < adxConfig.range;
+        const isStrongTrend = adxValid && adxValue >= adxConfig.trend;
         
         // ===== FILTRE VOLATILITÉ =====
         // Évite les trades en très faible volatilité (consolidation)
@@ -718,38 +740,40 @@ class TradeEngine {
         // 3. ET probabilité de gain >= seuil
         // 4. ET pas de fakeout détecté
         // 5. ET liquidité suffisante
-        // 6. NOUVEAU: ET pas en range (ADX >= 20) OU score très fort (7/7)
+        // 6. ET pas en range (ADX valide et >= seuil) OU score très fort (7/7) OU ADX invalide
         const qualityTradeable = signalQuality?.tradeable || 
                                 (signalQuality?.minimumMet) ||
-                                (confluence >= 3 && Math.abs(indicatorScore) >= 25);
+                                (confluence >= 2 && Math.abs(indicatorScore) >= 20);
         
         const ichimokuTradeable = hasStrongIchimokuScore && hasSignal && hasConfidence;
         
         // Filtres de sécurité obligatoires
         const safetyFiltersOK = !fakeout.isFakeout && liquidity.sufficient;
         
-        // NOUVEAU: Filtre anti-range
+        // Filtre anti-range ASSOUPLI:
         // Autorise le trade si:
-        // - ADX >= 20 (pas en range) OU
-        // - Score Ichimoku parfait (7/7) avec confiance high OU
-        // - Tendance forte (ADX >= 25) peu importe le score
-        const antiRangeOK = !isRangeMarket || 
-                          (absIchimokuScore >= 7 && hasConfidence) ||
-                          isStrongTrend;
+        // - ADX invalide (= 0, bug de calcul) → on ignore le filtre
+        // - ADX >= seuil (pas en range)
+        // - Score Ichimoku >= 6 (tendance confirmée par Ichimoku)
+        // - Tendance forte (ADX >= trend threshold)
+        const antiRangeOK = !adxValid ||           // ADX invalide = on ignore
+                          !isRangeMarket ||        // Pas en range
+                          absIchimokuScore >= 6 || // Score fort = tendance confirmée
+                          isStrongTrend;           // ADX montre tendance forte
         
-        // NOUVEAU: Filtre anti-consolidation
-        // Évite les trades en très faible volatilité sauf si signal très fort
-        const volatilityOK = !isLowVolatility || absIchimokuScore >= 6;
+        // Filtre anti-consolidation ASSOUPLI
+        // Évite les trades en très faible volatilité sauf si signal fort
+        const volatilityOK = !isLowVolatility || absIchimokuScore >= 5;
         
-        // ===== FILTRE TIMEFRAME 5M RENFORCÉ =====
-        // En 5m, on exige des critères plus stricts
+        // ===== FILTRE TIMEFRAME ASSOUPLI =====
+        // Critères adaptés pour permettre plus de trades en tendance forte
         let timeframeFilterOK = true;
         if (timeframe === '5m') {
-            // En 5m: exige score >= 5 OU (score >= 4 ET confluence >= 3)
-            timeframeFilterOK = absIchimokuScore >= 5 || (absIchimokuScore >= 4 && confluence >= 3);
+            // En 5m: exige score >= 4 OU (score >= 3 ET confluence >= 2)
+            timeframeFilterOK = absIchimokuScore >= 4 || (absIchimokuScore >= 3 && confluence >= 2);
         } else if (timeframe === '1m') {
-            // En 1m: exige score >= 6 OU (score >= 5 ET confluence >= 4)
-            timeframeFilterOK = absIchimokuScore >= 6 || (absIchimokuScore >= 5 && confluence >= 4);
+            // En 1m: exige score >= 5 OU (score >= 4 ET confluence >= 2) - ASSOUPLI pour tendances fortes
+            timeframeFilterOK = absIchimokuScore >= 5 || (absIchimokuScore >= 4 && confluence >= 2);
         }
         
         // ===== FILTRE MULTI-TIMEFRAME =====
