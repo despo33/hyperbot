@@ -990,6 +990,23 @@ async function loadTradingConfig() {
         const rsiOversoldEl = document.getElementById('rsiOversold');
         if (rsiOversoldEl) rsiOversoldEl.value = config.rsiOversold || 30;
         
+        // Multi-Timeframe
+        const mtfEl = document.getElementById('configMultiTimeframe');
+        const mtfOptionsEl = document.getElementById('mtfOptions');
+        if (mtfEl) {
+            mtfEl.checked = config.multiTimeframeMode || false;
+            if (mtfOptionsEl) mtfOptionsEl.style.display = mtfEl.checked ? 'block' : 'none';
+        }
+        
+        // MTF Timeframes
+        if (config.mtfTimeframes) {
+            document.querySelectorAll('input[name="mtfTimeframes"]').forEach(cb => {
+                cb.checked = config.mtfTimeframes.includes(cb.value);
+            });
+        }
+        
+        const mtfMinConfEl = document.getElementById('mtfMinConfirmation');
+        if (mtfMinConfEl) mtfMinConfEl.value = config.mtfMinConfirmation || 2;
         
     } catch (error) {
         console.error('Erreur chargement config trading:', error);
@@ -1060,7 +1077,11 @@ async function saveTradingConfig() {
             // Filtres avancés
             useRSIFilter: document.getElementById('useRSIFilter')?.checked ?? true,
             rsiOverbought: parseInt(document.getElementById('rsiOverbought')?.value || 70),
-            rsiOversold: parseInt(document.getElementById('rsiOversold')?.value || 30)
+            rsiOversold: parseInt(document.getElementById('rsiOversold')?.value || 30),
+            // Multi-Timeframe
+            multiTimeframeMode: document.getElementById('configMultiTimeframe')?.checked || false,
+            mtfTimeframes: Array.from(document.querySelectorAll('input[name="mtfTimeframes"]:checked')).map(cb => cb.value),
+            mtfMinConfirmation: parseInt(document.getElementById('mtfMinConfirmation')?.value || 2)
         };
 
         await apiRequest('/config/trading', {
@@ -2038,6 +2059,15 @@ function initConfigControls() {
     if (selectedTF) {
         updateTimeframeInfo(selectedTF.value);
         updateTPSLPreview(selectedTF.value);
+    }
+    
+    // Multi-Timeframe toggle
+    const mtfToggle = document.getElementById('configMultiTimeframe');
+    const mtfOptions = document.getElementById('mtfOptions');
+    if (mtfToggle && mtfOptions) {
+        mtfToggle.addEventListener('change', (e) => {
+            mtfOptions.style.display = e.target.checked ? 'block' : 'none';
+        });
     }
     
     // Sliders avec valeurs
