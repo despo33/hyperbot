@@ -512,19 +512,26 @@ class TradeEngine {
         const ema200Position = advancedAnalysis?.ema200?.position || 'neutral';
         const signalDirection = analysis.finalSignal?.action === 'BUY' ? 'long' : 'short';
         
-        // Momentum aligné si:
-        // LONG: RSI > 40 ET (MACD > 0 OU prix > EMA200)
-        // SHORT: RSI < 60 ET (MACD < 0 OU prix < EMA200)
+        // Momentum aligné - OPTIMISÉ CRYPTO SCALPING
+        // LONG: RSI entre 25-65 (zone d'achat idéale, pas en surachat)
+        // SHORT: RSI entre 35-75 (zone de vente idéale, pas en survente)
+        // + MACD doit confirmer la direction
         let momentumAligned = true;
         if (signalDirection === 'long') {
-            const rsiOK = rsi > 35; // Pas en survente extrême
-            const macdOK = macdHistogram > -0.5; // MACD pas trop négatif
-            const emaOK = ema200Position !== 'below'; // Pas sous EMA200
+            // Zone RSI idéale pour LONG: 25-65 (acheter avant surachat)
+            const rsiOK = rsi >= 25 && rsi <= 65;
+            // MACD doit être positif OU en train de monter
+            const macdOK = macdHistogram > -0.3 || (advancedAnalysis?.macd?.crossover === 'bullish');
+            // Bonus si prix au-dessus EMA courte
+            const emaOK = ema200Position === 'above';
             momentumAligned = rsiOK && (macdOK || emaOK);
         } else if (signalDirection === 'short') {
-            const rsiOK = rsi < 65; // Pas en surachat extrême
-            const macdOK = macdHistogram < 0.5; // MACD pas trop positif
-            const emaOK = ema200Position !== 'above'; // Pas au-dessus EMA200
+            // Zone RSI idéale pour SHORT: 35-75 (vendre avant survente)
+            const rsiOK = rsi >= 35 && rsi <= 75;
+            // MACD doit être négatif OU en train de descendre
+            const macdOK = macdHistogram < 0.3 || (advancedAnalysis?.macd?.crossover === 'bearish');
+            // Bonus si prix en-dessous EMA courte
+            const emaOK = ema200Position === 'below';
             momentumAligned = rsiOK && (macdOK || emaOK);
         }
         
@@ -547,11 +554,20 @@ class TradeEngine {
         const atr = advancedAnalysis?.atr || { volatility: 'normal' };
         
         // ===== FILTRE ANTI-RANGE : ADX minimum =====
-        // ADX < 20 = marché en range, signaux peu fiables
-        // ADX > 25 = tendance établie, signaux plus fiables
+        // ADX dynamique selon timeframe (scalping = seuils plus bas)
+        // Crypto volatile = ADX naturellement plus bas
+        const adxThresholds = {
+            '1m': { range: 12, trend: 18 },   // Scalping: seuils bas
+            '5m': { range: 15, trend: 22 },   // Scalping: seuils bas
+            '15m': { range: 18, trend: 25 },  // Day trading
+            '1h': { range: 20, trend: 28 },   // Intraday
+            '4h': { range: 22, trend: 30 },   // Swing
+            '1d': { range: 20, trend: 25 }    // Position
+        };
+        const adxConfig = adxThresholds[timeframe] || adxThresholds['1h'];
         const adxValue = adx.value || 0;
-        const isRangeMarket = adxValue < 20;
-        const isStrongTrend = adxValue >= 25;
+        const isRangeMarket = adxValue < adxConfig.range;
+        const isStrongTrend = adxValue >= adxConfig.trend;
         
         // ===== FILTRE VOLATILITÉ =====
         // Évite les trades en très faible volatilité (consolidation)

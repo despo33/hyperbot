@@ -46,31 +46,45 @@ class TechnicalIndicators {
             }
         };
 
-        // Configurations par timeframe pour crypto
+        // Configurations par timeframe pour crypto - OPTIMISÉES SCALPING
+        // Crypto = haute volatilité, 24/7, mouvements rapides
         this.timeframeConfigs = {
             '1m': {
-                rsi: { period: 7, overbought: 75, oversold: 25 },
-                stochRsi: { rsiPeriod: 7, stochPeriod: 7, kPeriod: 3, dPeriod: 3, overbought: 85, oversold: 15 },
-                macd: { fastPeriod: 5, slowPeriod: 13, signalPeriod: 4 },
-                bollinger: { period: 10, stdDev: 2 },
-                volume: { maPeriod: 10, spikeMultiplier: 2.0 },
-                ema: { fast: 20, slow: 50 }
+                // RSI court pour réactivité, seuils élargis pour éviter faux signaux
+                rsi: { period: 5, overbought: 80, oversold: 20 },
+                // StochRSI ultra-rapide pour scalping
+                stochRsi: { rsiPeriod: 5, stochPeriod: 5, kPeriod: 2, dPeriod: 2, overbought: 85, oversold: 15 },
+                // MACD rapide pour détecter les retournements
+                macd: { fastPeriod: 3, slowPeriod: 10, signalPeriod: 3 },
+                // Bollinger serré pour scalping
+                bollinger: { period: 10, stdDev: 1.8 },
+                // Volume spike plus sensible
+                volume: { maPeriod: 8, spikeMultiplier: 1.5 },
+                // EMA courtes pour tendance immédiate
+                ema: { fast: 9, slow: 21 },
+                // ADX adapté scalping
+                adx: { period: 7, trendThreshold: 15 }
             },
             '5m': {
-                rsi: { period: 9, overbought: 72, oversold: 28 },
-                stochRsi: { rsiPeriod: 9, stochPeriod: 9, kPeriod: 3, dPeriod: 3, overbought: 82, oversold: 18 },
-                macd: { fastPeriod: 6, slowPeriod: 13, signalPeriod: 5 },
-                bollinger: { period: 14, stdDev: 2 },
-                volume: { maPeriod: 14, spikeMultiplier: 1.8 },
-                ema: { fast: 30, slow: 100 }
+                // RSI équilibré pour 5m
+                rsi: { period: 7, overbought: 75, oversold: 25 },
+                stochRsi: { rsiPeriod: 7, stochPeriod: 7, kPeriod: 3, dPeriod: 3, overbought: 82, oversold: 18 },
+                // MACD optimisé crypto 5m
+                macd: { fastPeriod: 5, slowPeriod: 12, signalPeriod: 4 },
+                bollinger: { period: 12, stdDev: 2 },
+                volume: { maPeriod: 12, spikeMultiplier: 1.6 },
+                // EMA pour tendance court terme
+                ema: { fast: 12, slow: 26 },
+                adx: { period: 10, trendThreshold: 18 }
             },
             '15m': {
-                rsi: { period: 12, overbought: 70, oversold: 30 },
-                stochRsi: { rsiPeriod: 12, stochPeriod: 12, kPeriod: 3, dPeriod: 3, overbought: 80, oversold: 20 },
-                macd: { fastPeriod: 8, slowPeriod: 17, signalPeriod: 9 },
-                bollinger: { period: 18, stdDev: 2 },
-                volume: { maPeriod: 18, spikeMultiplier: 1.6 },
-                ema: { fast: 40, slow: 150 }
+                rsi: { period: 9, overbought: 72, oversold: 28 },
+                stochRsi: { rsiPeriod: 9, stochPeriod: 9, kPeriod: 3, dPeriod: 3, overbought: 80, oversold: 20 },
+                macd: { fastPeriod: 6, slowPeriod: 14, signalPeriod: 5 },
+                bollinger: { period: 15, stdDev: 2 },
+                volume: { maPeriod: 15, spikeMultiplier: 1.5 },
+                ema: { fast: 21, slow: 55 },
+                adx: { period: 12, trendThreshold: 20 }
             },
             '1h': {
                 rsi: { period: 14, overbought: 70, oversold: 30 },
