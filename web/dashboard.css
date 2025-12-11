@@ -1952,6 +1952,7 @@ input[type="range"]::-moz-range-thumb {
     border-radius: var(--border-radius-sm);
     cursor: pointer;
     transition: all 0.2s;
+    position: relative;
 }
 
 .timeframe-btn strong {
@@ -4299,8 +4300,11 @@ input[type="range"]::-moz-range-thumb {
 /* Indicateur sur les timeframes */
 .timeframe-btn .active-param-indicator {
     position: absolute;
-    top: 4px;
-    right: 4px;
+    top: 6px;
+    right: 6px;
+    width: 10px;
+    height: 10px;
+    z-index: 10;
 }
 
 .timeframe-option {
