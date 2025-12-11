@@ -1956,6 +1956,9 @@ function navigateTo(page) {
     } else if (page === 'trading') {
         loadTradingConfig();
     }
+    
+    // Réinitialise les icônes Lucide après navigation
+    setTimeout(() => lucide.createIcons(), 50);
 }
 
 // ==================== EVENT LISTENERS ====================
