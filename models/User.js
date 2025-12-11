@@ -167,9 +167,8 @@ const userSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Index pour les recherches
-userSchema.index({ email: 1 });
-userSchema.index({ username: 1 });
+// Note: Les index sont déjà créés via unique: true dans le schema
+// Pas besoin de les redéclarer ici (évite les warnings Mongoose)
 
 // Hash du mot de passe avant sauvegarde
 userSchema.pre('save', async function(next) {

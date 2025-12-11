@@ -23,44 +23,7 @@ function getAuthToken() {
     return localStorage.getItem('authToken');
 }
 
-/**
- * Effectue une requête API authentifiée
- */
-async function authApiRequest(endpoint, options = {}) {
-    const token = getAuthToken();
-    const headers = {
-        'Content-Type': 'application/json',
-        ...options.headers
-    };
-    
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    try {
-        const response = await fetch(`${API_BASE}${endpoint}`, {
-            ...options,
-            headers
-        });
-
-        const data = await response.json();
-
-        if (response.status === 401 || response.status === 403) {
-            // Token invalide, déconnexion
-            logout();
-            return null;
-        }
-
-        if (!response.ok) {
-            throw new Error(data.error || `HTTP ${response.status}`);
-        }
-
-        return data;
-    } catch (error) {
-        console.error(`API Error [${endpoint}]:`, error.message);
-        throw error;
-    }
-}
+// Note: authApiRequest supprimée - utiliser apiRequest à la place
 
 /**
  * Déconnexion
@@ -83,7 +46,7 @@ async function loadUserInfo() {
         }
         
         // Rafraîchit depuis le serveur
-        const data = await authApiRequest('/auth/me');
+        const data = await apiRequest('/auth/me');
         if (data && data.success) {
             currentUser = data.user;
             localStorage.setItem('user', JSON.stringify(currentUser));
