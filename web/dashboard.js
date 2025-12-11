@@ -1143,10 +1143,10 @@ async function loadRiskConfig() {
         
         // RRR (slider)
         const rrrEl = document.getElementById('minRiskRewardRatio');
-        const rrrValueEl = document.getElementById('rrrValue');
+        const rrrValueEl = document.getElementById('minRiskRewardRatioValue');
         if (rrrEl) {
-            rrrEl.value = config.minRiskRewardRatio || 2;
-            if (rrrValueEl) rrrValueEl.textContent = (config.minRiskRewardRatio || 2) + ':1';
+            rrrEl.value = config.minRiskRewardRatio || 0.5;
+            if (rrrValueEl) rrrValueEl.textContent = (config.minRiskRewardRatio || 0.5) + ':1';
         }
         
         // Max position size (slider)
@@ -2299,8 +2299,11 @@ function initRiskControls() {
     }
     
     if (rrrInput) {
+        const rrrValueEl = document.getElementById('minRiskRewardRatioValue');
         rrrInput.addEventListener('input', (e) => {
-            const val = parseFloat(e.target.value) || 0;
+            const val = parseFloat(e.target.value) || 0.5;
+            // Met à jour l'affichage de la valeur
+            if (rrrValueEl) rrrValueEl.textContent = val.toFixed(1) + ':1';
             updateRRRExplanation(val);
             // Met à jour les presets actifs
             rrrPresets.forEach(btn => {
@@ -2313,7 +2316,9 @@ function initRiskControls() {
     rrrPresets.forEach(btn => {
         btn.addEventListener('click', () => {
             const val = parseFloat(btn.dataset.value);
+            const rrrValueEl = document.getElementById('minRiskRewardRatioValue');
             if (rrrInput) rrrInput.value = val;
+            if (rrrValueEl) rrrValueEl.textContent = val.toFixed(1) + ':1';
             updateRRRExplanation(val);
             rrrPresets.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
