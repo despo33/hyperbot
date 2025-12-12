@@ -43,37 +43,37 @@ class TradeEngine {
         this.TIMEFRAME_PRESETS = {
             '1m': {
                 name: 'Ultra Scalping',
-                minScore: 3,              // Score Ichimoku minimum (assoupli)
-                minWinProbability: 0.50,  // Probabilité minimum (50%) - très souple
-                minConfluence: 1,         // Confluence minimum (assoupli)
-                rsiLongMax: 85,           // RSI max pour LONG (assoupli)
-                rsiShortMin: 15,          // RSI min pour SHORT (assoupli)
-                adxMin: 5,                // ADX minimum (très bas pour 1m)
-                minRRR: 0.3,              // RRR minimum très bas pour scalping rapide
+                minScore: 4,              // Score Ichimoku minimum (renforcé)
+                minWinProbability: 0.58,  // Probabilité minimum (58%) - renforcé
+                minConfluence: 2,         // Confluence minimum (renforcé)
+                rsiLongMax: 75,           // RSI max pour LONG (renforcé)
+                rsiShortMin: 25,          // RSI min pour SHORT (renforcé)
+                adxMin: 10,               // ADX minimum (renforcé)
+                minRRR: 0.5,              // RRR minimum renforcé
                 analysisInterval: 30000,  // Analyse toutes les 30s
                 description: 'Trades rapides, filtres souples pour capturer les mouvements'
             },
             '5m': {
                 name: 'Scalping',
-                minScore: 3,              // Assoupli
-                minWinProbability: 0.52,  // Assoupli
-                minConfluence: 1,         // Assoupli
-                rsiLongMax: 80,           // Assoupli
-                rsiShortMin: 20,          // Assoupli
-                adxMin: 8,                // Assoupli
-                minRRR: 0.5,              // RRR assoupli pour scalping
+                minScore: 4,              // Renforcé
+                minWinProbability: 0.60,  // Renforcé
+                minConfluence: 2,         // Renforcé
+                rsiLongMax: 72,           // Renforcé
+                rsiShortMin: 28,          // Renforcé
+                adxMin: 12,               // Renforcé
+                minRRR: 0.7,              // RRR renforcé pour scalping
                 analysisInterval: 60000,  // Analyse toutes les 1min
                 description: 'Scalping classique, bon équilibre vitesse/qualité'
             },
             '15m': {
                 name: 'Intraday',
-                minScore: 3,
-                minWinProbability: 0.55,  // Assoupli
+                minScore: 4,              // Renforcé
+                minWinProbability: 0.62,  // Renforcé
                 minConfluence: 2,
-                rsiLongMax: 75,           // Assoupli
-                rsiShortMin: 25,          // Assoupli
-                adxMin: 10,               // Assoupli
-                minRRR: 0.7,              // RRR assoupli
+                rsiLongMax: 70,           // Renforcé
+                rsiShortMin: 30,          // Renforcé
+                adxMin: 15,               // Renforcé
+                minRRR: 1.0,              // RRR renforcé
                 analysisInterval: 60000,
                 description: 'Trading intraday, filtres équilibrés'
             },
@@ -91,12 +91,12 @@ class TradeEngine {
             },
             '1h': {
                 name: 'Swing Court',
-                minScore: 3,
-                minWinProbability: 0.68,
+                minScore: 4,              // Renforcé
+                minWinProbability: 0.65,  // Renforcé
                 minConfluence: 2,
-                rsiLongMax: 70,
-                rsiShortMin: 30,
-                adxMin: 20,
+                rsiLongMax: 68,           // Renforcé
+                rsiShortMin: 32,          // Renforcé
+                adxMin: 18,               // Renforcé
                 minRRR: 1.2,
                 analysisInterval: 180000, // Analyse toutes les 3min
                 description: 'Swing trading court terme, filtres stricts'
@@ -181,8 +181,21 @@ class TradeEngine {
             opportunities: [],            // Opportunités détectées
             // SÉCURITÉ: Verrous pour éviter les trades en double
             tradingLocks: new Set(),      // Symboles en cours de trade
-            isProcessingTrades: false     // Flag global de traitement
+            isProcessingTrades: false,    // Flag global de traitement
+            // ===== ANTI-OVERTRADING =====
+            lastTradeTime: new Map(),     // Dernier trade par symbole (timestamp)
+            consecutiveShorts: 0,         // Compteur de shorts consécutifs
+            consecutiveLongs: 0,          // Compteur de longs consécutifs
+            lastTradeDirection: null      // Dernière direction de trade
         };
+        
+        // ===== CONFIGURATION ANTI-OVERTRADING =====
+        this.antiOvertradingConfig = {
+            symbolCooldownMs: 5 * 60 * 1000,  // 5 minutes entre trades sur même symbole
+            maxConsecutiveSameDirection: 5,   // Max 5 trades consécutifs dans la même direction
+            globalCooldownMs: 30 * 1000       // 30 secondes minimum entre tous les trades
+        };
+        this.lastGlobalTradeTime = 0;
 
         // Intervalle d'analyse
         this.analysisInterval = null;
@@ -1462,6 +1475,36 @@ class TradeEngine {
             return null;
         }
         
+        // ===== ANTI-OVERTRADING: Cooldown par symbole =====
+        const lastTradeForSymbol = this.state.lastTradeTime.get(symbol);
+        if (lastTradeForSymbol) {
+            const timeSinceLastTrade = Date.now() - lastTradeForSymbol;
+            if (timeSinceLastTrade < this.antiOvertradingConfig.symbolCooldownMs) {
+                const remainingMs = this.antiOvertradingConfig.symbolCooldownMs - timeSinceLastTrade;
+                const remainingMin = (remainingMs / 60000).toFixed(1);
+                this.log(`${symbol}: ⏳ Cooldown actif (${remainingMin}min restantes)`, 'info');
+                return null;
+            }
+        }
+        
+        // ===== ANTI-OVERTRADING: Cooldown global =====
+        const timeSinceGlobalTrade = Date.now() - this.lastGlobalTradeTime;
+        if (timeSinceGlobalTrade < this.antiOvertradingConfig.globalCooldownMs) {
+            this.log(`${symbol}: ⏳ Cooldown global actif`, 'info');
+            return null;
+        }
+        
+        // ===== ANTI-OVERTRADING: Limite trades consécutifs même direction =====
+        const direction = signal.action === 'BUY' ? 'long' : 'short';
+        if (direction === 'short' && this.state.consecutiveShorts >= this.antiOvertradingConfig.maxConsecutiveSameDirection) {
+            this.log(`${symbol}: ⚠️ Trop de SHORTS consécutifs (${this.state.consecutiveShorts}), attente d'un LONG`, 'warn');
+            return null;
+        }
+        if (direction === 'long' && this.state.consecutiveLongs >= this.antiOvertradingConfig.maxConsecutiveSameDirection) {
+            this.log(`${symbol}: ⚠️ Trop de LONGS consécutifs (${this.state.consecutiveLongs}), attente d'un SHORT`, 'warn');
+            return null;
+        }
+        
         // Pose le verrou
         this.state.tradingLocks.add(symbol);
         
@@ -1620,6 +1663,22 @@ class TradeEngine {
                 takeProfit: sltp.takeProfit,
                 openedAt: Date.now()
             });
+            
+            // ===== MISE À JOUR ANTI-OVERTRADING =====
+            this.state.lastTradeTime.set(symbol, Date.now());
+            this.lastGlobalTradeTime = Date.now();
+            
+            // Met à jour les compteurs de direction consécutive
+            if (direction === 'short') {
+                this.state.consecutiveShorts++;
+                this.state.consecutiveLongs = 0;
+            } else {
+                this.state.consecutiveLongs++;
+                this.state.consecutiveShorts = 0;
+            }
+            this.state.lastTradeDirection = direction;
+            
+            this.log(`📊 Anti-overtrading: ${direction.toUpperCase()} #${direction === 'short' ? this.state.consecutiveShorts : this.state.consecutiveLongs}`, 'info');
             
             // Track la position pour détecter les fermetures (TP/SL atteint)
             positionManager.trackPosition({
