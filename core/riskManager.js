@@ -26,7 +26,8 @@ class RiskManager {
         this.configPath = path.join(__dirname, '..', 'storage', 'risk.json');
         this.statePath = path.join(__dirname, '..', 'storage', 'state.json');
         
-        // Configuration par défaut
+        // Configuration par défaut (valeurs initiales à la connexion)
+        // L'utilisateur peut modifier ces valeurs via l'UI - ses réglages ont priorité
         this.config = {
             riskPerTrade: 1,           // % du capital risqué par trade
             dailyLossLimit: 5,         // Limite de perte journalière en %
@@ -39,17 +40,6 @@ class RiskManager {
             maxLeverage: 10,           // Levier maximum
             defaultSLPercent: 2,       // SL par défaut en % du prix d'entrée
             defaultTPPercent: 4        // TP par défaut en % du prix d'entrée
-        };
-        
-        // ===== LIMITES DE SÉCURITÉ ABSOLUES =====
-        // Ces limites ne peuvent PAS être dépassées même via l'UI
-        this.SAFETY_LIMITS = {
-            maxRiskPerTrade: 5,        // Max 5% risque par trade (même si UI dit 70%)
-            maxPositionSizeAbs: 30,    // Max 30% du capital par position
-            maxDailyLossAbs: 15,       // Max 15% perte journalière
-            maxDrawdownAbs: 25,        // Max 25% drawdown
-            maxTradesPerDayAbs: 50,    // Max 50 trades/jour
-            maxConsecutiveLossesAbs: 5 // Max 5 pertes consécutives avant pause
         };
 
         // État du jour
@@ -81,6 +71,7 @@ class RiskManager {
 
     /**
      * Charge la configuration depuis le fichier
+     * Les réglages utilisateur ont priorité sur les valeurs par défaut
      */
     loadConfig() {
         try {
@@ -88,9 +79,6 @@ class RiskManager {
                 const data = JSON.parse(fs.readFileSync(this.configPath, 'utf8'));
                 this.config = { ...this.config, ...data };
                 console.log('[RISK] Configuration chargée');
-                
-                // Applique les limites de sécurité au chargement
-                this.applySafetyLimits();
             }
         } catch (error) {
             console.error('[RISK] Erreur chargement config:', error.message);
@@ -158,13 +146,11 @@ class RiskManager {
 
     /**
      * Met à jour la configuration
+     * Les réglages utilisateur ont priorité - pas de limites forcées
      * @param {Object} newConfig 
      */
     updateConfig(newConfig) {
         this.config = { ...this.config, ...newConfig };
-        
-        // ===== APPLIQUE LES LIMITES DE SÉCURITÉ =====
-        this.applySafetyLimits();
         
         // Log les changements de TP/SL
         if (newConfig.defaultTPPercent !== undefined || newConfig.defaultSLPercent !== undefined) {
@@ -172,56 +158,6 @@ class RiskManager {
         }
         
         this.saveConfig();
-    }
-    
-    /**
-     * Applique les limites de sécurité absolues
-     * Ces limites protègent contre les réglages dangereux de l'UI
-     */
-    applySafetyLimits() {
-        let warnings = [];
-        
-        // Risque par trade
-        if (this.config.riskPerTrade > this.SAFETY_LIMITS.maxRiskPerTrade) {
-            warnings.push(`Risque/trade réduit de ${this.config.riskPerTrade}% à ${this.SAFETY_LIMITS.maxRiskPerTrade}%`);
-            this.config.riskPerTrade = this.SAFETY_LIMITS.maxRiskPerTrade;
-        }
-        
-        // Taille position max
-        if (this.config.maxPositionSize > this.SAFETY_LIMITS.maxPositionSizeAbs) {
-            warnings.push(`Taille position max réduite de ${this.config.maxPositionSize}% à ${this.SAFETY_LIMITS.maxPositionSizeAbs}%`);
-            this.config.maxPositionSize = this.SAFETY_LIMITS.maxPositionSizeAbs;
-        }
-        
-        // Perte journalière max
-        if (this.config.dailyLossLimit > this.SAFETY_LIMITS.maxDailyLossAbs) {
-            warnings.push(`Limite perte journalière réduite de ${this.config.dailyLossLimit}% à ${this.SAFETY_LIMITS.maxDailyLossAbs}%`);
-            this.config.dailyLossLimit = this.SAFETY_LIMITS.maxDailyLossAbs;
-        }
-        
-        // Drawdown max
-        if (this.config.maxDrawdown > this.SAFETY_LIMITS.maxDrawdownAbs) {
-            warnings.push(`Drawdown max réduit de ${this.config.maxDrawdown}% à ${this.SAFETY_LIMITS.maxDrawdownAbs}%`);
-            this.config.maxDrawdown = this.SAFETY_LIMITS.maxDrawdownAbs;
-        }
-        
-        // Trades par jour
-        if (this.config.maxTradesPerDay > this.SAFETY_LIMITS.maxTradesPerDayAbs) {
-            warnings.push(`Max trades/jour réduit de ${this.config.maxTradesPerDay} à ${this.SAFETY_LIMITS.maxTradesPerDayAbs}`);
-            this.config.maxTradesPerDay = this.SAFETY_LIMITS.maxTradesPerDayAbs;
-        }
-        
-        // Pertes consécutives
-        if (this.config.maxConsecutiveLosses > this.SAFETY_LIMITS.maxConsecutiveLossesAbs) {
-            warnings.push(`Max pertes consécutives réduit de ${this.config.maxConsecutiveLosses} à ${this.SAFETY_LIMITS.maxConsecutiveLossesAbs}`);
-            this.config.maxConsecutiveLosses = this.SAFETY_LIMITS.maxConsecutiveLossesAbs;
-        }
-        
-        // Log les warnings
-        if (warnings.length > 0) {
-            console.log('[RISK] ⚠️ LIMITES DE SÉCURITÉ APPLIQUÉES:');
-            warnings.forEach(w => console.log(`[RISK]   - ${w}`));
-        }
     }
 
     /**
