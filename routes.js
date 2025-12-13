@@ -9,6 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import tradeEngine from './core/tradeEngine.js';
+import botManager from './core/BotManager.js';
 import riskManager from './core/riskManager.js';
 import priceFetcher from './core/priceFetcher.js';
 import signalDetector from './core/signalDetector.js';
@@ -34,7 +35,15 @@ const router = Router();
  */
 router.get('/status', optionalAuth, async (req, res) => {
     try {
-        const status = tradeEngine.getStatus();
+        // Si utilisateur connecté, récupère le statut de SON bot
+        let botStatus = null;
+        if (req.user) {
+            const userId = req.user._id.toString();
+            botStatus = botManager.getBotStatus(userId);
+        }
+        
+        // Fallback sur le tradeEngine global si pas de bot utilisateur
+        const status = botStatus || tradeEngine.getStatus();
         const riskStats = riskManager.getStats();
         
         let balance = null;
@@ -101,32 +110,69 @@ router.get('/status', optionalAuth, async (req, res) => {
 
 /**
  * POST /api/bot/start
- * Démarre le bot (protégé)
+ * Démarre le bot de l'utilisateur connecté
  */
 router.post('/bot/start', requireAuth, async (req, res) => {
     try {
-        const success = await tradeEngine.start();
-        res.json({ success, message: success ? 'Bot démarré' : 'Échec du démarrage' });
+        const userId = req.user._id.toString();
+        const activeWallet = req.user.getActiveWallet();
+        
+        if (!activeWallet) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Aucun wallet configuré. Ajoutez un wallet dans Configuration API.' 
+            });
+        }
+        
+        // Récupère la config de l'utilisateur
+        const userConfig = req.user.botConfig || {};
+        
+        // Démarre le bot de l'utilisateur
+        const success = await botManager.startBot(userId, activeWallet, userConfig);
+        
+        res.json({ 
+            success, 
+            message: success ? 'Bot démarré' : 'Échec du démarrage',
+            userId: userId.substring(0, 8) + '...'
+        });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
 /**
  * POST /api/bot/stop
- * Arrête le bot (protégé)
+ * Arrête le bot de l'utilisateur connecté
  */
 router.post('/bot/stop', requireAuth, (req, res) => {
-    const success = tradeEngine.stop();
-    res.json({ success, message: success ? 'Bot arrêté' : 'Bot déjà arrêté' });
+    try {
+        const userId = req.user._id.toString();
+        const success = botManager.stopBot(userId);
+        
+        res.json({ 
+            success, 
+            message: success ? 'Bot arrêté' : 'Bot déjà arrêté ou non démarré' 
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
 /**
  * GET /api/logs
- * Retourne les logs
+ * Retourne les logs du bot de l'utilisateur
  */
-router.get('/logs', (req, res) => {
+router.get('/logs', optionalAuth, (req, res) => {
     const limit = parseInt(req.query.limit) || 100;
+    
+    // Si utilisateur connecté, retourne ses logs
+    if (req.user) {
+        const userId = req.user._id.toString();
+        const logs = botManager.getBotLogs(userId, limit);
+        return res.json({ logs, userId: userId.substring(0, 8) + '...' });
+    }
+    
+    // Sinon logs globaux (ancien système)
     const logs = tradeEngine.getLogs(limit);
     res.json({ logs });
 });

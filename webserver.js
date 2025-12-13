@@ -12,6 +12,7 @@ import routes from './routes.js';
 import authRoutes from './routes/authRoutes.js';
 import walletRoutes from './routes/walletRoutes.js';
 import tradeEngine from './core/tradeEngine.js';
+import botManager from './core/BotManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -254,7 +255,7 @@ export function createWebServer(port = 3000) {
         });
     }
 
-    // Abonne aux événements du trade engine
+    // Abonne aux événements du trade engine (ancien système - fallback)
     tradeEngine.on('onLog', (log) => {
         broadcast('log', log, 'logs');
     });
@@ -269,6 +270,27 @@ export function createWebServer(port = 3000) {
 
     tradeEngine.on('onAnalysis', (analysis) => {
         broadcast('analysis', analysis, 'analysis');
+    });
+
+    // Abonne aux événements du BotManager (multi-utilisateurs)
+    botManager.on('onLog', (log) => {
+        broadcast('log', log, 'logs');
+    });
+
+    botManager.on('onSignal', (signal) => {
+        broadcast('signal', signal, 'signals');
+    });
+
+    botManager.on('onTrade', (trade) => {
+        broadcast('trade', trade, 'trades');
+    });
+
+    botManager.on('onAnalysis', (analysis) => {
+        broadcast('analysis', analysis, 'analysis');
+    });
+
+    botManager.on('onStatusChange', (status) => {
+        broadcast('botStatus', status, 'status');
     });
 
     // Ping périodique pour maintenir les connexions
