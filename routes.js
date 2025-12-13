@@ -667,27 +667,7 @@ router.post('/keys/load', async (req, res) => {
 
 // ==================== MULTI-WALLET ROUTES ====================
 // NOTE: Les routes /wallets principales sont dans walletRoutes.js (MongoDB)
-// Ces routes legacy utilisent le système fichier et sont conservées pour compatibilité
-
-/**
- * POST /api/wallets/load
- * Charge tous les wallets sauvegardés (système fichier legacy)
- */
-router.post('/wallets/load', async (req, res) => {
-    try {
-        const result = await auth.loadAllWallets();
-        const wallets = auth.listWallets();
-        const activeWallet = auth.getActiveWallet();
-        
-        res.json({
-            ...result,
-            wallets,
-            activeWallet
-        });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
+// La route legacy /wallets/load a été supprimée car elle interférait avec le système MongoDB
 
 // ==================== SIGNALS ROUTES ====================
 
