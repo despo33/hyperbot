@@ -260,10 +260,28 @@ router.post('/:id/activate', authenticateToken, async (req, res) => {
 /**
  * GET /api/wallets/active/secret
  * Récupère la phrase secrète du wallet actif (pour le trading)
- * Route interne, ne pas exposer au frontend
+ * Route INTERNE UNIQUEMENT - ne JAMAIS exposer au frontend
+ * Protégée par vérification d'origine
  */
 router.get('/active/secret', authenticateToken, async (req, res) => {
     try {
+        // SÉCURITÉ: Cette route ne doit être appelée que depuis le serveur lui-même
+        // Vérifie que la requête vient de localhost (appel interne)
+        const clientIP = req.ip || req.connection.remoteAddress;
+        const isLocalRequest = clientIP === '127.0.0.1' || 
+                               clientIP === '::1' || 
+                               clientIP === '::ffff:127.0.0.1' ||
+                               req.headers['x-internal-request'] === process.env.ENCRYPTION_KEY;
+        
+        // En production, bloquer les requêtes externes
+        if (process.env.NODE_ENV === 'production' && !isLocalRequest) {
+            console.warn(`[SECURITY] Tentative d'accès non autorisé à /active/secret depuis ${clientIP}`);
+            return res.status(403).json({ 
+                success: false, 
+                error: 'Accès non autorisé' 
+            });
+        }
+        
         const activeWallet = req.user.getActiveWallet();
         
         if (!activeWallet) {

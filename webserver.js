@@ -105,7 +105,10 @@ export function createWebServer(port = 3000) {
     app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
     // CORS configuré selon l'environnement
-    const corsOrigin = process.env.CORS_ORIGIN || '*';
+    // En production, restreindre aux origines autorisées
+    const corsOrigin = process.env.NODE_ENV === 'production' 
+        ? (process.env.CORS_ORIGIN || 'http://72.62.25.146')
+        : '*';
     app.use((req, res, next) => {
         res.header('Access-Control-Allow-Origin', corsOrigin);
         res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');

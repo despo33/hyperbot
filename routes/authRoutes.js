@@ -510,10 +510,10 @@ router.put('/password', authenticateToken, async (req, res) => {
             });
         }
 
-        if (newPassword.length < 6) {
+        if (newPassword.length < 8) {
             return res.status(400).json({ 
                 success: false, 
-                error: 'Le nouveau mot de passe doit contenir au moins 6 caractères' 
+                error: 'Le nouveau mot de passe doit contenir au moins 8 caractères' 
             });
         }
 
@@ -602,10 +602,10 @@ router.post('/reset-password', async (req, res) => {
             });
         }
 
-        if (newPassword.length < 6) {
+        if (newPassword.length < 8) {
             return res.status(400).json({ 
                 success: false, 
-                error: 'Le mot de passe doit contenir au moins 6 caractères' 
+                error: 'Le mot de passe doit contenir au moins 8 caractères' 
             });
         }
 
