@@ -153,7 +153,9 @@ class PriceFetcher {
      * @returns {Promise<Array>}
      */
     async getCandles(symbol, timeframe = '1h', limit = 100, forceRefresh = false) {
-        const cacheKey = `${symbol}_${timeframe}`;
+        // L'API Hyperliquid attend juste le symbole (BTC, ETH, etc.) sans -PERP
+        const cleanSymbol = symbol.replace('-PERP', '');
+        const cacheKey = `${cleanSymbol}_${timeframe}`;
         const cached = this.candleCache.get(cacheKey);
 
         // Retourne le cache si valide et suffisant
@@ -169,7 +171,7 @@ class PriceFetcher {
             const endTime = Date.now();
             const startTime = endTime - (intervalMs * (limit + 10)); // +10 pour la marge
 
-            const candles = await api.getCandles(symbol, timeframe, startTime, endTime);
+            const candles = await api.getCandles(cleanSymbol, timeframe, startTime, endTime);
 
             // Met en cache
             this.candleCache.set(cacheKey, {
@@ -179,7 +181,7 @@ class PriceFetcher {
 
             return candles.slice(-limit);
         } catch (error) {
-            console.error(`[PRICE] Erreur getCandles ${symbol} ${timeframe}:`, error.message);
+            console.error(`[PRICE] Erreur getCandles ${cleanSymbol} ${timeframe}:`, error.message);
             
             // Retourne le cache si disponible
             if (cached) {
