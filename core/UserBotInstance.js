@@ -343,23 +343,26 @@ class UserBotInstance {
         // Utilise signalDetector.analyze() qui fait tout le travail
         const analysis = signalDetector.analyze(candles, {}, timeframe);
         
-        if (!analysis.success || !analysis.finalSignal) {
+        if (!analysis.success || !analysis.finalSignal || !analysis.finalSignal.action) {
             return null;
         }
 
         const finalSignal = analysis.finalSignal;
+        const signalScore = finalSignal.score || finalSignal.normalizedScore || 0;
         
         // Vérifie les filtres de score
-        if (finalSignal.score < this.config.minScore) return null;
-        if (finalSignal.winProbability && finalSignal.winProbability < this.config.minWinProbability) return null;
+        if (signalScore < this.config.minScore) return null;
+
+        // Convertit direction bullish/bearish en LONG/SHORT
+        const direction = finalSignal.action === 'BUY' ? 'LONG' : 'SHORT';
 
         // Filtre RSI si activé
         if (this.config.useRSIFilter && analysis.indicators?.rsi) {
-            const rsiValue = analysis.indicators.rsi.value || analysis.indicators.rsi;
-            if (finalSignal.direction === 'LONG' && rsiValue > this.config.rsiOverbought) {
+            const rsiValue = analysis.indicators.rsi?.value || analysis.indicators.rsi || 50;
+            if (direction === 'LONG' && rsiValue > this.config.rsiOverbought) {
                 return null;
             }
-            if (finalSignal.direction === 'SHORT' && rsiValue < this.config.rsiOversold) {
+            if (direction === 'SHORT' && rsiValue < this.config.rsiOversold) {
                 return null;
             }
         }
@@ -367,7 +370,7 @@ class UserBotInstance {
         const result = {
             symbol: cleanSymbol,
             timeframe,
-            signal: finalSignal,
+            signal: { ...finalSignal, direction, score: signalScore },
             price: candles[candles.length - 1].close,
             ichimoku: analysis.ichimokuScore,
             indicators: analysis.indicators,
@@ -375,7 +378,7 @@ class UserBotInstance {
         };
 
         this.state.lastSignal = result;
-        this.log(`📊 Signal ${finalSignal.direction} sur ${symbol} (score: ${finalSignal.score})`, 'signal');
+        this.log(`📊 Signal ${direction} sur ${symbol} (score: ${signalScore.toFixed(1)})`, 'signal');
         this.emit('onSignal', result);
 
         return result;
