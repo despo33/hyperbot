@@ -347,7 +347,7 @@ class UserBotInstance {
         if (!ichimokuData) return null;
 
         // Calcule les indicateurs
-        const indicatorData = indicators.calculateAll(candles);
+        const indicatorData = indicators.analyzeAll(candles, timeframe);
 
         // Détecte les signaux
         const signals = signalDetector.detectSignals(candles, ichimokuData, indicatorData, this.config.enabledSignals);
