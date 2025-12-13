@@ -333,10 +333,11 @@ class UserBotInstance {
      * Analyse un symbole sur un timeframe
      */
     async analyzeSymbol(symbol, timeframe) {
-        const fullSymbol = symbol.includes('-') ? symbol : `${symbol}-PERP`;
+        // L'API Hyperliquid attend juste le symbole (BTC, ETH, etc.) sans -PERP
+        const cleanSymbol = symbol.replace('-PERP', '');
         
         // Récupère les candles
-        const candles = await priceFetcher.getCandles(fullSymbol, timeframe, 200);
+        const candles = await priceFetcher.getCandles(cleanSymbol, timeframe, 200);
         if (!candles || candles.length < 52) {
             return null;
         }
