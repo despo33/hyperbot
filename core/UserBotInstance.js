@@ -343,7 +343,7 @@ class UserBotInstance {
         }
 
         // Calcule Ichimoku
-        const ichimokuData = ichimoku.calculate(candles);
+        const ichimokuData = ichimoku.calculateIchimoku(candles);
         if (!ichimokuData) return null;
 
         // Calcule les indicateurs
