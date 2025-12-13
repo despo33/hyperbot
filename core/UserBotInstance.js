@@ -116,7 +116,7 @@ class UserBotInstance {
             timeframes: ['1h'],
             leverage: 10,
             maxConcurrentTrades: 7,
-            mode: 'manual',
+            mode: 'auto',
             analysisInterval: 60000,
             minWinProbability: 0.65,
             minScore: 3,
