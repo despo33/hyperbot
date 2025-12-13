@@ -666,140 +666,12 @@ router.post('/keys/load', async (req, res) => {
 });
 
 // ==================== MULTI-WALLET ROUTES ====================
-
-/**
- * GET /api/wallets
- * Liste tous les wallets enregistrés
- */
-router.get('/wallets', (req, res) => {
-    try {
-        const wallets = auth.listWallets();
-        const activeWallet = auth.getActiveWallet();
-        res.json({ 
-            wallets, 
-            activeWallet,
-            count: wallets.length 
-        });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-/**
- * POST /api/wallets/add
- * Ajoute un nouveau wallet
- */
-router.post('/wallets/add', async (req, res) => {
-    try {
-        const { name, secretPhrase, tradingAddress, apiKey } = req.body;
-
-        if (!secretPhrase) {
-            return res.status(400).json({ error: 'Secret phrase requis' });
-        }
-
-        const result = await auth.addWallet(name, secretPhrase, tradingAddress, apiKey);
-        
-        if (!result.success) {
-            return res.status(400).json(result);
-        }
-
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-/**
- * DELETE /api/wallets/:walletId
- * Supprime un wallet
- */
-router.delete('/wallets/:walletId', (req, res) => {
-    try {
-        const { walletId } = req.params;
-        const result = auth.removeWallet(walletId);
-        
-        if (!result.success) {
-            return res.status(404).json(result);
-        }
-
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-/**
- * PUT /api/wallets/:walletId/rename
- * Renomme un wallet
- */
-router.put('/wallets/:walletId/rename', (req, res) => {
-    try {
-        const { walletId } = req.params;
-        const { name } = req.body;
-
-        if (!name) {
-            return res.status(400).json({ error: 'Nom requis' });
-        }
-
-        const result = auth.renameWallet(walletId, name);
-        
-        if (!result.success) {
-            return res.status(404).json(result);
-        }
-
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-/**
- * POST /api/wallets/:walletId/activate
- * Active un wallet spécifique
- */
-router.post('/wallets/:walletId/activate', async (req, res) => {
-    try {
-        const { walletId } = req.params;
-        const result = await auth.switchWallet(walletId);
-        
-        if (!result.success) {
-            return res.status(404).json(result);
-        }
-
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-/**
- * PUT /api/wallets/:walletId/trading-address
- * Met à jour l'adresse de trading d'un wallet
- */
-router.put('/wallets/:walletId/trading-address', (req, res) => {
-    try {
-        const { walletId } = req.params;
-        const { tradingAddress } = req.body;
-
-        if (!tradingAddress) {
-            return res.status(400).json({ error: 'Adresse de trading requise' });
-        }
-
-        const result = auth.updateTradingAddress(walletId, tradingAddress);
-        
-        if (!result.success) {
-            return res.status(400).json(result);
-        }
-
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
+// NOTE: Les routes /wallets principales sont dans walletRoutes.js (MongoDB)
+// Ces routes legacy utilisent le système fichier et sont conservées pour compatibilité
 
 /**
  * POST /api/wallets/load
- * Charge tous les wallets sauvegardés
+ * Charge tous les wallets sauvegardés (système fichier legacy)
  */
 router.post('/wallets/load', async (req, res) => {
     try {
@@ -811,34 +683,6 @@ router.post('/wallets/load', async (req, res) => {
             ...result,
             wallets,
             activeWallet
-        });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-/**
- * GET /api/wallets/:walletId/balance
- * Récupère le solde d'un wallet spécifique
- */
-router.get('/wallets/:walletId/balance', async (req, res) => {
-    try {
-        const { walletId } = req.params;
-        const wallets = auth.listWallets();
-        const wallet = wallets.find(w => w.id === walletId);
-        
-        if (!wallet) {
-            return res.status(404).json({ error: 'Wallet non trouvé' });
-        }
-
-        const balance = await api.getAccountBalance(wallet.tradingAddress || wallet.address);
-        
-        res.json({
-            walletId,
-            name: wallet.name,
-            address: wallet.address,
-            tradingAddress: wallet.tradingAddress,
-            balance
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
