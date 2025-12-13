@@ -4,7 +4,7 @@
  */
 
 import api from '../services/hyperliquidApi.js';
-import HyperliquidAuth from '../services/hyperliquidAuth.js';
+import { HyperliquidAuth } from '../services/hyperliquidAuth.js';
 import priceFetcher from './priceFetcher.js';
 import signalDetector from './signalDetector.js';
 import RiskManager from './riskManager.js';

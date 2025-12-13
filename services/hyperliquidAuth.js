@@ -581,3 +581,4 @@ class HyperliquidAuth {
 // Instance singleton
 const auth = new HyperliquidAuth();
 export default auth;
+export { HyperliquidAuth };
