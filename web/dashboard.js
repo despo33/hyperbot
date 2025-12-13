@@ -655,6 +655,11 @@ function updateSignalDisplay(signal) {
     const badgeEl = document.querySelector('#lastSignal .signal-badge');
     const detailsEl = document.getElementById('signalDetails');
 
+    // Vérifie que les éléments existent
+    if (!badgeEl || !detailsEl) {
+        return;
+    }
+
     if (!signal || !signal.action) {
         badgeEl.textContent = 'AUCUN';
         badgeEl.className = 'signal-badge neutral';

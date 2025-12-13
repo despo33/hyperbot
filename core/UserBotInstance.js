@@ -426,20 +426,93 @@ class UserBotInstance {
         this.log(`🎯 Exécution ${signal.direction} sur ${symbol} @ ${price}`, 'trade');
         this.log(`   TP: ${tpsl.tp.toFixed(2)} | SL: ${tpsl.sl.toFixed(2)}`, 'trade');
 
-        // TODO: Implémenter l'exécution réelle via l'API
-        // Pour l'instant, on simule
-        
-        this.state.lastTradeTime.set(symbol, Date.now());
-        this.lastGlobalTradeTime = Date.now();
+        try {
+            // Calcule la taille de la position basée sur le solde et le risque
+            const balance = await this.getBalance();
+            if (!balance || balance.totalEquity <= 0) {
+                this.log(`❌ Solde insuffisant pour trader`, 'error');
+                return;
+            }
 
-        this.emit('onTrade', {
-            symbol,
-            direction: signal.direction,
-            price,
-            tp: tpsl.tp,
-            sl: tpsl.sl,
-            timestamp: new Date()
-        });
+            // Risque par trade (2% du capital par défaut)
+            const riskPercent = this.config.riskPerTrade || 2;
+            const riskAmount = balance.totalEquity * (riskPercent / 100);
+            
+            // Calcule la taille basée sur le SL
+            const slDistance = Math.abs(price - tpsl.sl);
+            const slPercent = (slDistance / price) * 100;
+            
+            // Taille = (Risque en $) / (Distance SL en %)
+            let positionSize = riskAmount / slDistance;
+            
+            // Applique le levier
+            const leverage = this.config.leverage || 10;
+            positionSize = positionSize * leverage / price;
+            
+            // Minimum 10$ de position
+            const minNotional = 10;
+            const notionalValue = positionSize * price;
+            if (notionalValue < minNotional) {
+                positionSize = minNotional / price;
+            }
+
+            this.log(`📊 Taille position: ${positionSize.toFixed(4)} ${symbol} (${(positionSize * price).toFixed(2)} USD)`, 'info');
+
+            // Exécute l'ordre via l'API
+            const isBuy = signal.direction === 'LONG';
+            
+            const result = await api.placeOrderWithTPSL({
+                symbol: symbol,
+                isBuy: isBuy,
+                size: positionSize,
+                price: price,
+                takeProfit: tpsl.tp,
+                stopLoss: tpsl.sl,
+                leverage: leverage,
+                reduceOnly: false
+            });
+
+            this.log(`✅ Ordre exécuté: ${JSON.stringify(result)}`, 'trade');
+            
+            // Met à jour l'état
+            this.state.lastTradeTime.set(symbol, Date.now());
+            this.lastGlobalTradeTime = Date.now();
+            this.state.activePositions.set(symbol, {
+                direction: signal.direction,
+                entryPrice: price,
+                size: positionSize,
+                tp: tpsl.tp,
+                sl: tpsl.sl,
+                timestamp: new Date()
+            });
+
+            this.emit('onTrade', {
+                symbol,
+                direction: signal.direction,
+                price,
+                size: positionSize,
+                tp: tpsl.tp,
+                sl: tpsl.sl,
+                result: result,
+                timestamp: new Date()
+            });
+
+        } catch (error) {
+            this.log(`❌ Erreur exécution ordre ${symbol}: ${error.message}`, 'error');
+        }
+    }
+    
+    /**
+     * Récupère le solde du compte
+     */
+    async getBalance() {
+        try {
+            const tradingAddress = this.auth.tradingAddress || this.auth.getAddress();
+            return await api.getBalance(tradingAddress);
+        } catch (error) {
+            this.log(`Erreur récupération solde: ${error.message}`, 'error');
+            return null;
+        }
     }
 
     /**
