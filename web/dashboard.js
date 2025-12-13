@@ -1259,18 +1259,13 @@ async function loadWallets() {
 }
 
 /**
- * Charge les wallets sauvegardés depuis le fichier
+ * Recharge les wallets depuis la base de données
  */
 async function loadAllWallets() {
     try {
-        const data = await apiRequest('/wallets/load', { method: 'POST' });
-        
-        if (data.success) {
-            showToast(`${data.count} wallet(s) chargé(s)`, 'success');
-            renderWalletsList(data.wallets || []);
-            updateActiveWalletInfo(data.activeWallet);
-            document.getElementById('walletCount').textContent = data.count || 0;
-        }
+        // Utilise la même route que loadWallets() - MongoDB
+        await loadWallets();
+        showToast('Wallets rechargés', 'success');
     } catch (error) {
         showToast('Erreur: ' + error.message, 'error');
     }
