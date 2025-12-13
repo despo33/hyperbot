@@ -1937,12 +1937,45 @@ function quickTrade(symbol, signal) {
     showTradeDetails(symbol);
 }
 
+// ==================== MOBILE MENU ====================
+
+/**
+ * Toggle le menu mobile
+ */
+function toggleMobileMenu() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('mobileOverlay');
+    
+    if (sidebar && overlay) {
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('active');
+        document.body.style.overflow = sidebar.classList.contains('open') ? 'hidden' : '';
+    }
+}
+
+/**
+ * Ferme le menu mobile
+ */
+function closeMobileMenu() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('mobileOverlay');
+    
+    if (sidebar && overlay) {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+}
+
 // ==================== NAVIGATION ====================
 
 /**
  * Change de page
  */
 function navigateTo(page) {
+    // Ferme le menu mobile si ouvert
+    closeMobileMenu();
+    
     // Met à jour la navigation
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.toggle('active', item.dataset.page === page);

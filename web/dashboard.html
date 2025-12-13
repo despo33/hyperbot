@@ -36,8 +36,14 @@
 <body>
     <!-- Main App -->
     <div id="app" class="app">
+        <!-- Mobile Overlay -->
+        <div class="mobile-overlay" id="mobileOverlay" onclick="toggleMobileMenu()"></div>
+        
         <!-- Sidebar -->
-        <nav class="sidebar">
+        <nav class="sidebar" id="sidebar">
+            <button class="sidebar-close-btn" onclick="toggleMobileMenu()">
+                <i data-lucide="x"></i>
+            </button>
             <div class="sidebar-header">
                 <div class="logo">
                     <i data-lucide="bot"></i>
@@ -93,6 +99,9 @@
             <!-- Header -->
             <header class="header">
                 <div class="header-left">
+                    <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileMenu()">
+                        <i data-lucide="menu"></i>
+                    </button>
                     <h1 id="pageTitle">Tableau de bord</h1>
                 </div>
                 <div class="header-right">
