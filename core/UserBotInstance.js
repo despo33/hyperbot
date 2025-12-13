@@ -8,8 +8,6 @@ import { HyperliquidAuth } from '../services/hyperliquidAuth.js';
 import priceFetcher from './priceFetcher.js';
 import signalDetector from './signalDetector.js';
 import RiskManager from './riskManager.js';
-import ichimoku from './ichimoku.js';
-import indicators from './indicators.js';
 import { decryptSecret } from '../utils/crypto.js';
 
 /**
@@ -338,51 +336,46 @@ class UserBotInstance {
         
         // Récupère les candles
         const candles = await priceFetcher.getCandles(cleanSymbol, timeframe, 200);
-        if (!candles || candles.length < 52) {
+        if (!candles || candles.length < 60) {
             return null;
         }
 
-        // Calcule Ichimoku
-        const ichimokuData = ichimoku.calculateIchimoku(candles);
-        if (!ichimokuData) return null;
+        // Utilise signalDetector.analyze() qui fait tout le travail
+        const analysis = signalDetector.analyze(candles, {}, timeframe);
+        
+        if (!analysis.success || !analysis.finalSignal) {
+            return null;
+        }
 
-        // Calcule les indicateurs
-        const indicatorData = indicators.analyzeAll(candles, timeframe);
+        const finalSignal = analysis.finalSignal;
+        
+        // Vérifie les filtres de score
+        if (finalSignal.score < this.config.minScore) return null;
+        if (finalSignal.winProbability && finalSignal.winProbability < this.config.minWinProbability) return null;
 
-        // Détecte les signaux
-        const signals = signalDetector.detectSignals(candles, ichimokuData, indicatorData, this.config.enabledSignals);
-
-        if (signals.length === 0) return null;
-
-        // Prend le signal le plus fort
-        const bestSignal = signals.reduce((best, s) => s.score > best.score ? s : best, signals[0]);
-
-        // Vérifie les filtres
-        if (bestSignal.score < this.config.minScore) return null;
-        if (bestSignal.winProbability < this.config.minWinProbability) return null;
-
-        // Filtre RSI
-        if (this.config.useRSIFilter && indicatorData.rsi) {
-            if (bestSignal.direction === 'LONG' && indicatorData.rsi > this.config.rsiOverbought) {
+        // Filtre RSI si activé
+        if (this.config.useRSIFilter && analysis.indicators?.rsi) {
+            const rsiValue = analysis.indicators.rsi.value || analysis.indicators.rsi;
+            if (finalSignal.direction === 'LONG' && rsiValue > this.config.rsiOverbought) {
                 return null;
             }
-            if (bestSignal.direction === 'SHORT' && indicatorData.rsi < this.config.rsiOversold) {
+            if (finalSignal.direction === 'SHORT' && rsiValue < this.config.rsiOversold) {
                 return null;
             }
         }
 
         const result = {
-            symbol: fullSymbol,
+            symbol: cleanSymbol,
             timeframe,
-            signal: bestSignal,
+            signal: finalSignal,
             price: candles[candles.length - 1].close,
-            ichimoku: ichimokuData,
-            indicators: indicatorData,
+            ichimoku: analysis.ichimokuScore,
+            indicators: analysis.indicators,
             timestamp: new Date()
         };
 
         this.state.lastSignal = result;
-        this.log(`📊 Signal ${bestSignal.direction} sur ${symbol} (score: ${bestSignal.score})`, 'signal');
+        this.log(`📊 Signal ${finalSignal.direction} sur ${symbol} (score: ${finalSignal.score})`, 'signal');
         this.emit('onSignal', result);
 
         return result;
