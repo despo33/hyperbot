@@ -292,6 +292,7 @@ class UserBotInstance {
 
         try {
             this.state.analysisCount++;
+            this.log(`🔍 Analyse #${this.state.analysisCount} - ${this.config.symbols.length} symboles sur ${this.config.timeframes.join(', ')}`, 'info');
             const opportunities = [];
 
             for (const symbol of this.config.symbols) {
@@ -309,6 +310,8 @@ class UserBotInstance {
 
             this.state.opportunities = opportunities;
             this.state.lastAnalysis = new Date();
+            
+            this.log(`✅ Analyse terminée: ${opportunities.length} opportunités trouvées`, 'info');
 
             // Émet l'événement d'analyse
             this.emit('onAnalysis', {
@@ -319,6 +322,7 @@ class UserBotInstance {
 
             // En mode auto, exécute les trades
             if (this.config.mode === 'auto' && opportunities.length > 0) {
+                this.log(`🎯 Mode AUTO: traitement de ${opportunities.length} opportunités`, 'info');
                 await this.processOpportunities(opportunities);
             }
 
