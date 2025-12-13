@@ -508,7 +508,7 @@ class UserBotInstance {
     async getBalance() {
         try {
             const tradingAddress = this.auth.tradingAddress || this.auth.getAddress();
-            return await api.getBalance(tradingAddress);
+            return await api.getAccountBalance(tradingAddress);
         } catch (error) {
             this.log(`Erreur récupération solde: ${error.message}`, 'error');
             return null;
