@@ -5,7 +5,7 @@
 
 // Configuration EmailJS
 const EMAILJS_CONFIG = {
-    serviceId: 'service_6l0qdkv',           // Service SMTP Hostinger
+    serviceId: 'service_n7ht3ns',           // Service SMTP Hostinger
     publicKey: '1gU42ltovIyRmP-_F',
     templates: {
         verification: 'template_9lx6dfr',   // Template de vérification
