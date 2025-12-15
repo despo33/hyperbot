@@ -389,6 +389,9 @@ router.post('/config/trading', optionalAuth, async (req, res) => {
             if (configUpdate.multiTimeframeMode !== undefined) req.user.botConfig.multiTimeframeMode = configUpdate.multiTimeframeMode;
             if (configUpdate.mtfTimeframes) req.user.botConfig.mtfTimeframes = configUpdate.mtfTimeframes;
             if (configUpdate.mtfMinConfirmation) req.user.botConfig.mtfMinConfirmation = configUpdate.mtfMinConfirmation;
+            // Risk Management
+            if (configUpdate.riskPerTrade) req.user.botConfig.riskPerTrade = configUpdate.riskPerTrade;
+            if (configUpdate.maxPositionSize) req.user.botConfig.maxPositionSize = configUpdate.maxPositionSize;
             if (configUpdate.enabledSignals) {
                 req.user.botConfig.enabledSignals = { ...req.user.botConfig.enabledSignals, ...configUpdate.enabledSignals };
             }
@@ -418,17 +421,47 @@ router.post('/config/trading', optionalAuth, async (req, res) => {
  * GET /api/config/risk
  * Retourne la config risk management
  */
-router.get('/config/risk', (req, res) => {
-    res.json({ config: riskManager.getConfig() });
+router.get('/config/risk', optionalAuth, async (req, res) => {
+    // Si utilisateur connecté, retourne sa config risk depuis botConfig
+    if (req.user && req.user.botConfig) {
+        return res.json({ 
+            config: {
+                riskPerTrade: req.user.botConfig.riskPerTrade || 2,
+                maxPositionSize: req.user.botConfig.maxPositionSize || 50,
+                ...riskManager.getConfig()
+            },
+            fromUser: true 
+        });
+    }
+    res.json({ config: riskManager.getConfig(), fromUser: false });
 });
 
 /**
  * POST /api/config/risk
  * Met à jour la config risk management
  */
-router.post('/config/risk', (req, res) => {
+router.post('/config/risk', optionalAuth, async (req, res) => {
     try {
-        riskManager.updateConfig(req.body);
+        const configUpdate = req.body;
+        
+        // Si utilisateur connecté, sauvegarde dans son compte
+        if (req.user) {
+            if (configUpdate.riskPerTrade) req.user.botConfig.riskPerTrade = configUpdate.riskPerTrade;
+            if (configUpdate.maxPositionSize) req.user.botConfig.maxPositionSize = configUpdate.maxPositionSize;
+            
+            await req.user.save();
+            console.log(`[RISK] Config risk sauvegardée pour ${req.user.username}`);
+            
+            // Applique au bot utilisateur actif
+            const userId = req.user._id.toString();
+            botManager.updateBotConfig(userId, {
+                riskPerTrade: configUpdate.riskPerTrade,
+                maxPositionSize: configUpdate.maxPositionSize
+            });
+        }
+        
+        // Sauvegarde aussi dans riskManager (pour les autres paramètres)
+        riskManager.updateConfig(configUpdate);
         res.json({ success: true, config: riskManager.getConfig() });
     } catch (error) {
         res.status(500).json({ error: error.message });

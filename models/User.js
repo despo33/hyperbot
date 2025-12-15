@@ -131,6 +131,55 @@ const userSchema = new mongoose.Schema({
             kumoBreakout: { type: Boolean, default: true },
             kumoTwist: { type: Boolean, default: true },
             kijunBounce: { type: Boolean, default: true }
+        },
+        // Intervalle d'analyse
+        analysisInterval: {
+            type: Number,
+            default: 60000
+        },
+        // Multi-Timeframe
+        multiTimeframeMode: {
+            type: Boolean,
+            default: false
+        },
+        mtfTimeframes: {
+            type: [String],
+            default: ['5m', '15m', '1h']
+        },
+        mtfMinConfirmation: {
+            type: Number,
+            default: 2
+        },
+        // Filtres RSI
+        useRSIFilter: {
+            type: Boolean,
+            default: true
+        },
+        rsiOverbought: {
+            type: Number,
+            default: 70
+        },
+        rsiOversold: {
+            type: Number,
+            default: 30
+        },
+        // ATR
+        atrMultiplierSL: {
+            type: Number,
+            default: 1.5
+        },
+        atrMultiplierTP: {
+            type: Number,
+            default: 2.5
+        },
+        // Risk Management
+        riskPerTrade: {
+            type: Number,
+            default: 2
+        },
+        maxPositionSize: {
+            type: Number,
+            default: 50
         }
     },
     
