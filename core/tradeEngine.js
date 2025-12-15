@@ -264,8 +264,6 @@ class TradeEngine {
         const preset = this.getTimeframePreset(timeframe);
         const tpsl = this.TIMEFRAME_TPSL[timeframe] || { tp: 2.0, sl: 1.0 };
         
-        this.log(`Applying preset "${preset.name}" for ${timeframe}`, 'info');
-        
         // Applique les réglages du preset
         this.config.minScore = preset.minScore;
         this.config.minWinProbability = preset.minWinProbability;
@@ -282,10 +280,7 @@ class TradeEngine {
         // Applique le RRR minimum du preset au riskManager
         if (riskManager && preset.minRRR !== undefined) {
             riskManager.config.minRiskRewardRatio = preset.minRRR;
-            this.log(`RRR minimum ajusté: ${preset.minRRR}`, 'info');
         }
-        
-        this.log(`Preset ${preset.name}: Score>=${preset.minScore}, WinProb>=${(preset.minWinProbability*100).toFixed(0)}%, RSI LONG<=${preset.rsiLongMax}, ADX>=${preset.adxMin}, RRR>=${preset.minRRR}`, 'info');
         
         return preset;
     }
@@ -311,21 +306,32 @@ class TradeEngine {
             }
         }
         
-        // Détermine les TP/SL à utiliser
+        // Détermine les TP/SL à utiliser selon le mode
         let tpPercent, slPercent;
+        const tpslMode = newConfig.tpslMode || 'auto';
         
-        if (newConfig.defaultTP !== undefined && newConfig.defaultSL !== undefined) {
-            // Utilise les valeurs envoyées par le dashboard
+        if (tpslMode === 'percent' && newConfig.defaultTP !== undefined && newConfig.defaultSL !== undefined) {
+            // Mode pourcentage manuel
             tpPercent = newConfig.defaultTP;
             slPercent = newConfig.defaultSL;
-            this.log(`TP/SL configurés manuellement: TP=${tpPercent}%, SL=${slPercent}%`, 'info');
-        } else if (newConfig.timeframes) {
-            // Utilise les valeurs par défaut du timeframe
-            const tf = newConfig.timeframes[0] || '15m';
+            this.log(`TP/SL manuels: TP=${tpPercent}%, SL=${slPercent}%`, 'info');
+        } else if (tpslMode === 'atr') {
+            // Mode ATR - les valeurs seront calculées dynamiquement
+            tpPercent = newConfig.defaultTP;
+            slPercent = newConfig.defaultSL;
+            this.log(`TP/SL mode ATR: multiplicateurs SL=${newConfig.atrMultiplierSL || 1.5}x, TP=${newConfig.atrMultiplierTP || 2.5}x`, 'info');
+        } else if (tpslMode === 'ichimoku_pure') {
+            // Mode Ichimoku pur - TP/SL basés sur les niveaux Ichimoku
+            tpPercent = newConfig.defaultTP;
+            slPercent = newConfig.defaultSL;
+            this.log(`TP/SL mode Ichimoku: niveaux dynamiques basés sur Kumo/Kijun`, 'info');
+        } else {
+            // Mode auto - utilise les valeurs du timeframe
+            const tf = newConfig.timeframes?.[0] || '15m';
             const tpsl = this.TIMEFRAME_TPSL[tf] || { tp: 2.0, sl: 1.0 };
-            tpPercent = tpsl.tp;
-            slPercent = tpsl.sl;
-            this.log(`TP/SL adaptés au timeframe ${tf}: TP=${tpPercent}%, SL=${slPercent}%`, 'info');
+            tpPercent = newConfig.defaultTP !== undefined ? newConfig.defaultTP : tpsl.tp;
+            slPercent = newConfig.defaultSL !== undefined ? newConfig.defaultSL : tpsl.sl;
+            this.log(`TP/SL auto (${tf}): TP=${tpPercent}%, SL=${slPercent}%`, 'info');
         }
         
         // Met à jour la config du tradeEngine
