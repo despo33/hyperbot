@@ -112,10 +112,15 @@ class UserBotInstance {
         this.log(`🚀 Bot démarré pour l'utilisateur ${this.userId}`, 'success');
         this.log(`Mode: ${this.config.mode.toUpperCase()}`, 'info');
         this.log(`Symboles: ${this.config.symbols.join(', ')}`, 'info');
-        this.log(`Timeframe: ${this.config.timeframes.join(', ')}`, 'info');
-
-        // Applique le preset du timeframe
-        this.applyTimeframePreset(this.config.timeframes[0]);
+        
+        // Affiche les timeframes selon le mode
+        if (this.config.multiTimeframeMode && this.config.mtfTimeframes?.length > 0) {
+            this.log(`Mode Multi-Timeframe: ${this.config.mtfTimeframes.join(', ')}`, 'info');
+        } else {
+            this.log(`Timeframe: ${this.config.timeframes.join(', ')}`, 'info');
+            // Applique le preset seulement en mode non-MTF
+            this.applyTimeframePreset(this.config.timeframes[0]);
+        }
 
         // Démarre la boucle d'analyse
         this.startAnalysisLoop();
@@ -151,7 +156,10 @@ class UserBotInstance {
             this.config.minScore = preset.minScore;
             this.config.minWinProbability = preset.minWinProbability;
             this.config.analysisInterval = preset.analysisInterval;
-            this.log(`Preset ${preset.name} appliqué pour ${timeframe}`, 'info');
+            // Log seulement si pas en mode MTF
+            if (!this.config.multiTimeframeMode) {
+                this.log(`Preset ${preset.name} appliqué pour ${timeframe}`, 'info');
+            }
         }
     }
 
