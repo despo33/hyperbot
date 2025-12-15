@@ -9,6 +9,12 @@ import User from '../models/User.js';
 export const JWT_SECRET = process.env.JWT_SECRET || 'hyperliquid-bot-jwt-secret-key';
 export const JWT_EXPIRES_IN = '7d';
 
+// Avertissement sécurité si clé par défaut en production
+if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'hyperliquid-bot-jwt-secret-key') {
+    console.error('[SECURITY] ⚠️ ATTENTION: JWT_SECRET par défaut utilisé en production!');
+    console.error('[SECURITY] Définissez JWT_SECRET dans vos variables d\'environnement.');
+}
+
 /**
  * Middleware optionnel - récupère l'utilisateur si token présent
  * Ne bloque pas si pas de token

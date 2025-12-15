@@ -361,9 +361,9 @@ router.get('/config/trading', optionalAuth, async (req, res) => {
 
 /**
  * POST /api/config/trading
- * Met à jour la config trading de l'utilisateur
+ * Met à jour la config trading de l'utilisateur (protégé)
  */
-router.post('/config/trading', optionalAuth, async (req, res) => {
+router.post('/config/trading', requireAuth, async (req, res) => {
     try {
         // Si utilisateur connecté, sauvegarde dans son compte
         if (req.user) {
@@ -438,9 +438,9 @@ router.get('/config/risk', optionalAuth, async (req, res) => {
 
 /**
  * POST /api/config/risk
- * Met à jour la config risk management
+ * Met à jour la config risk management (protégé)
  */
-router.post('/config/risk', optionalAuth, async (req, res) => {
+router.post('/config/risk', requireAuth, async (req, res) => {
     try {
         const configUpdate = req.body;
         
@@ -495,9 +495,9 @@ router.post('/risk/restart-bot', requireAuth, (req, res) => {
 
 /**
  * POST /api/keys/save
- * Sauvegarde les clés API dans le compte utilisateur
+ * Sauvegarde les clés API dans le compte utilisateur (protégé)
  */
-router.post('/keys/save', optionalAuth, async (req, res) => {
+router.post('/keys/save', requireAuth, async (req, res) => {
     try {
         const { secretPhrase, apiKey, tradingAddress, walletName } = req.body;
 
@@ -676,9 +676,9 @@ router.get('/account/check/:address', async (req, res) => {
 
 /**
  * POST /api/keys/test
- * Teste la connexion
+ * Teste la connexion (protégé)
  */
-router.post('/keys/test', async (req, res) => {
+router.post('/keys/test', requireAuth, async (req, res) => {
     try {
         const result = await auth.testConnection();
         res.json(result);
@@ -689,9 +689,9 @@ router.post('/keys/test', async (req, res) => {
 
 /**
  * POST /api/keys/load
- * Charge les clés sauvegardées
+ * Charge les clés sauvegardées (protégé)
  */
-router.post('/keys/load', async (req, res) => {
+router.post('/keys/load', requireAuth, async (req, res) => {
     try {
         const keys = auth.loadKeys();
         
@@ -1147,9 +1147,9 @@ router.get('/trade-details/:symbol', async (req, res) => {
 
 /**
  * POST /api/scanner/start
- * Démarre le scan automatique
+ * Démarre le scan automatique (protégé)
  */
-router.post('/scanner/start', (req, res) => {
+router.post('/scanner/start', requireAuth, (req, res) => {
     const intervalMs = req.body.interval || 300000; // 5 min par défaut
     const timeframe = req.body.timeframe || '1h';
     
@@ -1164,9 +1164,9 @@ router.post('/scanner/start', (req, res) => {
 
 /**
  * POST /api/scanner/stop
- * Arrête le scan automatique
+ * Arrête le scan automatique (protégé)
  */
-router.post('/scanner/stop', (req, res) => {
+router.post('/scanner/stop', requireAuth, (req, res) => {
     scanner.stopAutoScan();
     res.json({ success: true, message: 'Scan automatique arrêté' });
 });
