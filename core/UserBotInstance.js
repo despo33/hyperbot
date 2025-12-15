@@ -185,7 +185,20 @@ class UserBotInstance {
                 : this.config.timeframes;
             
             const modeLabel = this.config.multiTimeframeMode ? 'MTF' : 'Normal';
-            this.log(`🔍 Analyse #${this.state.analysisCount} [${modeLabel}] - ${this.config.symbols.length} symboles sur ${timeframesToAnalyze.join(', ')}`, 'info');
+            
+            // Log des TP/SL par timeframe en mode MTF
+            if (this.config.multiTimeframeMode) {
+                const tpslInfo = timeframesToAnalyze.map(tf => {
+                    const preset = this.TIMEFRAME_TPSL[tf] || { tp: 2, sl: 1 };
+                    return `${tf}(TP:${preset.tp}%/SL:${preset.sl}%)`;
+                }).join(', ');
+                this.log(`🔍 Analyse #${this.state.analysisCount} [MTF] - ${this.config.symbols.length} symboles`, 'info');
+                this.log(`📊 Timeframes: ${tpslInfo}`, 'info');
+            } else {
+                const tf = timeframesToAnalyze[0];
+                const preset = this.TIMEFRAME_TPSL[tf] || { tp: 2, sl: 1 };
+                this.log(`🔍 Analyse #${this.state.analysisCount} [${tf}] - ${this.config.symbols.length} symboles (TP:${preset.tp}%/SL:${preset.sl}%)`, 'info');
+            }
             
             const opportunities = [];
 
@@ -276,7 +289,8 @@ class UserBotInstance {
         };
 
         this.state.lastSignal = result;
-        this.log(`📊 Signal ${direction} sur ${symbol} (score: ${signalScore.toFixed(1)})`, 'signal');
+        const tfPreset = this.TIMEFRAME_TPSL[timeframe] || { tp: 2, sl: 1 };
+        this.log(`📊 Signal ${direction} sur ${symbol} [${timeframe}] (score: ${signalScore.toFixed(1)}) - TP:${tfPreset.tp}%/SL:${tfPreset.sl}%`, 'signal');
         this.emit('onSignal', result);
 
         return result;
