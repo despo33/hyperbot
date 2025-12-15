@@ -212,7 +212,9 @@
                     </label>
                     <div class="relative">
                         <input type="password" id="register-password" class="input-field w-full px-4 py-3 rounded-lg pr-12" 
-                               placeholder="Minimum 6 caractères" minlength="6" required>
+                               placeholder="Minimum 8 caractères" minlength="8" required 
+                               pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$"
+                               title="Le mot de passe doit contenir au moins 8 caractères, une majuscule, une minuscule et un chiffre">
                         <button type="button" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
                                 onclick="togglePassword('register-password')">
                             <i class="fas fa-eye"></i>
@@ -520,6 +522,32 @@
             // Validation
             if (password !== passwordConfirm) {
                 showError('Les mots de passe ne correspondent pas');
+                return;
+            }
+            
+            // Validation mot de passe fort
+            if (password.length < 8) {
+                showError('Le mot de passe doit contenir au moins 8 caractères');
+                return;
+            }
+            
+            const hasUpperCase = /[A-Z]/.test(password);
+            const hasLowerCase = /[a-z]/.test(password);
+            const hasNumber = /\d/.test(password);
+            
+            if (!hasUpperCase || !hasLowerCase || !hasNumber) {
+                showError('Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre');
+                return;
+            }
+            
+            // Validation username
+            if (username.length < 3 || username.length > 30) {
+                showError('Le nom d\'utilisateur doit contenir entre 3 et 30 caractères');
+                return;
+            }
+            
+            if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+                showError('Le nom d\'utilisateur ne peut contenir que des lettres, chiffres et underscores');
                 return;
             }
             

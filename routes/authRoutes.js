@@ -154,6 +154,18 @@ router.post('/register', async (req, res) => {
             });
         }
 
+        // Validation mot de passe fort (majuscule, minuscule, chiffre)
+        const hasUpperCase = /[A-Z]/.test(password);
+        const hasLowerCase = /[a-z]/.test(password);
+        const hasNumber = /\d/.test(password);
+        
+        if (!hasUpperCase || !hasLowerCase || !hasNumber) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre' 
+            });
+        }
+
         // Vérifie si l'email existe déjà
         const existingEmail = await User.findOne({ email: email.toLowerCase() });
         if (existingEmail) {
