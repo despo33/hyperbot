@@ -196,27 +196,30 @@ class UserBotInstance {
             };
             const tpslModeLabel = tpslModeLabels[this.config.tpslMode] || 'Auto';
             
+            // Modes dynamiques (tous sauf 'percent')
+            const isDynamicMode = this.config.tpslMode !== 'percent';
+            
             // Log des TP/SL par timeframe en mode MTF
             if (this.config.multiTimeframeMode) {
                 this.log(`🔍 Analyse #${this.state.analysisCount} [MTF] - ${this.config.symbols.length} symboles`, 'info');
                 this.log(`🎯 Mode TP/SL: ${tpslModeLabel}`, 'info');
                 
-                if (this.config.tpslMode === 'ichimoku') {
+                if (isDynamicMode) {
                     this.log(`📊 Timeframes: ${timeframesToAnalyze.join(', ')} (TP/SL calculés dynamiquement)`, 'info');
                 } else {
-                    const tpslInfo = timeframesToAnalyze.map(tf => {
-                        const preset = this.TIMEFRAME_TPSL[tf] || { tp: 2, sl: 1 };
-                        return `${tf}(TP:${preset.tp}%/SL:${preset.sl}%)`;
-                    }).join(', ');
-                    this.log(`📊 Timeframes: ${tpslInfo}`, 'info');
+                    // Mode manuel: affiche les valeurs fixes
+                    const tp = this.config.defaultTP || 2;
+                    const sl = this.config.defaultSL || 1;
+                    this.log(`📊 Timeframes: ${timeframesToAnalyze.join(', ')} (TP:${tp}%/SL:${sl}% fixes)`, 'info');
                 }
             } else {
                 const tf = timeframesToAnalyze[0];
-                const preset = this.TIMEFRAME_TPSL[tf] || { tp: 2, sl: 1 };
-                if (this.config.tpslMode === 'ichimoku') {
+                if (isDynamicMode) {
                     this.log(`🔍 Analyse #${this.state.analysisCount} [${tf}] - ${this.config.symbols.length} symboles | TP/SL: ${tpslModeLabel}`, 'info');
                 } else {
-                    this.log(`🔍 Analyse #${this.state.analysisCount} [${tf}] - ${this.config.symbols.length} symboles (TP:${preset.tp}%/SL:${preset.sl}%)`, 'info');
+                    const tp = this.config.defaultTP || 2;
+                    const sl = this.config.defaultSL || 1;
+                    this.log(`🔍 Analyse #${this.state.analysisCount} [${tf}] - ${this.config.symbols.length} symboles (TP:${tp}%/SL:${sl}%)`, 'info');
                 }
             }
             
