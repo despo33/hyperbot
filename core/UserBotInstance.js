@@ -186,18 +186,38 @@ class UserBotInstance {
             
             const modeLabel = this.config.multiTimeframeMode ? 'MTF' : 'Normal';
             
+            // Log du mode TP/SL
+            const tpslModeLabels = {
+                'auto': 'Ichimoku+ (dynamique)',
+                'ichimoku': 'Ichimoku Pur',
+                'ichimoku_pure': 'Ichimoku Pur',
+                'atr': 'ATR Dynamique',
+                'percent': 'Manuel'
+            };
+            const tpslModeLabel = tpslModeLabels[this.config.tpslMode] || 'Auto';
+            
             // Log des TP/SL par timeframe en mode MTF
             if (this.config.multiTimeframeMode) {
-                const tpslInfo = timeframesToAnalyze.map(tf => {
-                    const preset = this.TIMEFRAME_TPSL[tf] || { tp: 2, sl: 1 };
-                    return `${tf}(TP:${preset.tp}%/SL:${preset.sl}%)`;
-                }).join(', ');
                 this.log(`🔍 Analyse #${this.state.analysisCount} [MTF] - ${this.config.symbols.length} symboles`, 'info');
-                this.log(`📊 Timeframes: ${tpslInfo}`, 'info');
+                this.log(`🎯 Mode TP/SL: ${tpslModeLabel}`, 'info');
+                
+                if (this.config.tpslMode === 'ichimoku') {
+                    this.log(`📊 Timeframes: ${timeframesToAnalyze.join(', ')} (TP/SL calculés dynamiquement)`, 'info');
+                } else {
+                    const tpslInfo = timeframesToAnalyze.map(tf => {
+                        const preset = this.TIMEFRAME_TPSL[tf] || { tp: 2, sl: 1 };
+                        return `${tf}(TP:${preset.tp}%/SL:${preset.sl}%)`;
+                    }).join(', ');
+                    this.log(`📊 Timeframes: ${tpslInfo}`, 'info');
+                }
             } else {
                 const tf = timeframesToAnalyze[0];
                 const preset = this.TIMEFRAME_TPSL[tf] || { tp: 2, sl: 1 };
-                this.log(`🔍 Analyse #${this.state.analysisCount} [${tf}] - ${this.config.symbols.length} symboles (TP:${preset.tp}%/SL:${preset.sl}%)`, 'info');
+                if (this.config.tpslMode === 'ichimoku') {
+                    this.log(`🔍 Analyse #${this.state.analysisCount} [${tf}] - ${this.config.symbols.length} symboles | TP/SL: ${tpslModeLabel}`, 'info');
+                } else {
+                    this.log(`🔍 Analyse #${this.state.analysisCount} [${tf}] - ${this.config.symbols.length} symboles (TP:${preset.tp}%/SL:${preset.sl}%)`, 'info');
+                }
             }
             
             const opportunities = [];
@@ -289,8 +309,11 @@ class UserBotInstance {
         };
 
         this.state.lastSignal = result;
-        const tfPreset = this.TIMEFRAME_TPSL[timeframe] || { tp: 2, sl: 1 };
-        this.log(`📊 Signal ${direction} sur ${symbol} [${timeframe}] (score: ${signalScore.toFixed(1)}) - TP:${tfPreset.tp}%/SL:${tfPreset.sl}%`, 'signal');
+        
+        // Log avec TP/SL selon le mode (tous les modes dynamiques affichent les valeurs calculées)
+        const tpsl = this.calculateTPSL(result);
+        const modeTag = this.config.tpslMode === 'percent' ? '' : ` [${this.config.tpslMode || 'auto'}]`;
+        this.log(`📊 Signal ${direction} sur ${symbol} [${timeframe}] (score: ${signalScore.toFixed(1)}) - TP:${tpsl.tpPercent}%/SL:${tpsl.slPercent}%${modeTag}`, 'signal');
         this.emit('onSignal', result);
 
         return result;
@@ -463,24 +486,230 @@ class UserBotInstance {
      * Calcule TP/SL selon le mode configuré
      */
     calculateTPSL(opportunity) {
-        const { price, timeframe } = opportunity;
+        const { price, timeframe, signal, indicators, ichimoku } = opportunity;
         const preset = this.TIMEFRAME_TPSL[timeframe] || { tp: 2, sl: 1 };
+        const direction = signal?.direction || 'LONG';
+        const isLong = direction === 'LONG';
 
         let tp, sl;
+        let tpPercent, slPercent;
 
         switch (this.config.tpslMode) {
             case 'percent':
-                tp = price * (1 + this.config.defaultTP / 100);
-                sl = price * (1 - this.config.defaultSL / 100);
+                // Mode manuel: utilise les valeurs définies par l'utilisateur
+                tpPercent = this.config.defaultTP || 2;
+                slPercent = this.config.defaultSL || 1;
                 break;
+                
+            case 'ichimoku':
+            case 'ichimoku_pure':
+                // Mode Ichimoku dynamique: calcule TP/SL basés sur les niveaux Ichimoku
+                const ichimokuTPSL = this.calculateIchimokuTPSL(opportunity, false);
+                tpPercent = ichimokuTPSL.tpPercent;
+                slPercent = ichimokuTPSL.slPercent;
+                break;
+                
+            case 'atr':
+                // Mode ATR: utilise l'ATR pour calculer TP/SL dynamiques
+                const atrTPSL = this.calculateATRTPSL(opportunity);
+                tpPercent = atrTPSL.tpPercent;
+                slPercent = atrTPSL.slPercent;
+                break;
+                
             case 'auto':
             default:
-                tp = price * (1 + preset.tp / 100);
-                sl = price * (1 - preset.sl / 100);
+                // Mode auto (Ichimoku+): Ichimoku + autres indicateurs
+                const autoTPSL = this.calculateIchimokuTPSL(opportunity, true);
+                tpPercent = autoTPSL.tpPercent;
+                slPercent = autoTPSL.slPercent;
                 break;
         }
 
-        return { tp, sl };
+        // Calcule les prix TP/SL selon la direction
+        if (isLong) {
+            tp = price * (1 + tpPercent / 100);
+            sl = price * (1 - slPercent / 100);
+        } else {
+            tp = price * (1 - tpPercent / 100);
+            sl = price * (1 + slPercent / 100);
+        }
+
+        return { tp, sl, tpPercent, slPercent };
+    }
+
+    /**
+     * Calcule TP/SL dynamiques basés sur Ichimoku et autres indicateurs
+     * @param {Object} opportunity - L'opportunité de trade
+     * @param {boolean} useOtherIndicators - Si true, utilise aussi RSI, ATR, Bollinger pour affiner
+     */
+    calculateIchimokuTPSL(opportunity, useOtherIndicators = true) {
+        const { price, signal, indicators, ichimoku } = opportunity;
+        const direction = signal?.direction || 'LONG';
+        const isLong = direction === 'LONG';
+        const score = signal?.score || 5;
+
+        // Valeurs par défaut (fallback)
+        let slPercent = 1.5;
+        let tpPercent = 3;
+
+        try {
+            // === CALCUL DU STOP LOSS basé sur Ichimoku ===
+            if (ichimoku) {
+                const tenkan = ichimoku.tenkan || ichimoku.tenkanSen;
+                const kijun = ichimoku.kijun || ichimoku.kijunSen;
+                const senkouA = ichimoku.senkouA || ichimoku.senkouSpanA;
+                const senkouB = ichimoku.senkouB || ichimoku.senkouSpanB;
+                
+                // Kumo (nuage) = zone entre Senkou A et B
+                const kumoTop = Math.max(senkouA || 0, senkouB || 0);
+                const kumoBottom = Math.min(senkouA || price, senkouB || price);
+                
+                if (isLong) {
+                    // LONG: SL sous Kijun ou sous le Kumo
+                    let slLevel = kijun || kumoBottom;
+                    
+                    // Si le prix est au-dessus du Kumo, SL = bas du Kumo
+                    if (price > kumoTop && kumoBottom > 0) {
+                        slLevel = kumoBottom;
+                    }
+                    // Si le prix est dans le Kumo, SL = Kijun ou Tenkan
+                    else if (price <= kumoTop && price >= kumoBottom) {
+                        slLevel = Math.min(kijun || price * 0.98, tenkan || price * 0.98);
+                    }
+                    
+                    // Calcule le % de distance
+                    if (slLevel && slLevel < price) {
+                        slPercent = ((price - slLevel) / price) * 100;
+                    }
+                } else {
+                    // SHORT: SL au-dessus de Kijun ou au-dessus du Kumo
+                    let slLevel = kijun || kumoTop;
+                    
+                    if (price < kumoBottom && kumoTop > 0) {
+                        slLevel = kumoTop;
+                    } else if (price >= kumoBottom && price <= kumoTop) {
+                        slLevel = Math.max(kijun || price * 1.02, tenkan || price * 1.02);
+                    }
+                    
+                    if (slLevel && slLevel > price) {
+                        slPercent = ((slLevel - price) / price) * 100;
+                    }
+                }
+            }
+
+            // === AJUSTEMENT basé sur les autres indicateurs (si activé) ===
+            if (useOtherIndicators) {
+                // RSI: Si RSI extrême, réduit le SL (plus de marge)
+                if (indicators?.rsi) {
+                    const rsi = indicators.rsi.value || indicators.rsi;
+                    if (isLong && rsi < 35) {
+                        // RSI survendu = signal fort, on peut serrer le SL
+                        slPercent *= 0.85;
+                    } else if (!isLong && rsi > 65) {
+                        // RSI suracheté = signal fort pour short
+                        slPercent *= 0.85;
+                    } else if ((isLong && rsi > 60) || (!isLong && rsi < 40)) {
+                        // RSI contre nous = élargir le SL
+                        slPercent *= 1.2;
+                    }
+                }
+
+                // Volatilité (ATR si disponible ou Bollinger)
+                if (indicators?.atr) {
+                    const atrPercent = (indicators.atr / price) * 100;
+                    // Si ATR élevé, élargir le SL
+                    if (atrPercent > 2) {
+                        slPercent = Math.max(slPercent, atrPercent * 0.8);
+                    }
+                } else if (indicators?.bollinger) {
+                    const bb = indicators.bollinger;
+                    const bbWidth = ((bb.upper - bb.lower) / bb.middle) * 100;
+                    // Bollinger large = volatilité élevée
+                    if (bbWidth > 4) {
+                        slPercent *= 1.15;
+                    }
+                }
+            }
+
+            // === CALCUL DU TAKE PROFIT ===
+            // Basé sur le RRR minimum configuré et le score du signal
+            const minRRR = this.config.minRiskRewardRatio || 1.5;
+            
+            // Score élevé = on peut viser plus haut
+            let rrrMultiplier = minRRR;
+            if (score >= 7) {
+                rrrMultiplier = minRRR * 1.5; // Signal très fort
+            } else if (score >= 5) {
+                rrrMultiplier = minRRR * 1.2; // Signal fort
+            }
+            
+            tpPercent = slPercent * rrrMultiplier;
+
+            // === LIMITES DE SÉCURITÉ ===
+            // SL minimum 0.3%, maximum 5%
+            slPercent = Math.max(0.3, Math.min(5, slPercent));
+            // TP minimum 0.5%, maximum 15%
+            tpPercent = Math.max(0.5, Math.min(15, tpPercent));
+
+        } catch (error) {
+            this.log(`Erreur calcul Ichimoku TP/SL: ${error.message}`, 'warning');
+            // Fallback sur les presets
+            const preset = this.TIMEFRAME_TPSL[opportunity.timeframe] || { tp: 2, sl: 1 };
+            slPercent = preset.sl;
+            tpPercent = preset.tp;
+        }
+
+        return { tpPercent: Math.round(tpPercent * 100) / 100, slPercent: Math.round(slPercent * 100) / 100 };
+    }
+
+    /**
+     * Calcule TP/SL basés uniquement sur l'ATR (volatilité)
+     */
+    calculateATRTPSL(opportunity) {
+        const { price, signal, indicators } = opportunity;
+        const direction = signal?.direction || 'LONG';
+        const score = signal?.score || 5;
+        const minRRR = this.config.minRiskRewardRatio || 1.5;
+
+        // Valeurs par défaut
+        let slPercent = 1.5;
+        let tpPercent = 3;
+
+        try {
+            // Utilise l'ATR si disponible
+            if (indicators?.atr) {
+                const atrPercent = (indicators.atr / price) * 100;
+                // SL = 1.5x ATR (standard)
+                slPercent = atrPercent * 1.5;
+            } else if (indicators?.bollinger) {
+                // Fallback sur Bollinger si pas d'ATR
+                const bb = indicators.bollinger;
+                const bbWidth = ((bb.upper - bb.lower) / bb.middle) * 100;
+                slPercent = bbWidth / 3; // ~1/3 de la largeur des bandes
+            }
+
+            // TP basé sur RRR et score
+            let rrrMultiplier = minRRR;
+            if (score >= 7) {
+                rrrMultiplier = minRRR * 1.5;
+            } else if (score >= 5) {
+                rrrMultiplier = minRRR * 1.2;
+            }
+            
+            tpPercent = slPercent * rrrMultiplier;
+
+            // Limites de sécurité
+            slPercent = Math.max(0.3, Math.min(5, slPercent));
+            tpPercent = Math.max(0.5, Math.min(15, tpPercent));
+
+        } catch (error) {
+            this.log(`Erreur calcul ATR TP/SL: ${error.message}`, 'warning');
+            const preset = this.TIMEFRAME_TPSL[opportunity.timeframe] || { tp: 2, sl: 1 };
+            slPercent = preset.sl;
+            tpPercent = preset.tp;
+        }
+
+        return { tpPercent: Math.round(tpPercent * 100) / 100, slPercent: Math.round(slPercent * 100) / 100 };
     }
 
     /**
