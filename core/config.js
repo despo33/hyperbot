@@ -121,7 +121,8 @@ export const DEFAULT_BOT_CONFIG = {
     useRSIFilter: true,
     rsiOverbought: 70,
     rsiOversold: 30,
-    riskPerTrade: 2
+    riskPerTrade: 2,
+    maxPositionSize: 50  // % max du capital par position (sécurité)
 };
 
 // ===== ANTI-OVERTRADING =====

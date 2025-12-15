@@ -320,29 +320,49 @@ class UserBotInstance {
                 return;
             }
 
-            // Risque par trade (2% du capital par défaut)
-            const riskPercent = this.config.riskPerTrade || 2;
-            const riskAmount = balance.totalEquity * (riskPercent / 100);
-            
-            // Calcule la taille basée sur le SL
-            const slDistance = Math.abs(price - tpsl.sl);
-            const slPercent = (slDistance / price) * 100;
-            
-            // Taille = (Risque en $) / (Distance SL en %)
-            let positionSize = riskAmount / slDistance;
-            
-            // Applique le levier
+            const accountBalance = balance.totalEquity;
             const leverage = this.config.leverage || 10;
-            positionSize = positionSize * leverage / price;
             
-            // Minimum 10$ de position
-            const minNotional = 10;
-            const notionalValue = positionSize * price;
-            if (notionalValue < minNotional) {
-                positionSize = minNotional / price;
+            // Risque par trade (% du capital, défaut 2%)
+            const riskPercent = this.config.riskPerTrade || 2;
+            const riskAmount = accountBalance * (riskPercent / 100);
+            
+            // Distance au SL en % du prix
+            const slDistancePercent = Math.abs(price - tpsl.sl) / price;
+            
+            // Formule correcte: Taille = Risque / (Distance SL% * Prix)
+            // Cela donne la quantité d'actif à acheter pour que si le SL est touché,
+            // la perte soit exactement = riskAmount
+            let positionSize = riskAmount / (slDistancePercent * price);
+            
+            // Avec le levier, on peut ouvrir une position plus grande
+            // mais le risque reste le même (la marge requise diminue)
+            positionSize = positionSize * leverage;
+            
+            // Vérifie que la position ne dépasse pas un % max du capital (sécurité)
+            const maxPositionPercent = this.config.maxPositionSize || 50; // 50% max par défaut
+            const maxPositionValue = accountBalance * (maxPositionPercent / 100) * leverage;
+            let positionValue = positionSize * price;
+            
+            if (positionValue > maxPositionValue) {
+                positionSize = maxPositionValue / price;
+                positionValue = positionSize * price;
+                this.log(`⚠️ Position réduite au max ${maxPositionPercent}% du capital`, 'warning');
             }
+            
+            // Minimum 10$ de position (requis par Hyperliquid)
+            const minNotional = 10;
+            if (positionValue < minNotional) {
+                positionSize = minNotional / price;
+                positionValue = minNotional;
+                this.log(`⚠️ Position ajustée au minimum $${minNotional}`, 'warning');
+            }
+            
+            // Calcule la marge requise
+            const marginRequired = positionValue / leverage;
 
-            this.log(`📊 Taille position: ${positionSize.toFixed(4)} ${symbol} (${(positionSize * price).toFixed(2)} USD)`, 'info');
+            this.log(`📊 Capital: $${accountBalance.toFixed(2)} | Risque: ${riskPercent}% ($${riskAmount.toFixed(2)})`, 'info');
+            this.log(`📊 Position: ${positionSize.toFixed(4)} ${symbol} ($${positionValue.toFixed(2)}) | Levier: ${leverage}x | Marge: $${marginRequired.toFixed(2)}`, 'info');
 
             // Exécute l'ordre via l'API
             const isBuy = signal.direction === 'LONG';
