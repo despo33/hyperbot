@@ -314,6 +314,23 @@ class UserBotInstance {
     async executeTrade(opportunity) {
         const { symbol, signal, price } = opportunity;
 
+        // Vérifie si on a déjà une position sur ce symbole (via API)
+        try {
+            const tradingAddress = this.auth.tradingAddress || this.auth.getAddress();
+            const positions = await api.getPositions(tradingAddress);
+            const existingPosition = positions?.find(p => 
+                (p.coin === symbol || p.coin === `${symbol}-PERP`) && 
+                parseFloat(p.szi || p.size || 0) !== 0
+            );
+            
+            if (existingPosition) {
+                this.log(`⏭️ Position ${symbol} existe déjà, skip`, 'info');
+                return;
+            }
+        } catch (error) {
+            this.log(`⚠️ Impossible de vérifier positions existantes: ${error.message}`, 'warning');
+        }
+
         // Calcule TP/SL
         const tpsl = this.calculateTPSL(opportunity);
 
@@ -338,24 +355,25 @@ class UserBotInstance {
             // Distance au SL en % du prix
             const slDistancePercent = Math.abs(price - tpsl.sl) / price;
             
-            // Formule correcte: Taille = Risque / (Distance SL% * Prix)
-            // Cela donne la quantité d'actif à acheter pour que si le SL est touché,
-            // la perte soit exactement = riskAmount
-            let positionSize = riskAmount / (slDistancePercent * price);
+            // Formule correcte: Taille = Risque / Distance SL%
+            // Si SL = 1% et risque = $3.33, alors position value = $333
+            // Car si le prix baisse de 1%, on perd 1% de $333 = $3.33
+            let positionValue = riskAmount / slDistancePercent;
+            let positionSize = positionValue / price;
             
-            // Avec le levier, on peut ouvrir une position plus grande
-            // mais le risque reste le même (la marge requise diminue)
-            positionSize = positionSize * leverage;
+            // Le levier ne multiplie PAS la taille de position
+            // Il réduit seulement la marge requise (marge = position / levier)
+            // Vérifie que la marge requise ne dépasse pas un % max du capital
+            const maxMarginPercent = this.config.maxPositionSize || 50; // 50% max de marge par défaut
+            const maxMargin = accountBalance * (maxMarginPercent / 100);
+            let marginRequired = positionValue / leverage;
             
-            // Vérifie que la position ne dépasse pas un % max du capital (sécurité)
-            const maxPositionPercent = this.config.maxPositionSize || 50; // 50% max par défaut
-            const maxPositionValue = accountBalance * (maxPositionPercent / 100) * leverage;
-            let positionValue = positionSize * price;
-            
-            if (positionValue > maxPositionValue) {
-                positionSize = maxPositionValue / price;
-                positionValue = positionSize * price;
-                this.log(`⚠️ Position réduite au max ${maxPositionPercent}% du capital`, 'warning');
+            if (marginRequired > maxMargin) {
+                // Réduit la position pour respecter la marge max
+                positionValue = maxMargin * leverage;
+                positionSize = positionValue / price;
+                marginRequired = maxMargin;
+                this.log(`⚠️ Position réduite: marge max ${maxMarginPercent}% du capital ($${maxMargin.toFixed(2)})`, 'warning');
             }
             
             // Minimum 10$ de position (requis par Hyperliquid)
@@ -363,11 +381,9 @@ class UserBotInstance {
             if (positionValue < minNotional) {
                 positionSize = minNotional / price;
                 positionValue = minNotional;
+                marginRequired = positionValue / leverage;
                 this.log(`⚠️ Position ajustée au minimum $${minNotional}`, 'warning');
             }
-            
-            // Calcule la marge requise
-            const marginRequired = positionValue / leverage;
 
             this.log(`📊 Capital: $${accountBalance.toFixed(2)} | Risque: ${riskPercent}% ($${riskAmount.toFixed(2)})`, 'info');
             this.log(`📊 Position: ${positionSize.toFixed(4)} ${symbol} ($${positionValue.toFixed(2)}) | Levier: ${leverage}x | Marge: $${marginRequired.toFixed(2)}`, 'info');
