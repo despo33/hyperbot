@@ -739,16 +739,28 @@ router.get('/signals/last', (req, res) => {
 
 /**
  * GET /api/account/balance
- * Retourne le solde du compte (utilise l'adresse de trading si configurée)
+ * Retourne le solde du compte de l'utilisateur connecté
  */
-router.get('/account/balance', async (req, res) => {
+router.get('/account/balance', optionalAuth, async (req, res) => {
     try {
-        // Utilise l'adresse de trading si différente de l'API wallet
-        const addressToUse = auth.getBalanceAddress();
+        let addressToUse;
+        
+        // Utilise le wallet de l'utilisateur si connecté
+        if (req.user) {
+            const activeWallet = req.user.getActiveWallet();
+            addressToUse = activeWallet?.tradingAddress || activeWallet?.address;
+        }
+        
+        // Fallback sur l'adresse globale si pas d'utilisateur
+        if (!addressToUse) {
+            addressToUse = auth.getBalanceAddress();
+        }
+        
         const balance = await api.getAccountBalance(addressToUse);
         res.json({
             ...balance,
-            addressUsed: addressToUse
+            addressUsed: addressToUse,
+            isUserWallet: !!req.user
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -757,14 +769,25 @@ router.get('/account/balance', async (req, res) => {
 
 /**
  * GET /api/account/fills
- * Retourne l'historique des trades
+ * Retourne l'historique des trades de l'utilisateur connecté
  */
-router.get('/account/fills', async (req, res) => {
+router.get('/account/fills', optionalAuth, async (req, res) => {
     try {
-        // Utilise l'adresse de trading
-        const tradingAddress = auth.getBalanceAddress();
+        let tradingAddress;
+        
+        // Utilise le wallet de l'utilisateur si connecté
+        if (req.user) {
+            const activeWallet = req.user.getActiveWallet();
+            tradingAddress = activeWallet?.tradingAddress || activeWallet?.address;
+        }
+        
+        // Fallback sur l'adresse globale si pas d'utilisateur
+        if (!tradingAddress) {
+            tradingAddress = auth.getBalanceAddress();
+        }
+        
         const fills = await api.getUserFills(tradingAddress);
-        res.json({ fills });
+        res.json({ fills, isUserWallet: !!req.user });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
