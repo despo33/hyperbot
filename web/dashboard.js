@@ -1022,8 +1022,18 @@ async function loadTradingConfig() {
         const mtfEl = document.getElementById('configMultiTimeframe');
         const mtfOptionsEl = document.getElementById('mtfOptions');
         if (mtfEl) {
-            mtfEl.checked = config.multiTimeframeMode || false;
-            if (mtfOptionsEl) mtfOptionsEl.style.display = mtfEl.checked ? 'block' : 'none';
+            const isMultiTF = config.multiTimeframeMode || false;
+            mtfEl.checked = isMultiTF;
+            if (mtfOptionsEl) mtfOptionsEl.style.display = isMultiTF ? 'block' : 'none';
+            
+            // Grise les timeframes uniques si MTF est activé
+            const tfRadios = document.querySelectorAll('input[name="configTimeframe"]');
+            const tfCards = document.querySelectorAll('.timeframe-card');
+            tfRadios.forEach(radio => radio.disabled = isMultiTF);
+            tfCards.forEach(card => {
+                card.style.opacity = isMultiTF ? '0.4' : '1';
+                card.style.pointerEvents = isMultiTF ? 'none' : 'auto';
+            });
         }
         
         // MTF Timeframes
@@ -2123,8 +2133,39 @@ function initConfigControls() {
     const mtfOptions = document.getElementById('mtfOptions');
     if (mtfToggle && mtfOptions) {
         mtfToggle.addEventListener('change', (e) => {
-            mtfOptions.style.display = e.target.checked ? 'block' : 'none';
+            const isMultiTF = e.target.checked;
+            mtfOptions.style.display = isMultiTF ? 'block' : 'none';
+            
+            // Désactive/grise les boutons de timeframe unique quand MTF est activé
+            const tfRadios = document.querySelectorAll('input[name="configTimeframe"]');
+            const tfCards = document.querySelectorAll('.timeframe-card');
+            
+            tfRadios.forEach(radio => {
+                radio.disabled = isMultiTF;
+            });
+            
+            tfCards.forEach(card => {
+                if (isMultiTF) {
+                    card.style.opacity = '0.4';
+                    card.style.pointerEvents = 'none';
+                } else {
+                    card.style.opacity = '1';
+                    card.style.pointerEvents = 'auto';
+                }
+            });
         });
+        
+        // Applique l'état initial au chargement
+        if (mtfToggle.checked) {
+            mtfOptions.style.display = 'block';
+            const tfRadios = document.querySelectorAll('input[name="configTimeframe"]');
+            const tfCards = document.querySelectorAll('.timeframe-card');
+            tfRadios.forEach(radio => radio.disabled = true);
+            tfCards.forEach(card => {
+                card.style.opacity = '0.4';
+                card.style.pointerEvents = 'none';
+            });
+        }
     }
     
     // Sliders avec valeurs
