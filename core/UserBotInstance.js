@@ -7,8 +7,8 @@ import api from '../services/hyperliquidApi.js';
 import { HyperliquidAuth } from '../services/hyperliquidAuth.js';
 import priceFetcher from './priceFetcher.js';
 import signalDetector from './signalDetector.js';
-import RiskManager from './riskManager.js';
 import { decryptSecret } from '../utils/crypto.js';
+import { TIMEFRAME_TPSL, TIMEFRAME_PRESETS, DEFAULT_BOT_CONFIG, ANTI_OVERTRADING_CONFIG } from './config.js';
 
 /**
  * Instance de bot pour un utilisateur spécifique
@@ -18,123 +18,13 @@ class UserBotInstance {
         this.userId = userId;
         this.auth = new HyperliquidAuth();
         
-        // TP/SL par timeframe
-        this.TIMEFRAME_TPSL = {
-            '1m': { tp: 0.5, sl: 0.25 },
-            '5m': { tp: 1.0, sl: 0.5 },
-            '15m': { tp: 2.0, sl: 1.0 },
-            '30m': { tp: 3.0, sl: 1.5 },
-            '1h': { tp: 4.0, sl: 2.0 },
-            '4h': { tp: 6.0, sl: 3.0 },
-            '1d': { tp: 10.0, sl: 5.0 }
-        };
-
-        // Presets par timeframe
-        this.TIMEFRAME_PRESETS = {
-            '1m': {
-                name: 'Ultra Scalping',
-                minScore: 4,
-                minWinProbability: 0.58,
-                minConfluence: 2,
-                rsiLongMax: 75,
-                rsiShortMin: 25,
-                adxMin: 10,
-                minRRR: 0.5,
-                analysisInterval: 30000
-            },
-            '5m': {
-                name: 'Scalping',
-                minScore: 4,
-                minWinProbability: 0.60,
-                minConfluence: 2,
-                rsiLongMax: 72,
-                rsiShortMin: 28,
-                adxMin: 12,
-                minRRR: 0.7,
-                analysisInterval: 60000
-            },
-            '15m': {
-                name: 'Intraday',
-                minScore: 4,
-                minWinProbability: 0.62,
-                minConfluence: 2,
-                rsiLongMax: 70,
-                rsiShortMin: 30,
-                adxMin: 15,
-                minRRR: 1.0,
-                analysisInterval: 60000
-            },
-            '30m': {
-                name: 'Intraday+',
-                minScore: 3,
-                minWinProbability: 0.65,
-                minConfluence: 2,
-                rsiLongMax: 70,
-                rsiShortMin: 30,
-                adxMin: 18,
-                minRRR: 1.0,
-                analysisInterval: 120000
-            },
-            '1h': {
-                name: 'Swing Court',
-                minScore: 4,
-                minWinProbability: 0.65,
-                minConfluence: 2,
-                rsiLongMax: 68,
-                rsiShortMin: 32,
-                adxMin: 18,
-                minRRR: 1.2,
-                analysisInterval: 180000
-            },
-            '4h': {
-                name: 'Swing',
-                minScore: 3,
-                minWinProbability: 0.68,
-                minConfluence: 3,
-                rsiLongMax: 65,
-                rsiShortMin: 35,
-                adxMin: 20,
-                minRRR: 1.5,
-                analysisInterval: 300000
-            },
-            '1d': {
-                name: 'Position',
-                minScore: 3,
-                minWinProbability: 0.70,
-                minConfluence: 3,
-                rsiLongMax: 65,
-                rsiShortMin: 35,
-                adxMin: 22,
-                minRRR: 2.0,
-                analysisInterval: 600000
-            }
-        };
+        // Utilise les constantes centralisées depuis config.js
+        this.TIMEFRAME_TPSL = TIMEFRAME_TPSL;
+        this.TIMEFRAME_PRESETS = TIMEFRAME_PRESETS;
 
         // Configuration par défaut (peut être surchargée par userConfig)
         this.config = {
-            symbols: ['BTC', 'ETH', 'SOL', 'DOGE', 'XRP'],
-            timeframes: ['1h'],
-            leverage: 10,
-            maxConcurrentTrades: 7,
-            mode: 'auto',
-            analysisInterval: 60000,
-            minWinProbability: 0.65,
-            minScore: 3,
-            defaultTP: 2.0,
-            defaultSL: 1.0,
-            tpslMode: 'auto',
-            atrMultiplierSL: 1.5,
-            atrMultiplierTP: 2.5,
-            enabledSignals: {
-                tkCross: true,
-                kumoBreakout: true,
-                kumoTwist: true,
-                kijunBounce: true
-            },
-            useRSIFilter: true,
-            rsiOverbought: 70,
-            rsiOversold: 30,
-            multiTimeframeMode: false,
+            ...DEFAULT_BOT_CONFIG,
             ...userConfig
         };
 
@@ -157,12 +47,8 @@ class UserBotInstance {
             lastTradeDirection: null
         };
 
-        // Anti-overtrading
-        this.antiOvertradingConfig = {
-            symbolCooldownMs: 5 * 60 * 1000,
-            maxConsecutiveSameDirection: 5,
-            globalCooldownMs: 30 * 1000
-        };
+        // Anti-overtrading (utilise config centralisée)
+        this.antiOvertradingConfig = ANTI_OVERTRADING_CONFIG;
         this.lastGlobalTradeTime = 0;
 
         // Intervalle d'analyse

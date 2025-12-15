@@ -9,10 +9,9 @@ import crypto from 'crypto';
 import User from '../models/User.js';
 import emailService from '../services/emailService.js';
 import database from '../services/database.js';
+import { requireAuth, JWT_SECRET, JWT_EXPIRES_IN } from '../utils/auth.js';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'hyperliquid-bot-jwt-secret-key';
-const JWT_EXPIRES_IN = '7d';
 
 // Avertissement si secret par défaut en production
 if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'hyperliquid-bot-jwt-secret-key') {
@@ -110,31 +109,9 @@ setInterval(() => {
     }
 }, 60000);
 
-/**
- * Middleware pour vérifier le token JWT
- */
-export const authenticateToken = async (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
-    if (!token) {
-        return res.status(401).json({ success: false, error: 'Token manquant' });
-    }
-
-    try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        const user = await User.findById(decoded.userId);
-        
-        if (!user || !user.isActive) {
-            return res.status(401).json({ success: false, error: 'Utilisateur non trouvé ou désactivé' });
-        }
-        
-        req.user = user;
-        next();
-    } catch (error) {
-        return res.status(403).json({ success: false, error: 'Token invalide' });
-    }
-};
+// NOTE: Le middleware authenticateToken a été remplacé par requireAuth de utils/auth.js
+// pour éviter la duplication de code. Exporter requireAuth pour compatibilité.
+export { requireAuth as authenticateToken } from '../utils/auth.js';
 
 /**
  * POST /api/auth/register
@@ -442,7 +419,7 @@ router.post('/login', async (req, res) => {
  * GET /api/auth/me
  * Récupère les infos de l'utilisateur connecté
  */
-router.get('/me', authenticateToken, async (req, res) => {
+router.get('/me', requireAuth, async (req, res) => {
     try {
         res.json({
             success: true,
@@ -461,7 +438,7 @@ router.get('/me', authenticateToken, async (req, res) => {
  * PUT /api/auth/profile
  * Met à jour le profil utilisateur
  */
-router.put('/profile', authenticateToken, async (req, res) => {
+router.put('/profile', requireAuth, async (req, res) => {
     try {
         const { username } = req.body;
         const user = req.user;
@@ -498,7 +475,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
  * PUT /api/auth/password
  * Change le mot de passe
  */
-router.put('/password', authenticateToken, async (req, res) => {
+router.put('/password', requireAuth, async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
         const user = req.user;

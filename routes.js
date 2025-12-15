@@ -1,6 +1,12 @@
 /**
  * Routes API du dashboard de trading
- * Accès direct sans authentification - les données se complètent avec la clé API Hyperliquid
+ * 
+ * ARCHITECTURE:
+ * - botManager + UserBotInstance: Système multi-utilisateurs (chaque user a son bot)
+ * - tradeEngine: Moteur legacy, utilisé comme fallback et pour l'analyse globale
+ * 
+ * Les routes utilisent botManager pour les opérations utilisateur et tradeEngine
+ * comme fallback quand aucun bot utilisateur n'est actif.
  */
 
 import { Router } from 'express';
@@ -8,7 +14,9 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Moteur legacy (fallback + analyse globale)
 import tradeEngine from './core/tradeEngine.js';
+// Gestionnaire multi-utilisateurs (système principal)
 import botManager from './core/BotManager.js';
 import riskManager from './core/riskManager.js';
 import priceFetcher from './core/priceFetcher.js';

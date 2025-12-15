@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express';
-import { authenticateToken } from './authRoutes.js';
+import { requireAuth } from '../utils/auth.js';
 import { encryptSecret, decryptSecret } from '../utils/crypto.js';
 
 const router = Router();
@@ -13,7 +13,7 @@ const router = Router();
  * GET /api/wallets
  * Liste tous les wallets de l'utilisateur
  */
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
     try {
         const wallets = req.user.wallets.map(w => ({
             id: w._id,
@@ -43,7 +43,7 @@ router.get('/', authenticateToken, async (req, res) => {
  * POST /api/wallets
  * Ajoute un nouveau wallet
  */
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
     try {
         const { name, secretPhrase, tradingAddress } = req.body;
 
@@ -128,7 +128,7 @@ router.post('/', authenticateToken, async (req, res) => {
  * PUT /api/wallets/:id
  * Met à jour un wallet
  */
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', requireAuth, async (req, res) => {
     try {
         const { id } = req.params;
         const { name, tradingAddress } = req.body;
@@ -173,7 +173,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
  * DELETE /api/wallets/:id
  * Supprime un wallet
  */
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -220,7 +220,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
  * POST /api/wallets/:id/activate
  * Active un wallet
  */
-router.post('/:id/activate', authenticateToken, async (req, res) => {
+router.post('/:id/activate', requireAuth, async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -263,7 +263,7 @@ router.post('/:id/activate', authenticateToken, async (req, res) => {
  * Route INTERNE UNIQUEMENT - ne JAMAIS exposer au frontend
  * Protégée par vérification d'origine
  */
-router.get('/active/secret', authenticateToken, async (req, res) => {
+router.get('/active/secret', requireAuth, async (req, res) => {
     try {
         // SÉCURITÉ: Cette route ne doit être appelée que depuis le serveur lui-même
         // Vérifie que la requête vient de localhost (appel interne)
