@@ -178,11 +178,19 @@ class UserBotInstance {
 
         try {
             this.state.analysisCount++;
-            this.log(`🔍 Analyse #${this.state.analysisCount} - ${this.config.symbols.length} symboles sur ${this.config.timeframes.join(', ')}`, 'info');
+            
+            // Détermine les timeframes à analyser (mode MTF ou normal)
+            const timeframesToAnalyze = this.config.multiTimeframeMode && this.config.mtfTimeframes?.length > 0
+                ? this.config.mtfTimeframes
+                : this.config.timeframes;
+            
+            const modeLabel = this.config.multiTimeframeMode ? 'MTF' : 'Normal';
+            this.log(`🔍 Analyse #${this.state.analysisCount} [${modeLabel}] - ${this.config.symbols.length} symboles sur ${timeframesToAnalyze.join(', ')}`, 'info');
+            
             const opportunities = [];
 
             for (const symbol of this.config.symbols) {
-                for (const timeframe of this.config.timeframes) {
+                for (const timeframe of timeframesToAnalyze) {
                     try {
                         const result = await this.analyzeSymbol(symbol, timeframe);
                         if (result && result.signal) {

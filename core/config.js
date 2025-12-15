@@ -122,7 +122,11 @@ export const DEFAULT_BOT_CONFIG = {
     rsiOverbought: 70,
     rsiOversold: 30,
     riskPerTrade: 2,
-    maxPositionSize: 50  // % max du capital par position (sécurité)
+    maxPositionSize: 50,  // % max du capital par position (sécurité)
+    // Multi-Timeframe
+    multiTimeframeMode: false,
+    mtfTimeframes: ['5m', '15m', '1h'],
+    mtfMinConfirmation: 2
 };
 
 // ===== ANTI-OVERTRADING =====

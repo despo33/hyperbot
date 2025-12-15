@@ -396,7 +396,11 @@ router.post('/config/trading', optionalAuth, async (req, res) => {
             await req.user.save();
             console.log(`[CONFIG] Config sauvegardée pour ${req.user.username}`);
             
-            // Applique aussi au tradeEngine pour la session
+            // Applique au bot utilisateur actif (si en cours d'exécution)
+            const userId = req.user._id.toString();
+            botManager.updateBotConfig(userId, configUpdate);
+            
+            // Applique aussi au tradeEngine pour la session (fallback)
             tradeEngine.updateConfig(configUpdate);
             
             return res.json({ success: true, config: req.user.botConfig, savedToUser: true });
