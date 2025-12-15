@@ -2300,6 +2300,35 @@ input[type="range"]::-moz-range-thumb {
     color: var(--accent-primary);
 }
 
+/* Style grisé quand MTF est activé */
+.timeframe-option input:disabled + .timeframe-btn {
+    opacity: 0.35;
+    cursor: not-allowed;
+    background: rgba(100, 100, 100, 0.1);
+    border-color: rgba(100, 100, 100, 0.2);
+    filter: grayscale(100%);
+}
+
+.timeframe-option input:disabled + .timeframe-btn strong,
+.timeframe-option input:disabled + .timeframe-btn small {
+    color: var(--text-muted);
+}
+
+.timeframe-option input:disabled + .timeframe-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 10px,
+        rgba(100, 100, 100, 0.05) 10px,
+        rgba(100, 100, 100, 0.05) 20px
+    );
+    border-radius: var(--border-radius-sm);
+    pointer-events: none;
+}
+
 .timeframe-info {
     margin-top: 1rem;
 }
