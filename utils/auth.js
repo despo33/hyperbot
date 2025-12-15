@@ -6,8 +6,8 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'hyperliquid-bot-jwt-secret-key';
-const JWT_EXPIRES_IN = '7d';
+export const JWT_SECRET = process.env.JWT_SECRET || 'hyperliquid-bot-jwt-secret-key';
+export const JWT_EXPIRES_IN = '7d';
 
 /**
  * Middleware optionnel - récupère l'utilisateur si token présent
