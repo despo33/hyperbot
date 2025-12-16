@@ -491,6 +491,253 @@ router.post('/risk/restart-bot', requireAuth, (req, res) => {
     res.json({ success: true, stats: riskManager.getStats() });
 });
 
+// ==================== PROFILES ROUTES ====================
+
+/**
+ * GET /api/profiles
+ * Retourne la liste des profils de l'utilisateur
+ */
+router.get('/profiles', requireAuth, async (req, res) => {
+    try {
+        const profiles = req.user.configProfiles.map((p, index) => ({
+            id: p._id,
+            index,
+            name: p.name,
+            description: p.description,
+            isActive: index === req.user.activeProfileIndex,
+            createdAt: p.createdAt
+        }));
+        
+        res.json({ 
+            success: true, 
+            profiles,
+            activeProfileIndex: req.user.activeProfileIndex
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * POST /api/profiles
+ * Crée un nouveau profil
+ */
+router.post('/profiles', requireAuth, async (req, res) => {
+    try {
+        const { name, description, copyFromCurrent } = req.body;
+        
+        // Limite à 10 profils max
+        if (req.user.configProfiles.length >= 10) {
+            return res.status(400).json({ error: 'Maximum 10 profils autorisés' });
+        }
+        
+        const profileData = {
+            name: name || `Profil ${req.user.configProfiles.length + 1}`,
+            description: description || '',
+            config: copyFromCurrent !== false ? { ...req.user.botConfig.toObject() } : undefined
+        };
+        
+        const newProfile = req.user.addProfile(profileData);
+        await req.user.save();
+        
+        console.log(`[PROFILES] Profil "${newProfile.name}" créé pour ${req.user.username}`);
+        
+        res.json({ 
+            success: true, 
+            profile: {
+                id: newProfile._id,
+                index: req.user.configProfiles.length - 1,
+                name: newProfile.name,
+                description: newProfile.description,
+                isActive: newProfile.isActive
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * GET /api/profiles/:index
+ * Retourne les détails d'un profil spécifique
+ */
+router.get('/profiles/:index', requireAuth, async (req, res) => {
+    try {
+        const index = parseInt(req.params.index);
+        
+        if (index < 0 || index >= req.user.configProfiles.length) {
+            return res.status(404).json({ error: 'Profil non trouvé' });
+        }
+        
+        const profile = req.user.configProfiles[index];
+        
+        res.json({ 
+            success: true, 
+            profile: {
+                id: profile._id,
+                index,
+                name: profile.name,
+                description: profile.description,
+                isActive: index === req.user.activeProfileIndex,
+                config: profile.config,
+                createdAt: profile.createdAt
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * PUT /api/profiles/:index
+ * Met à jour un profil
+ */
+router.put('/profiles/:index', requireAuth, async (req, res) => {
+    try {
+        const index = parseInt(req.params.index);
+        const { name, description, config } = req.body;
+        
+        const updatedProfile = req.user.updateProfile(index, { name, description, config });
+        
+        if (!updatedProfile) {
+            return res.status(404).json({ error: 'Profil non trouvé' });
+        }
+        
+        await req.user.save();
+        
+        // Si c'est le profil actif et que le bot tourne, met à jour le bot
+        if (index === req.user.activeProfileIndex && config) {
+            const userId = req.user._id.toString();
+            botManager.updateBotConfig(userId, config);
+        }
+        
+        console.log(`[PROFILES] Profil "${updatedProfile.name}" mis à jour pour ${req.user.username}`);
+        
+        res.json({ 
+            success: true, 
+            profile: {
+                id: updatedProfile._id,
+                index,
+                name: updatedProfile.name,
+                description: updatedProfile.description,
+                isActive: index === req.user.activeProfileIndex
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * POST /api/profiles/:index/activate
+ * Active un profil
+ */
+router.post('/profiles/:index/activate', requireAuth, async (req, res) => {
+    try {
+        const index = parseInt(req.params.index);
+        
+        const success = req.user.setActiveProfile(index);
+        
+        if (!success) {
+            return res.status(404).json({ error: 'Profil non trouvé' });
+        }
+        
+        await req.user.save();
+        
+        // Met à jour le bot avec la nouvelle config
+        const userId = req.user._id.toString();
+        const profile = req.user.configProfiles[index];
+        if (profile && profile.config) {
+            botManager.updateBotConfig(userId, profile.config);
+        }
+        
+        console.log(`[PROFILES] Profil "${profile.name}" activé pour ${req.user.username}`);
+        
+        res.json({ 
+            success: true, 
+            activeProfileIndex: index,
+            config: req.user.botConfig
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * DELETE /api/profiles/:index
+ * Supprime un profil
+ */
+router.delete('/profiles/:index', requireAuth, async (req, res) => {
+    try {
+        const index = parseInt(req.params.index);
+        
+        if (req.user.configProfiles.length <= 1) {
+            return res.status(400).json({ error: 'Impossible de supprimer le dernier profil' });
+        }
+        
+        const profileName = req.user.configProfiles[index]?.name;
+        const success = req.user.deleteProfile(index);
+        
+        if (!success) {
+            return res.status(404).json({ error: 'Profil non trouvé' });
+        }
+        
+        await req.user.save();
+        
+        console.log(`[PROFILES] Profil "${profileName}" supprimé pour ${req.user.username}`);
+        
+        res.json({ 
+            success: true, 
+            activeProfileIndex: req.user.activeProfileIndex,
+            remainingProfiles: req.user.configProfiles.length
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * POST /api/profiles/:index/duplicate
+ * Duplique un profil
+ */
+router.post('/profiles/:index/duplicate', requireAuth, async (req, res) => {
+    try {
+        const index = parseInt(req.params.index);
+        
+        if (req.user.configProfiles.length >= 10) {
+            return res.status(400).json({ error: 'Maximum 10 profils autorisés' });
+        }
+        
+        if (index < 0 || index >= req.user.configProfiles.length) {
+            return res.status(404).json({ error: 'Profil non trouvé' });
+        }
+        
+        const sourceProfile = req.user.configProfiles[index];
+        const newProfile = req.user.addProfile({
+            name: `${sourceProfile.name} (copie)`,
+            description: sourceProfile.description,
+            config: { ...sourceProfile.config.toObject() }
+        });
+        
+        await req.user.save();
+        
+        console.log(`[PROFILES] Profil "${sourceProfile.name}" dupliqué pour ${req.user.username}`);
+        
+        res.json({ 
+            success: true, 
+            profile: {
+                id: newProfile._id,
+                index: req.user.configProfiles.length - 1,
+                name: newProfile.name,
+                description: newProfile.description,
+                isActive: false
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ==================== API KEYS ROUTES (LIÉES À L'UTILISATEUR) ====================
 
 /**

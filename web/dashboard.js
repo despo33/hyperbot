@@ -249,7 +249,8 @@ async function loadInitialData() {
         loadRiskConfig(),
         checkApiStatus(),
         loadLogs(),
-        loadAccountStats()
+        loadAccountStats(),
+        loadProfiles()
     ]);
 }
 
@@ -2052,6 +2053,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Config Trading
     document.getElementById('saveTradingConfig')?.addEventListener('click', saveTradingConfig);
     
+    // Profiles
+    document.getElementById('createProfileBtn')?.addEventListener('click', createProfile);
+    
     // Initialise les contrôles de configuration
     initConfigControls();
 
@@ -3105,5 +3109,221 @@ function hideActiveConfigCard() {
     if (card) {
         card.style.display = 'none';
     }
+}
+
+// ==================== PROFILES MANAGEMENT ====================
+
+/**
+ * Charge et affiche les profils de configuration
+ */
+async function loadProfiles() {
+    const container = document.getElementById('profilesContainer');
+    if (!container) return;
+    
+    try {
+        const data = await apiRequest('/profiles');
+        
+        if (!data.profiles || data.profiles.length === 0) {
+            container.innerHTML = `
+                <div class="profile-empty">
+                    <i data-lucide="layers"></i>
+                    <p>Aucun profil créé</p>
+                    <button class="btn btn-primary" onclick="createProfile()">
+                        <i data-lucide="plus"></i> Créer mon premier profil
+                    </button>
+                </div>
+            `;
+            lucide.createIcons();
+            return;
+        }
+        
+        container.innerHTML = data.profiles.map(profile => `
+            <div class="profile-card ${profile.isActive ? 'active' : ''}" data-index="${profile.index}">
+                <div class="profile-header">
+                    <div class="profile-name">
+                        ${profile.name}
+                        ${profile.isActive ? '<span class="active-badge">Actif</span>' : ''}
+                    </div>
+                </div>
+                ${profile.description ? `<div class="profile-description">${profile.description}</div>` : ''}
+                <div class="profile-actions">
+                    ${!profile.isActive ? `
+                        <button class="btn btn-success btn-sm" onclick="activateProfile(${profile.index})">
+                            <i data-lucide="check"></i> Activer
+                        </button>
+                    ` : ''}
+                    <button class="btn btn-secondary btn-sm" onclick="editProfile(${profile.index})">
+                        <i data-lucide="edit-2"></i>
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="duplicateProfile(${profile.index})">
+                        <i data-lucide="copy"></i>
+                    </button>
+                    ${data.profiles.length > 1 ? `
+                        <button class="btn btn-danger btn-sm" onclick="deleteProfile(${profile.index}, '${profile.name}')">
+                            <i data-lucide="trash-2"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `).join('');
+        
+        lucide.createIcons();
+    } catch (error) {
+        console.error('Erreur chargement profils:', error);
+        container.innerHTML = `<p class="text-danger">Erreur: ${error.message}</p>`;
+    }
+}
+
+/**
+ * Crée un nouveau profil
+ */
+async function createProfile() {
+    const name = prompt('Nom du nouveau profil:', `Profil ${Date.now() % 1000}`);
+    if (!name) return;
+    
+    const description = prompt('Description (optionnel):', '');
+    
+    try {
+        await apiRequest('/profiles', {
+            method: 'POST',
+            body: JSON.stringify({ name, description, copyFromCurrent: true })
+        });
+        
+        showNotification('Profil créé avec succès', 'success');
+        loadProfiles();
+    } catch (error) {
+        showNotification('Erreur: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Active un profil
+ */
+async function activateProfile(index) {
+    try {
+        const data = await apiRequest(`/profiles/${index}/activate`, {
+            method: 'POST'
+        });
+        
+        showNotification('Profil activé', 'success');
+        loadProfiles();
+        
+        // Recharge la config trading pour refléter le nouveau profil
+        loadTradingConfig();
+    } catch (error) {
+        showNotification('Erreur: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Édite un profil
+ */
+async function editProfile(index) {
+    try {
+        const data = await apiRequest(`/profiles/${index}`);
+        const profile = data.profile;
+        
+        const newName = prompt('Nom du profil:', profile.name);
+        if (newName === null) return;
+        
+        const newDescription = prompt('Description:', profile.description || '');
+        
+        await apiRequest(`/profiles/${index}`, {
+            method: 'PUT',
+            body: JSON.stringify({ name: newName, description: newDescription })
+        });
+        
+        showNotification('Profil mis à jour', 'success');
+        loadProfiles();
+    } catch (error) {
+        showNotification('Erreur: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Duplique un profil
+ */
+async function duplicateProfile(index) {
+    try {
+        await apiRequest(`/profiles/${index}/duplicate`, {
+            method: 'POST'
+        });
+        
+        showNotification('Profil dupliqué', 'success');
+        loadProfiles();
+    } catch (error) {
+        showNotification('Erreur: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Supprime un profil
+ */
+async function deleteProfile(index, name) {
+    if (!confirm(`Supprimer le profil "${name}" ?`)) return;
+    
+    try {
+        await apiRequest(`/profiles/${index}`, {
+            method: 'DELETE'
+        });
+        
+        showNotification('Profil supprimé', 'success');
+        loadProfiles();
+    } catch (error) {
+        showNotification('Erreur: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Sauvegarde la config actuelle dans le profil actif
+ */
+async function saveToActiveProfile() {
+    try {
+        // Récupère l'index du profil actif
+        const profilesData = await apiRequest('/profiles');
+        const activeIndex = profilesData.activeProfileIndex;
+        
+        // Récupère la config actuelle du formulaire
+        const config = getConfigFromForm();
+        
+        // Met à jour le profil
+        await apiRequest(`/profiles/${activeIndex}`, {
+            method: 'PUT',
+            body: JSON.stringify({ config })
+        });
+        
+        showNotification('Configuration sauvegardée dans le profil', 'success');
+    } catch (error) {
+        showNotification('Erreur: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Récupère la configuration depuis le formulaire
+ */
+function getConfigFromForm() {
+    const selectedTF = document.querySelector('input[name="configTimeframe"]:checked')?.value || '15m';
+    const tpslMode = document.querySelector('input[name="tpslMode"]:checked')?.value || 'auto';
+    const cryptosText = document.getElementById('cryptosList')?.value || '';
+    const symbols = cryptosText.split(',').map(s => s.trim().toUpperCase()).filter(s => s.length > 0);
+    
+    return {
+        symbols,
+        timeframes: [selectedTF],
+        leverage: parseInt(document.getElementById('configLeverage')?.value || 10),
+        maxConcurrentTrades: parseInt(document.getElementById('maxConcurrentTrades')?.value || 7),
+        minScore: parseInt(document.getElementById('minScore')?.value || 4),
+        minWinProbability: parseFloat(document.getElementById('minWinProbability')?.value || 0.6),
+        tpslMode,
+        defaultTP: parseFloat(document.getElementById('defaultTP')?.value || 2),
+        defaultSL: parseFloat(document.getElementById('defaultSL')?.value || 1),
+        analysisInterval: parseInt(document.getElementById('analysisInterval')?.value || 30) * 1000,
+        multiTimeframeMode: document.getElementById('configMultiTimeframe')?.checked || false,
+        mtfTimeframes: Array.from(document.querySelectorAll('input[name="mtfTimeframes"]:checked')).map(cb => cb.value),
+        mtfMinConfirmation: parseInt(document.getElementById('mtfMinConfirmation')?.value || 2),
+        useRSIFilter: document.getElementById('useRSIFilter')?.checked ?? true,
+        rsiOverbought: parseInt(document.getElementById('rsiOverbought')?.value || 70),
+        rsiOversold: parseInt(document.getElementById('rsiOversold')?.value || 30)
+    };
 }
 

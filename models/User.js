@@ -7,6 +7,117 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
+// Schema pour les profils de configuration
+const configProfileSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: true,
+        default: 'Profil par défaut'
+    },
+    description: {
+        type: String,
+        default: ''
+    },
+    isActive: {
+        type: Boolean,
+        default: false
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now
+    },
+    // Configuration du bot
+    config: {
+        symbols: {
+            type: [String],
+            default: ['BTC', 'ETH', 'SOL', 'DOGE', 'XRP']
+        },
+        timeframes: {
+            type: [String],
+            default: ['1h']
+        },
+        leverage: {
+            type: Number,
+            default: 10
+        },
+        maxConcurrentTrades: {
+            type: Number,
+            default: 7
+        },
+        minWinProbability: {
+            type: Number,
+            default: 0.65
+        },
+        minScore: {
+            type: Number,
+            default: 3
+        },
+        tpslMode: {
+            type: String,
+            enum: ['auto', 'percent', 'atr', 'ichimoku_pure'],
+            default: 'auto'
+        },
+        defaultTP: {
+            type: Number,
+            default: 2
+        },
+        defaultSL: {
+            type: Number,
+            default: 1.3
+        },
+        enabledSignals: {
+            tkCross: { type: Boolean, default: true },
+            kumoBreakout: { type: Boolean, default: true },
+            kumoTwist: { type: Boolean, default: true },
+            kijunBounce: { type: Boolean, default: true }
+        },
+        analysisInterval: {
+            type: Number,
+            default: 60000
+        },
+        multiTimeframeMode: {
+            type: Boolean,
+            default: false
+        },
+        mtfTimeframes: {
+            type: [String],
+            default: ['5m', '15m', '1h']
+        },
+        mtfMinConfirmation: {
+            type: Number,
+            default: 2
+        },
+        useRSIFilter: {
+            type: Boolean,
+            default: true
+        },
+        rsiOverbought: {
+            type: Number,
+            default: 70
+        },
+        rsiOversold: {
+            type: Number,
+            default: 30
+        },
+        atrMultiplierSL: {
+            type: Number,
+            default: 1.5
+        },
+        atrMultiplierTP: {
+            type: Number,
+            default: 2.5
+        },
+        riskPerTrade: {
+            type: Number,
+            default: 2
+        },
+        maxPositionSize: {
+            type: Number,
+            default: 50
+        }
+    }
+});
+
 const walletSchema = new mongoose.Schema({
     name: {
         type: String,
@@ -83,6 +194,13 @@ const userSchema = new mongoose.Schema({
     // Wallets Hyperliquid
     wallets: [walletSchema],
     activeWalletIndex: {
+        type: Number,
+        default: 0
+    },
+    
+    // Profils de configuration
+    configProfiles: [configProfileSchema],
+    activeProfileIndex: {
         type: Number,
         default: 0
     },
@@ -274,6 +392,78 @@ userSchema.methods.setActiveWallet = function(index) {
     if (index >= 0 && index < this.wallets.length) {
         this.wallets.forEach((w, i) => w.isActive = (i === index));
         this.activeWalletIndex = index;
+        return true;
+    }
+    return false;
+};
+
+// Méthode pour obtenir le profil actif
+userSchema.methods.getActiveProfile = function() {
+    if (this.configProfiles.length === 0) return null;
+    return this.configProfiles[this.activeProfileIndex] || this.configProfiles[0];
+};
+
+// Méthode pour ajouter un profil
+userSchema.methods.addProfile = function(profileData) {
+    const profile = {
+        name: profileData.name || `Profil ${this.configProfiles.length + 1}`,
+        description: profileData.description || '',
+        isActive: this.configProfiles.length === 0,
+        config: profileData.config || { ...this.botConfig }
+    };
+    this.configProfiles.push(profile);
+    if (this.configProfiles.length === 1) {
+        this.activeProfileIndex = 0;
+    }
+    return this.configProfiles[this.configProfiles.length - 1];
+};
+
+// Méthode pour définir le profil actif
+userSchema.methods.setActiveProfile = function(index) {
+    if (index >= 0 && index < this.configProfiles.length) {
+        this.configProfiles.forEach((p, i) => p.isActive = (i === index));
+        this.activeProfileIndex = index;
+        // Copie la config du profil dans botConfig
+        const profile = this.configProfiles[index];
+        if (profile && profile.config) {
+            this.botConfig = { ...this.botConfig, ...profile.config };
+        }
+        return true;
+    }
+    return false;
+};
+
+// Méthode pour mettre à jour un profil
+userSchema.methods.updateProfile = function(index, updates) {
+    if (index >= 0 && index < this.configProfiles.length) {
+        const profile = this.configProfiles[index];
+        if (updates.name) profile.name = updates.name;
+        if (updates.description !== undefined) profile.description = updates.description;
+        if (updates.config) {
+            profile.config = { ...profile.config, ...updates.config };
+        }
+        // Si c'est le profil actif, met aussi à jour botConfig
+        if (index === this.activeProfileIndex && updates.config) {
+            this.botConfig = { ...this.botConfig, ...updates.config };
+        }
+        return profile;
+    }
+    return null;
+};
+
+// Méthode pour supprimer un profil
+userSchema.methods.deleteProfile = function(index) {
+    if (this.configProfiles.length <= 1) {
+        return false; // Garde au moins un profil
+    }
+    if (index >= 0 && index < this.configProfiles.length) {
+        this.configProfiles.splice(index, 1);
+        // Ajuste l'index actif si nécessaire
+        if (this.activeProfileIndex >= this.configProfiles.length) {
+            this.activeProfileIndex = this.configProfiles.length - 1;
+        }
+        // Marque le nouveau profil actif
+        this.configProfiles[this.activeProfileIndex].isActive = true;
         return true;
     }
     return false;
