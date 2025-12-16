@@ -116,7 +116,7 @@ export function createWebServer(port = 3000) {
     });
 
     // Choix du frontend: 'vue' pour le nouveau, 'legacy' pour l'ancien
-    const frontendMode = process.env.FRONTEND_MODE || 'vue';
+    const frontendMode = process.env.FRONTEND_MODE || 'legacy';
     const webDir = frontendMode === 'vue' ? 'web-vue' : 'web';
     
     // Fichiers statiques (dashboard) - avec options de sécurité
