@@ -242,14 +242,19 @@
                         </div>
                     </div>
 
-                    <!-- Positions Ouvertes -->
-                    <div class="card positions-card">
+                    <!-- Positions Ouvertes - Carte élargie -->
+                    <div class="card positions-card card-wide">
                         <div class="card-header">
                             <h3><i data-lucide="layers"></i> Positions Ouvertes</h3>
-                            <span class="positions-count" id="positionsCount">0</span>
+                            <div class="positions-header-right">
+                                <span class="positions-count" id="positionsCount">0</span>
+                                <button class="btn btn-small btn-outline" onclick="refreshPositions()" title="Rafraîchir">
+                                    <i data-lucide="refresh-cw"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="card-body">
-                            <div id="positionsList" class="positions-list">
+                            <div id="positionsList" class="positions-list-enhanced">
                                 <p class="no-position">Aucune position ouverte</p>
                             </div>
                         </div>

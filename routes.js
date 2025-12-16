@@ -332,6 +332,34 @@ router.post('/close-position', requireAuth, async (req, res) => {
 });
 
 /**
+ * POST /api/position/close
+ * Ferme une position manuellement (alias pour le dashboard)
+ */
+router.post('/position/close', requireAuth, async (req, res) => {
+    try {
+        const { symbol, size } = req.body;
+        
+        if (!symbol) {
+            return res.status(400).json({ success: false, error: 'Symbol requis' });
+        }
+        
+        console.log(`[MANUAL CLOSE] Fermeture manuelle de la position ${symbol} (size: ${size})`);
+        
+        const result = await api.closePosition(symbol);
+        
+        if (result) {
+            console.log(`[MANUAL CLOSE] Position ${symbol} fermée avec succès`);
+            res.json({ success: true, result, message: `Position ${symbol} fermée` });
+        } else {
+            res.json({ success: false, error: 'Échec de la fermeture' });
+        }
+    } catch (error) {
+        console.error(`[MANUAL CLOSE] Erreur:`, error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
  * POST /api/cancel-orders
  * Annule les ordres (protégé)
  */

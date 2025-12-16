@@ -683,7 +683,7 @@ function updateSignalDisplay(signal) {
 }
 
 /**
- * Met à jour l'affichage des positions
+ * Met à jour l'affichage des positions - Version améliorée
  */
 function updatePositionsDisplay(positions) {
     const container = document.getElementById('positionsList');
@@ -692,8 +692,15 @@ function updatePositionsDisplay(positions) {
     if (!container) return;
 
     if (!positions || positions.length === 0) {
-        container.innerHTML = '<p class="no-position">Aucune position ouverte</p>';
+        container.innerHTML = `
+            <div class="no-position-enhanced">
+                <i data-lucide="inbox"></i>
+                <p>Aucune position ouverte</p>
+                <span class="hint">Les positions apparaîtront ici lorsque le bot ouvrira des trades</span>
+            </div>
+        `;
         if (countEl) countEl.textContent = '0';
+        lucide.createIcons();
         return;
     }
 
@@ -701,42 +708,132 @@ function updatePositionsDisplay(positions) {
 
     let html = '';
     positions.forEach(pos => {
+        const symbol = pos.symbol || pos.coin;
         const direction = parseFloat(pos.size || pos.szi) > 0 ? 'long' : 'short';
         const size = Math.abs(parseFloat(pos.size || pos.szi || 0));
         const entryPrice = parseFloat(pos.entryPrice || pos.entryPx || 0);
+        const markPrice = parseFloat(pos.markPrice || pos.markPx || entryPrice);
         const pnl = parseFloat(pos.unrealizedPnl || 0);
+        const pnlPercent = entryPrice > 0 ? ((markPrice - entryPrice) / entryPrice * 100 * (direction === 'long' ? 1 : -1)) : 0;
         const pnlClass = pnl >= 0 ? 'positive' : 'negative';
         const pnlSign = pnl >= 0 ? '+' : '';
-        const leverage = pos.leverage || '-';
+        const leverage = pos.leverage || pos.maxLeverage || '-';
+        const liquidationPrice = parseFloat(pos.liquidationPx || pos.liquidationPrice || 0);
+        const marginUsed = parseFloat(pos.marginUsed || pos.margin || 0);
+        const positionValue = size * markPrice;
+        const returnOnMargin = marginUsed > 0 ? (pnl / marginUsed * 100) : 0;
         
         html += `
-            <div class="position-item ${direction}">
-                <div class="position-header">
-                    <div class="position-symbol">
-                        <span class="symbol">${pos.symbol || pos.coin}</span>
-                        <span class="direction ${direction}">${direction.toUpperCase()}</span>
+            <div class="position-card-enhanced ${direction}" data-symbol="${symbol}">
+                <div class="position-main">
+                    <div class="position-left">
+                        <div class="position-symbol-row">
+                            <span class="symbol-name">${symbol}</span>
+                            <span class="direction-badge ${direction}">${direction.toUpperCase()}</span>
+                            <span class="leverage-badge">${leverage}x</span>
+                        </div>
+                        <div class="position-size-row">
+                            <span class="size-value">${formatNumber(size, 4)} ${symbol.replace('-PERP', '')}</span>
+                            <span class="size-usd">≈ $${formatNumber(positionValue, 2)}</span>
+                        </div>
                     </div>
-                    <span class="position-pnl ${pnlClass}">${pnlSign}$${formatNumber(pnl)}</span>
+                    <div class="position-right">
+                        <div class="pnl-display ${pnlClass}">
+                            <span class="pnl-value">${pnlSign}$${formatNumber(Math.abs(pnl), 2)}</span>
+                            <span class="pnl-percent">${pnlSign}${formatNumber(Math.abs(pnlPercent), 2)}%</span>
+                        </div>
+                        <div class="rom-display ${pnlClass}">
+                            <span class="rom-label">ROM</span>
+                            <span class="rom-value">${pnlSign}${formatNumber(Math.abs(returnOnMargin), 1)}%</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="position-details">
-                    <div class="position-detail">
-                        <span class="label">Taille</span>
-                        <span class="value">${formatNumber(size, 4)}</span>
+                <div class="position-details-grid">
+                    <div class="detail-item">
+                        <span class="detail-label">Entrée</span>
+                        <span class="detail-value">$${formatNumber(entryPrice)}</span>
                     </div>
-                    <div class="position-detail">
-                        <span class="label">Entrée</span>
-                        <span class="value">$${formatNumber(entryPrice)}</span>
+                    <div class="detail-item">
+                        <span class="detail-label">Mark</span>
+                        <span class="detail-value highlight">$${formatNumber(markPrice)}</span>
                     </div>
-                    <div class="position-detail">
-                        <span class="label">Levier</span>
-                        <span class="value">${leverage}x</span>
+                    <div class="detail-item">
+                        <span class="detail-label">Marge</span>
+                        <span class="detail-value">$${formatNumber(marginUsed, 2)}</span>
                     </div>
+                    <div class="detail-item ${liquidationPrice > 0 ? 'danger' : ''}">
+                        <span class="detail-label">Liquidation</span>
+                        <span class="detail-value">${liquidationPrice > 0 ? '$' + formatNumber(liquidationPrice) : '-'}</span>
+                    </div>
+                </div>
+                <div class="position-actions">
+                    <button class="btn btn-small btn-outline" onclick="showPositionDetails('${symbol}')" title="Détails">
+                        <i data-lucide="info"></i>
+                        <span>Détails</span>
+                    </button>
+                    <button class="btn btn-small btn-danger" onclick="closePosition('${symbol}', ${size})" title="Fermer la position">
+                        <i data-lucide="x-circle"></i>
+                        <span>Fermer</span>
+                    </button>
                 </div>
             </div>
         `;
     });
 
     container.innerHTML = html;
+    lucide.createIcons();
+}
+
+/**
+ * Rafraîchit les positions manuellement
+ */
+async function refreshPositions() {
+    try {
+        const data = await apiRequest('/positions');
+        if (data.positions) {
+            updatePositionsDisplay(data.positions);
+            showToast('Positions rafraîchies', 'success');
+        }
+    } catch (error) {
+        console.error('Erreur rafraîchissement positions:', error);
+        showToast('Erreur lors du rafraîchissement', 'error');
+    }
+}
+
+/**
+ * Ferme une position manuellement
+ */
+async function closePosition(symbol, size) {
+    if (!confirm(`Voulez-vous vraiment fermer la position ${symbol} ?`)) {
+        return;
+    }
+    
+    try {
+        showToast(`Fermeture de ${symbol} en cours...`, 'info');
+        
+        const response = await apiRequest('/position/close', {
+            method: 'POST',
+            body: JSON.stringify({ symbol, size })
+        });
+        
+        if (response.success) {
+            showToast(`Position ${symbol} fermée avec succès`, 'success');
+            // Rafraîchir les positions
+            setTimeout(refreshPositions, 1000);
+        } else {
+            showToast(response.error || 'Erreur lors de la fermeture', 'error');
+        }
+    } catch (error) {
+        console.error('Erreur fermeture position:', error);
+        showToast('Erreur lors de la fermeture de la position', 'error');
+    }
+}
+
+/**
+ * Affiche les détails d'une position
+ */
+function showPositionDetails(symbol) {
+    showToast(`Détails de ${symbol} - Fonctionnalité à venir`, 'info');
 }
 
 /**
