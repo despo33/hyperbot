@@ -1290,9 +1290,26 @@ router.get('/account/history', optionalAuth, async (req, res) => {
             
             const entryTime = trade.entries[0]?.time || trade.exits[0]?.time;
             const exitTime = trade.exits[trade.exits.length - 1]?.time;
-            const entryPrice = trade.entries.length > 0 
-                ? trade.entries.reduce((sum, e) => sum + e.price * e.size, 0) / trade.entries.reduce((sum, e) => sum + e.size, 0)
-                : 0;
+            let entryPrice = 0;
+            if (trade.entries.length > 0) {
+                // Calcul normal si on a les entrées
+                entryPrice = trade.entries.reduce((sum, e) => sum + e.price * e.size, 0) / trade.entries.reduce((sum, e) => sum + e.size, 0);
+            } else if (trade.exits.length > 0) {
+                // Calcul inversé à partir du PnL et du prix de sortie
+                // PnL = (exitPrice - entryPrice) * size pour long
+                // PnL = (entryPrice - exitPrice) * size pour short
+                const avgExitPrice = trade.exits.reduce((sum, e) => sum + e.price * e.size, 0) / trade.exits.reduce((sum, e) => sum + e.size, 0);
+                const totalSize = trade.exits.reduce((sum, e) => sum + e.size, 0);
+                if (totalSize > 0 && avgExitPrice > 0) {
+                    if (trade.direction === 'long') {
+                        // entryPrice = exitPrice - (PnL / size)
+                        entryPrice = avgExitPrice - (trade.totalPnL / totalSize);
+                    } else {
+                        // entryPrice = exitPrice + (PnL / size)
+                        entryPrice = avgExitPrice + (trade.totalPnL / totalSize);
+                    }
+                }
+            }
             const exitPrice = trade.exits.reduce((sum, e) => sum + e.price * e.size, 0) / trade.exits.reduce((sum, e) => sum + e.size, 0);
             const totalSize = trade.entries.reduce((sum, e) => sum + e.size, 0) || trade.exits.reduce((sum, e) => sum + e.size, 0);
             
