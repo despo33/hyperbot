@@ -115,11 +115,22 @@ export function createWebServer(port = 3000) {
         next();
     });
 
+    // Choix du frontend: 'vue' pour le nouveau, 'legacy' pour l'ancien
+    const frontendMode = process.env.FRONTEND_MODE || 'vue';
+    const webDir = frontendMode === 'vue' ? 'web-vue' : 'web';
+    
     // Fichiers statiques (dashboard) - avec options de sécurité
-    app.use(express.static(path.join(__dirname, 'web'), {
+    app.use(express.static(path.join(__dirname, webDir), {
         dotfiles: 'deny',        // Refuse l'accès aux fichiers .xxx
         index: false,            // Pas d'index automatique
         maxAge: '1d'             // Cache 1 jour en production
+    }));
+    
+    // Ancien frontend (legacy) - toujours accessible sur /legacy
+    app.use('/legacy', express.static(path.join(__dirname, 'web'), {
+        dotfiles: 'deny',
+        index: false,
+        maxAge: '1d'
     }));
 
     // Routes API
@@ -127,20 +138,32 @@ export function createWebServer(port = 3000) {
     app.use('/api/auth', authRoutes);
     app.use('/api/wallets', walletRoutes);
 
-    // Route par défaut - redirige vers login ou dashboard
-    app.get('/', (req, res) => {
-        res.sendFile(path.join(__dirname, 'web', 'login.html'));
-    });
-    
-    // Route dashboard (protégée côté client)
-    app.get('/dashboard', (req, res) => {
-        res.sendFile(path.join(__dirname, 'web', 'dashboard.html'));
-    });
-    
-    // Route reset password
-    app.get('/reset-password', (req, res) => {
-        res.sendFile(path.join(__dirname, 'web', 'reset-password.html'));
-    });
+    // Routes pour le nouveau frontend Vue.js (SPA)
+    if (frontendMode === 'vue') {
+        // Toutes les routes non-API renvoient index.html (SPA routing)
+        app.get('*', (req, res, next) => {
+            // Skip API routes
+            if (req.path.startsWith('/api') || req.path.startsWith('/legacy')) {
+                return next();
+            }
+            res.sendFile(path.join(__dirname, webDir, 'index.html'));
+        });
+    } else {
+        // Route par défaut - redirige vers login ou dashboard (legacy)
+        app.get('/', (req, res) => {
+            res.sendFile(path.join(__dirname, 'web', 'login.html'));
+        });
+        
+        // Route dashboard (protégée côté client)
+        app.get('/dashboard', (req, res) => {
+            res.sendFile(path.join(__dirname, 'web', 'dashboard.html'));
+        });
+        
+        // Route reset password
+        app.get('/reset-password', (req, res) => {
+            res.sendFile(path.join(__dirname, 'web', 'reset-password.html'));
+        });
+    }
 
     // Gestion des erreurs
     app.use((err, req, res, next) => {

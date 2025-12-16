@@ -1,0 +1,6 @@
+import{x as i,r as s,j as d}from"./index-CkTTGbTf.js";import{a as u,c as g}from"./createLucideIcon-C2Ny1EPG.js";const p=i("auth",()=>{const t=s(localStorage.getItem("authToken")),a=s(JSON.parse(localStorage.getItem("user")||"null")),n=d(()=>!!t.value);async function c(o,h){const e=await u.post("/auth/login",{email:o,password:h});return e.data.success&&(t.value=e.data.token,a.value=e.data.user,localStorage.setItem("authToken",e.data.token),localStorage.setItem("user",JSON.stringify(e.data.user))),e.data}async function r(){t.value=null,a.value=null,localStorage.removeItem("authToken"),localStorage.removeItem("user")}async function l(){if(!t.value)return!1;try{const o=await u.get("/auth/me");if(o.data.success)return a.value=o.data.user,!0}catch{r()}return!1}return{token:t,user:a,isAuthenticated:n,login:c,logout:r,checkAuth:l}});/**
+ * @license lucide-vue-next v0.561.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const k=g("bot",[["path",{d:"M12 8V4H8",key:"hb8ula"}],["rect",{width:"16",height:"12",x:"4",y:"8",rx:"2",key:"enze0r"}],["path",{d:"M2 14h2",key:"vft8re"}],["path",{d:"M20 14h2",key:"4cs60a"}],["path",{d:"M15 13v2",key:"1xurst"}],["path",{d:"M9 13v2",key:"rq6x2g"}]]);export{k as B,p as u};
