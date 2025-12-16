@@ -3733,10 +3733,10 @@ async function createProfile() {
             body: JSON.stringify({ name, description, copyFromCurrent: true })
         });
         
-        showNotification('Profil créé avec succès', 'success');
+        showToast('Profil créé avec succès', 'success');
         loadProfiles();
     } catch (error) {
-        showNotification('Erreur: ' + error.message, 'error');
+        showToast('Erreur: ' + error.message, 'error');
     }
 }
 
@@ -3749,13 +3749,13 @@ async function activateProfile(index) {
             method: 'POST'
         });
         
-        showNotification('Profil activé', 'success');
+        showToast('Profil activé', 'success');
         loadProfiles();
         
         // Recharge la config trading pour refléter le nouveau profil
         loadTradingConfig();
     } catch (error) {
-        showNotification('Erreur: ' + error.message, 'error');
+        showToast('Erreur: ' + error.message, 'error');
     }
 }
 
@@ -3777,10 +3777,10 @@ async function editProfile(index) {
             body: JSON.stringify({ name: newName, description: newDescription })
         });
         
-        showNotification('Profil mis à jour', 'success');
+        showToast('Profil mis à jour', 'success');
         loadProfiles();
     } catch (error) {
-        showNotification('Erreur: ' + error.message, 'error');
+        showToast('Erreur: ' + error.message, 'error');
     }
 }
 
@@ -3793,10 +3793,10 @@ async function duplicateProfile(index) {
             method: 'POST'
         });
         
-        showNotification('Profil dupliqué', 'success');
+        showToast('Profil dupliqué', 'success');
         loadProfiles();
     } catch (error) {
-        showNotification('Erreur: ' + error.message, 'error');
+        showToast('Erreur: ' + error.message, 'error');
     }
 }
 
@@ -3811,10 +3811,10 @@ async function deleteProfile(index, name) {
             method: 'DELETE'
         });
         
-        showNotification('Profil supprimé', 'success');
+        showToast('Profil supprimé', 'success');
         loadProfiles();
     } catch (error) {
-        showNotification('Erreur: ' + error.message, 'error');
+        showToast('Erreur: ' + error.message, 'error');
     }
 }
 
@@ -3836,9 +3836,9 @@ async function saveToActiveProfile() {
             body: JSON.stringify({ config })
         });
         
-        showNotification('Configuration sauvegardée dans le profil', 'success');
+        showToast('Configuration sauvegardée dans le profil', 'success');
     } catch (error) {
-        showNotification('Erreur: ' + error.message, 'error');
+        showToast('Erreur: ' + error.message, 'error');
     }
 }
 
