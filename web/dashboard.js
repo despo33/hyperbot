@@ -832,8 +832,230 @@ async function closePosition(symbol, size) {
 /**
  * Affiche les détails d'une position
  */
-function showPositionDetails(symbol) {
-    showToast(`Détails de ${symbol} - Fonctionnalité à venir`, 'info');
+async function showPositionDetails(symbol) {
+    try {
+        showToast(`Chargement des détails de ${symbol}...`, 'info');
+        
+        const details = await apiRequest(`/position-details/${symbol}`);
+        
+        // Formate la durée
+        let durationStr = 'N/A';
+        if (details.duration) {
+            const minutes = Math.floor(details.duration / 60000);
+            const hours = Math.floor(minutes / 60);
+            if (hours > 0) {
+                durationStr = `${hours}h ${minutes % 60}m`;
+            } else {
+                durationStr = `${minutes}m`;
+            }
+        }
+        
+        // Formate la date d'ouverture
+        const openedAtStr = details.openedAt 
+            ? new Date(details.openedAt).toLocaleString('fr-FR')
+            : 'N/A';
+        
+        // Construit les facteurs d'entrée
+        let factorsHtml = '';
+        if (details.entryAnalysis?.factors?.length > 0) {
+            factorsHtml = details.entryAnalysis.factors.map(f => 
+                `<span class="factor-tag">${f}</span>`
+            ).join('');
+        } else {
+            factorsHtml = '<span class="text-muted">Aucun facteur enregistré</span>';
+        }
+        
+        // Construit les indicateurs actuels
+        let indicatorsHtml = '';
+        if (details.currentAnalysis?.indicators) {
+            const ind = details.currentAnalysis.indicators;
+            indicatorsHtml = `
+                <div class="indicator-grid">
+                    ${ind.rsi ? `<div class="indicator-item"><span class="label">RSI</span><span class="value">${ind.rsi.toFixed(1)}</span></div>` : ''}
+                    ${ind.adx ? `<div class="indicator-item"><span class="label">ADX</span><span class="value">${ind.adx.toFixed(1)}</span></div>` : ''}
+                    ${ind.macdHistogram !== undefined ? `<div class="indicator-item"><span class="label">MACD</span><span class="value ${ind.macdHistogram > 0 ? 'positive' : 'negative'}">${ind.macdHistogram > 0 ? '+' : ''}${ind.macdHistogram.toFixed(4)}</span></div>` : ''}
+                </div>
+            `;
+        }
+        
+        // Crée la modale
+        const modal = document.createElement('div');
+        modal.className = 'position-details-modal-overlay';
+        modal.innerHTML = `
+            <div class="position-details-modal">
+                <div class="modal-header">
+                    <h2>
+                        <span class="direction-badge ${details.direction}">${details.direction.toUpperCase()}</span>
+                        ${symbol}
+                    </h2>
+                    <button class="close-modal" onclick="this.closest('.position-details-modal-overlay').remove()">×</button>
+                </div>
+                
+                <div class="modal-body">
+                    <!-- Section Prix et P&L -->
+                    <div class="details-section">
+                        <h3><i data-lucide="dollar-sign"></i> Prix & P&L</h3>
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <span class="label">Prix d'entrée</span>
+                                <span class="value">$${details.entryPrice?.toFixed(4) || 'N/A'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Prix actuel</span>
+                                <span class="value">$${details.currentPrice?.toFixed(4) || 'N/A'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">P&L</span>
+                                <span class="value ${details.unrealizedPnl >= 0 ? 'positive' : 'negative'}">
+                                    ${details.unrealizedPnl >= 0 ? '+' : ''}$${details.unrealizedPnl?.toFixed(2) || '0.00'}
+                                    (${details.pnlPercent >= 0 ? '+' : ''}${details.pnlPercent?.toFixed(2) || '0'}%)
+                                </span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Taille</span>
+                                <span class="value">${details.size?.toFixed(4) || 'N/A'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Section Niveaux -->
+                    <div class="details-section">
+                        <h3><i data-lucide="target"></i> Niveaux TP/SL</h3>
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <span class="label">Stop Loss</span>
+                                <span class="value sl-value">$${details.stopLoss?.toFixed(4) || 'N/A'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Take Profit</span>
+                                <span class="value tp-value">$${details.takeProfit?.toFixed(4) || 'N/A'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Levier</span>
+                                <span class="value">${details.leverage || 1}x</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">RRR</span>
+                                <span class="value">${details.riskRewardRatio?.toFixed(2) || 'N/A'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Liquidation</span>
+                                <span class="value liq-value">$${details.exchangeData?.liquidationPrice?.toFixed(4) || 'N/A'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Section Raisons d'entrée -->
+                    <div class="details-section">
+                        <h3><i data-lucide="brain"></i> Raisons du Point d'Entrée</h3>
+                        ${details.entryAnalysis ? `
+                            <div class="entry-reason">
+                                <div class="reason-header">
+                                    <span class="signal-type">${details.entryAnalysis.signalType || 'Signal'}</span>
+                                    <span class="quality-badge grade-${details.entryAnalysis.qualityGrade?.toLowerCase() || 'c'}">
+                                        Grade ${details.entryAnalysis.qualityGrade || 'N/A'}
+                                    </span>
+                                </div>
+                                <p class="reason-text">${details.entryAnalysis.signalReason || 'Signal Ichimoku détecté'}</p>
+                                <div class="reason-stats">
+                                    <div class="stat">
+                                        <span class="label">Score Qualité</span>
+                                        <span class="value">${details.entryAnalysis.qualityScore || 0}/100</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="label">Probabilité Win</span>
+                                        <span class="value">${details.entryAnalysis.winProbability || 'N/A'}%</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="label">Confluence</span>
+                                        <span class="value">${details.entryAnalysis.confluence || 0} indicateurs</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="label">Score Ichimoku</span>
+                                        <span class="value">${details.entryAnalysis.ichimokuScore || 0}</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="label">Timeframe</span>
+                                        <span class="value">${details.entryAnalysis.timeframe || 'N/A'}</span>
+                                    </div>
+                                </div>
+                                <div class="factors-section">
+                                    <span class="factors-label">Facteurs de confirmation:</span>
+                                    <div class="factors-list">${factorsHtml}</div>
+                                </div>
+                                <div class="sltp-sources">
+                                    <span>SL basé sur: <strong>${details.entryAnalysis.slSource || 'percent'}</strong></span>
+                                    <span>TP basé sur: <strong>${details.entryAnalysis.tpSource || 'percent'}</strong></span>
+                                </div>
+                            </div>
+                        ` : `
+                            <div class="no-analysis">
+                                <i data-lucide="alert-circle"></i>
+                                <p>Position ouverte manuellement ou avant le démarrage du bot.<br>Les détails d'analyse ne sont pas disponibles.</p>
+                            </div>
+                        `}
+                    </div>
+                    
+                    <!-- Section État actuel -->
+                    ${details.currentAnalysis ? `
+                        <div class="details-section">
+                            <h3><i data-lucide="activity"></i> État Actuel du Marché</h3>
+                            <div class="current-analysis">
+                                <div class="analysis-stats">
+                                    <div class="stat">
+                                        <span class="label">Score</span>
+                                        <span class="value">${details.currentAnalysis.score || 0}</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="label">Direction</span>
+                                        <span class="value ${details.currentAnalysis.direction}">${details.currentAnalysis.direction || 'N/A'}</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="label">Confiance</span>
+                                        <span class="value">${((details.currentAnalysis.confidence || 0) * 100).toFixed(0)}%</span>
+                                    </div>
+                                </div>
+                                ${indicatorsHtml}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <!-- Section Timing -->
+                    <div class="details-section">
+                        <h3><i data-lucide="clock"></i> Timing</h3>
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <span class="label">Ouvert le</span>
+                                <span class="value">${openedAtStr}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Durée</span>
+                                <span class="value">${durationStr}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button class="btn btn-outline" onclick="this.closest('.position-details-modal-overlay').remove()">Fermer</button>
+                    <button class="btn btn-danger" onclick="closePosition('${symbol}', ${details.size}); this.closest('.position-details-modal-overlay').remove();">
+                        <i data-lucide="x-circle"></i> Fermer la position
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Initialise les icônes Lucide dans la modale
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+        
+    } catch (error) {
+        console.error('Erreur chargement détails:', error);
+        showToast(`Erreur: ${error.message}`, 'error');
+    }
 }
 
 /**

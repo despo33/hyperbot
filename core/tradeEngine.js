@@ -1564,7 +1564,7 @@ class TradeEngine {
                 leverage: this.config.leverage
             });
             
-            // Stocke la position
+            // Stocke la position avec les détails d'analyse
             this.state.activePositions.set(symbol, {
                 symbol,
                 direction,
@@ -1572,7 +1572,23 @@ class TradeEngine {
                 size: positionData.size,
                 stopLoss: sltp.stopLoss,
                 takeProfit: sltp.takeProfit,
-                openedAt: Date.now()
+                openedAt: Date.now(),
+                leverage: this.config.leverage,
+                riskRewardRatio: sltp.riskRewardRatio,
+                // Détails d'analyse pour affichage
+                analysis: {
+                    signalType: signal.type || 'unknown',
+                    signalReason: signal.reason || signal.type || 'Signal Ichimoku',
+                    qualityGrade: qualityGrade,
+                    qualityScore: qualityScore,
+                    winProbability: winProb,
+                    confluence: confluenceCount,
+                    factors: opportunity.signalQuality?.factors || [],
+                    slSource: sltp.slSource || 'percent',
+                    tpSource: sltp.tpSource || 'percent',
+                    ichimokuScore: opportunity.ichimokuScore || 0,
+                    timeframe: this.config.timeframe
+                }
             });
             
             // ===== MISE À JOUR ANTI-OVERTRADING =====

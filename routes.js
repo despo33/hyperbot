@@ -273,6 +273,104 @@ router.get('/positions', optionalAuth, async (req, res) => {
 });
 
 /**
+ * GET /api/position-details/:symbol
+ * Retourne les détails complets d'une position (analyse, calculs, raisons)
+ */
+router.get('/position-details/:symbol', optionalAuth, async (req, res) => {
+    try {
+        const { symbol } = req.params;
+        
+        // Récupère la position depuis l'exchange
+        let address;
+        if (req.user) {
+            const activeWallet = req.user.getActiveWallet();
+            address = activeWallet?.tradingAddress || activeWallet?.address;
+        }
+        const positions = await api.getOpenPositions(address);
+        const position = positions.find(p => (p.coin || p.symbol) === symbol);
+        
+        if (!position) {
+            return res.status(404).json({ error: 'Position non trouvée' });
+        }
+        
+        // Récupère les données stockées lors de l'ouverture
+        const storedPosition = tradeEngine.state.activePositions?.get(symbol);
+        
+        // Récupère l'analyse actuelle
+        const currentAnalysis = tradeEngine.state.multiAnalysis?.get(symbol);
+        
+        // Calcule le P&L actuel
+        const entryPrice = storedPosition?.entryPrice || parseFloat(position.entryPrice || position.entryPx || 0);
+        const currentPrice = await api.getPrice(symbol);
+        const size = Math.abs(parseFloat(position.size || position.szi || 0));
+        const direction = size > 0 ? 'long' : 'short';
+        
+        let unrealizedPnl = 0;
+        let pnlPercent = 0;
+        if (entryPrice > 0 && currentPrice > 0) {
+            if (direction === 'long') {
+                unrealizedPnl = (currentPrice - entryPrice) * size;
+                pnlPercent = ((currentPrice - entryPrice) / entryPrice) * 100;
+            } else {
+                unrealizedPnl = (entryPrice - currentPrice) * size;
+                pnlPercent = ((entryPrice - currentPrice) / entryPrice) * 100;
+            }
+        }
+        
+        // Construit la réponse détaillée
+        const details = {
+            // Infos de base
+            symbol,
+            direction,
+            size,
+            entryPrice,
+            currentPrice,
+            
+            // P&L
+            unrealizedPnl,
+            pnlPercent,
+            
+            // Niveaux TP/SL
+            stopLoss: storedPosition?.stopLoss || null,
+            takeProfit: storedPosition?.takeProfit || null,
+            leverage: storedPosition?.leverage || position.leverage || 1,
+            riskRewardRatio: storedPosition?.riskRewardRatio || null,
+            
+            // Timing
+            openedAt: storedPosition?.openedAt || null,
+            duration: storedPosition?.openedAt ? Date.now() - storedPosition.openedAt : null,
+            
+            // Analyse au moment de l'entrée (raisons du trade)
+            entryAnalysis: storedPosition?.analysis || null,
+            
+            // Analyse actuelle (état du marché maintenant)
+            currentAnalysis: currentAnalysis ? {
+                score: currentAnalysis.score,
+                direction: currentAnalysis.direction,
+                confidence: currentAnalysis.confidence,
+                winProbability: currentAnalysis.winProbability,
+                ichimokuScore: currentAnalysis.ichimokuScore,
+                signalQuality: currentAnalysis.signalQuality,
+                indicators: currentAnalysis.indicators,
+                recommendation: currentAnalysis.recommendation
+            } : null,
+            
+            // Données brutes de l'exchange
+            exchangeData: {
+                liquidationPrice: position.liquidationPrice || position.liquidationPx || null,
+                marginUsed: position.marginUsed || null,
+                unrealizedPnl: position.unrealizedPnl || null
+            }
+        };
+        
+        res.json(details);
+    } catch (error) {
+        console.error('Erreur position-details:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
  * GET /api/orders
  * Retourne les ordres ouverts de l'utilisateur
  */
