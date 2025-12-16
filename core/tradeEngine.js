@@ -15,6 +15,7 @@ import correlationManager from './correlationManager.js';
 import rateLimiter from '../services/rateLimiter.js';
 import connectionManager from '../services/connectionManager.js';
 import multiTimeframe from './multiTimeframe.js';
+import { TIMEFRAME_TPSL, TIMEFRAME_PRESETS, DEFAULT_BOT_CONFIG } from './config.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -27,105 +28,9 @@ const __dirname = path.dirname(__filename);
  */
 class TradeEngine {
     constructor() {
-        // TP/SL par timeframe
-        this.TIMEFRAME_TPSL = {
-            '1m': { tp: 0.5, sl: 0.25 },
-            '5m': { tp: 1.0, sl: 0.5 },
-            '15m': { tp: 2.0, sl: 1.0 },
-            '30m': { tp: 3.0, sl: 1.5 },
-            '1h': { tp: 4.0, sl: 2.0 },
-            '4h': { tp: 6.0, sl: 3.0 },
-            '1d': { tp: 10.0, sl: 5.0 }
-        };
-        
-        // ===== PRESETS DE FILTRES PAR TIMEFRAME =====
-        // Réglages optimisés automatiquement selon le timeframe choisi
-        this.TIMEFRAME_PRESETS = {
-            '1m': {
-                name: 'Ultra Scalping',
-                minScore: 4,              // Score Ichimoku minimum (renforcé)
-                minWinProbability: 0.58,  // Probabilité minimum (58%) - renforcé
-                minConfluence: 2,         // Confluence minimum (renforcé)
-                rsiLongMax: 75,           // RSI max pour LONG (renforcé)
-                rsiShortMin: 25,          // RSI min pour SHORT (renforcé)
-                adxMin: 10,               // ADX minimum (renforcé)
-                minRRR: 0.5,              // RRR minimum renforcé
-                analysisInterval: 30000,  // Analyse toutes les 30s
-                description: 'Trades rapides, filtres souples pour capturer les mouvements'
-            },
-            '5m': {
-                name: 'Scalping',
-                minScore: 4,              // Renforcé
-                minWinProbability: 0.60,  // Renforcé
-                minConfluence: 2,         // Renforcé
-                rsiLongMax: 72,           // Renforcé
-                rsiShortMin: 28,          // Renforcé
-                adxMin: 12,               // Renforcé
-                minRRR: 0.7,              // RRR renforcé pour scalping
-                analysisInterval: 60000,  // Analyse toutes les 1min
-                description: 'Scalping classique, bon équilibre vitesse/qualité'
-            },
-            '15m': {
-                name: 'Intraday',
-                minScore: 4,              // Renforcé
-                minWinProbability: 0.62,  // Renforcé
-                minConfluence: 2,
-                rsiLongMax: 70,           // Renforcé
-                rsiShortMin: 30,          // Renforcé
-                adxMin: 15,               // Renforcé
-                minRRR: 1.0,              // RRR renforcé
-                analysisInterval: 60000,
-                description: 'Trading intraday, filtres équilibrés'
-            },
-            '30m': {
-                name: 'Intraday+',
-                minScore: 3,
-                minWinProbability: 0.65,
-                minConfluence: 2,
-                rsiLongMax: 70,
-                rsiShortMin: 30,
-                adxMin: 18,
-                minRRR: 1.0,
-                analysisInterval: 120000, // Analyse toutes les 2min
-                description: 'Intraday avec plus de confirmation'
-            },
-            '1h': {
-                name: 'Swing Court',
-                minScore: 4,              // Renforcé
-                minWinProbability: 0.65,  // Renforcé
-                minConfluence: 2,
-                rsiLongMax: 68,           // Renforcé
-                rsiShortMin: 32,          // Renforcé
-                adxMin: 18,               // Renforcé
-                minRRR: 1.2,
-                analysisInterval: 180000, // Analyse toutes les 3min
-                description: 'Swing trading court terme, filtres stricts'
-            },
-            '4h': {
-                name: 'Swing',
-                minScore: 3,
-                minWinProbability: 0.70,
-                minConfluence: 2,
-                rsiLongMax: 68,
-                rsiShortMin: 32,
-                adxMin: 22,
-                minRRR: 1.5,
-                analysisInterval: 300000, // Analyse toutes les 5min
-                description: 'Swing trading, haute qualité de signal'
-            },
-            '1d': {
-                name: 'Position',
-                minScore: 3,
-                minWinProbability: 0.72,
-                minConfluence: 2,
-                rsiLongMax: 65,
-                rsiShortMin: 35,
-                adxMin: 20,
-                minRRR: 2.0,
-                analysisInterval: 600000, // Analyse toutes les 10min
-                description: 'Position trading, signaux très fiables'
-            }
-        };
+        // Utilise les constantes centralisées depuis config.js
+        this.TIMEFRAME_TPSL = TIMEFRAME_TPSL;
+        this.TIMEFRAME_PRESETS = TIMEFRAME_PRESETS;
         
         // Configuration
         this.config = {

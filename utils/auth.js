@@ -6,13 +6,19 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
-export const JWT_SECRET = process.env.JWT_SECRET || 'hyperliquid-bot-jwt-secret-key';
+// Validation stricte des variables d'environnement en production
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+    console.error('[FATAL] ❌ JWT_SECRET non défini en production!');
+    console.error('[FATAL] Définissez JWT_SECRET dans vos variables d\'environnement.');
+    process.exit(1);
+}
+
+export const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-jwt-secret-key-32chars';
 export const JWT_EXPIRES_IN = '7d';
 
-// Avertissement sécurité si clé par défaut en production
-if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'hyperliquid-bot-jwt-secret-key') {
-    console.error('[SECURITY] ⚠️ ATTENTION: JWT_SECRET par défaut utilisé en production!');
-    console.error('[SECURITY] Définissez JWT_SECRET dans vos variables d\'environnement.');
+// Avertissement en développement
+if (!process.env.JWT_SECRET) {
+    console.warn('[SECURITY] ⚠️ JWT_SECRET non défini - utilisation de la clé de développement');
 }
 
 /**
@@ -26,6 +32,7 @@ export async function optionalAuth(req, res, next) {
     if (token) {
         try {
             const decoded = jwt.verify(token, JWT_SECRET);
+            // Utilise lean() pour de meilleures performances, mais garde les méthodes nécessaires
             req.user = await User.findById(decoded.userId).select('-password');
         } catch (e) {
             // Token invalide, continue sans user
@@ -48,6 +55,8 @@ export async function requireAuth(req, res, next) {
     
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
+        // Note: On ne peut pas utiliser lean() ici car on a besoin des méthodes Mongoose
+        // (getActiveWallet, addProfile, etc.)
         req.user = await User.findById(decoded.userId).select('-password');
         
         if (!req.user) {

@@ -10,14 +10,9 @@ import User from '../models/User.js';
 import emailService from '../services/emailService.js';
 import database from '../services/database.js';
 import { requireAuth, JWT_SECRET, JWT_EXPIRES_IN } from '../utils/auth.js';
+import { registerSchema, loginSchema, resetPasswordSchema, validate } from '../utils/validation.js';
 
 const router = Router();
-
-// Avertissement si secret par défaut en production
-if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'hyperliquid-bot-jwt-secret-key') {
-    console.error('[SECURITY] ⚠️ ATTENTION: JWT_SECRET par défaut utilisé en production!');
-    console.error('[SECURITY] Définissez JWT_SECRET dans vos variables d\'environnement.');
-}
 
 // ===== FONCTIONS DE VALIDATION =====
 
@@ -117,7 +112,7 @@ export { requireAuth as authenticateToken } from '../utils/auth.js';
  * POST /api/auth/register
  * Inscription d'un nouvel utilisateur
  */
-router.post('/register', async (req, res) => {
+router.post('/register', validate(registerSchema), async (req, res) => {
     try {
         const { email, username, password } = req.body;
 
@@ -125,49 +120,8 @@ router.post('/register', async (req, res) => {
         const cleanEmail = sanitizeMongoInput(sanitizeString(email));
         const cleanUsername = sanitizeMongoInput(sanitizeString(username));
 
-        // Validation
-        if (!cleanEmail || !cleanUsername || !password) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Email, nom d\'utilisateur et mot de passe requis' 
-            });
-        }
-
-        if (!isValidEmail(cleanEmail)) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Format d\'email invalide' 
-            });
-        }
-
-        if (!isValidUsername(cleanUsername)) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Le nom d\'utilisateur doit contenir entre 3 et 30 caractères (lettres, chiffres, underscore)' 
-            });
-        }
-
-        if (password.length < 8) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Le mot de passe doit contenir au moins 8 caractères' 
-            });
-        }
-
-        // Validation mot de passe fort (majuscule, minuscule, chiffre)
-        const hasUpperCase = /[A-Z]/.test(password);
-        const hasLowerCase = /[a-z]/.test(password);
-        const hasNumber = /\d/.test(password);
-        
-        if (!hasUpperCase || !hasLowerCase || !hasNumber) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre' 
-            });
-        }
-
         // Vérifie si l'email existe déjà
-        const existingEmail = await User.findOne({ email: email.toLowerCase() });
+        const existingEmail = await User.findOne({ email: cleanEmail.toLowerCase() });
         if (existingEmail) {
             return res.status(400).json({ 
                 success: false, 
@@ -321,7 +275,7 @@ router.post('/resend-verification', async (req, res) => {
  * POST /api/auth/login
  * Connexion utilisateur
  */
-router.post('/login', async (req, res) => {
+router.post('/login', validate(loginSchema), async (req, res) => {
     try {
         const ip = req.ip || req.connection.remoteAddress;
         
@@ -335,13 +289,6 @@ router.post('/login', async (req, res) => {
         }
 
         const { email, password } = req.body;
-
-        if (!email || !password) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Email et mot de passe requis' 
-            });
-        }
 
         // Sanitize email
         const cleanEmail = sanitizeMongoInput(sanitizeString(email));
@@ -580,23 +527,9 @@ router.post('/forgot-password', async (req, res) => {
  * POST /api/auth/reset-password
  * Reset le mot de passe avec le token
  */
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', validate(resetPasswordSchema), async (req, res) => {
     try {
-        const { token, newPassword } = req.body;
-
-        if (!token || !newPassword) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Token et nouveau mot de passe requis' 
-            });
-        }
-
-        if (newPassword.length < 8) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Le mot de passe doit contenir au moins 8 caractères' 
-            });
-        }
+        const { token, password } = req.body;
 
         const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
         
@@ -612,7 +545,7 @@ router.post('/reset-password', async (req, res) => {
             });
         }
 
-        user.password = newPassword;
+        user.password = password;
         user.resetPasswordToken = null;
         user.resetPasswordExpires = null;
         await user.save();

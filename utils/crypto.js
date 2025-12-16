@@ -5,18 +5,26 @@
 
 import CryptoJS from 'crypto-js';
 
-// Validation de la clé d'encryption
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'hyperliquid-bot-secret-key-32ch';
+// Validation stricte des variables d'environnement en production
+if (process.env.NODE_ENV === 'production' && !process.env.ENCRYPTION_KEY) {
+    console.error('[FATAL] ❌ ENCRYPTION_KEY non définie en production!');
+    console.error('[FATAL] Définissez ENCRYPTION_KEY dans vos variables d\'environnement.');
+    process.exit(1);
+}
 
-// Avertissement si clé par défaut en production
-if (process.env.NODE_ENV === 'production' && ENCRYPTION_KEY === 'hyperliquid-bot-secret-key-32ch') {
-    console.error('[SECURITY] ⚠️ ATTENTION: Clé d\'encryption par défaut utilisée en production!');
-    console.error('[SECURITY] Définissez ENCRYPTION_KEY dans vos variables d\'environnement.');
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'dev-only-encryption-key-32chars!';
+
+// Avertissement en développement
+if (!process.env.ENCRYPTION_KEY) {
+    console.warn('[SECURITY] ⚠️ ENCRYPTION_KEY non définie - utilisation de la clé de développement');
 }
 
 // Vérifie la longueur minimale de la clé
 if (ENCRYPTION_KEY.length < 16) {
     console.error('[SECURITY] ⚠️ ENCRYPTION_KEY trop courte (minimum 16 caractères)');
+    if (process.env.NODE_ENV === 'production') {
+        process.exit(1);
+    }
 }
 
 /**

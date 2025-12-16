@@ -28,6 +28,7 @@ import scanner, { TOP_CRYPTOS } from './core/scanner.js';
 // Utilitaires centralisés
 import { optionalAuth, requireAuth } from './utils/auth.js';
 import { encryptSecret, decryptSecret } from './utils/crypto.js';
+import { tradingConfigSchema, profileSchema, tradeSchema, walletSchema, validate } from './utils/validation.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -293,7 +294,7 @@ router.get('/orders', optionalAuth, async (req, res) => {
  * POST /api/trade
  * Place un trade manuel (protégé)
  */
-router.post('/trade', requireAuth, async (req, res) => {
+router.post('/trade', requireAuth, validate(tradeSchema), async (req, res) => {
     try {
         const { symbol, direction, size, price, stopLoss, takeProfit } = req.body;
 
@@ -363,7 +364,7 @@ router.get('/config/trading', optionalAuth, async (req, res) => {
  * POST /api/config/trading
  * Met à jour la config trading de l'utilisateur (protégé)
  */
-router.post('/config/trading', requireAuth, async (req, res) => {
+router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async (req, res) => {
     try {
         // Si utilisateur connecté, sauvegarde dans son compte
         if (req.user) {
@@ -522,7 +523,7 @@ router.get('/profiles', requireAuth, async (req, res) => {
  * POST /api/profiles
  * Crée un nouveau profil
  */
-router.post('/profiles', requireAuth, async (req, res) => {
+router.post('/profiles', requireAuth, validate(profileSchema), async (req, res) => {
     try {
         const { name, description, copyFromCurrent } = req.body;
         

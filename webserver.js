@@ -8,11 +8,13 @@ import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import helmet from 'helmet';
 import routes from './routes.js';
 import authRoutes from './routes/authRoutes.js';
 import walletRoutes from './routes/walletRoutes.js';
 import tradeEngine from './core/tradeEngine.js';
 import botManager from './core/BotManager.js';
+import logger from './services/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -63,40 +65,30 @@ export function createWebServer(port = 3000) {
     const server = createServer(app);
     const wss = new WebSocketServer({ server });
 
-    // ===== SÉCURITÉ: Headers HTTP =====
-    app.use((req, res, next) => {
-        // Protection XSS
-        res.setHeader('X-XSS-Protection', '1; mode=block');
-        // Empêche le sniffing MIME
-        res.setHeader('X-Content-Type-Options', 'nosniff');
-        // Clickjacking protection
-        res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-        // Referrer policy
-        res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-        // Permissions policy
-        res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-        // Content Security Policy (CSP) - Protection XSS avancée
-        // Note: CSP désactivée temporairement pour compatibilité avec les CDN
-        // À réactiver avec une configuration plus permissive si nécessaire
-        /*
-        if (process.env.NODE_ENV === 'production') {
-            res.setHeader('Content-Security-Policy', 
-                "default-src 'self'; " +
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com; " +
-                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; " +
-                "font-src 'self' https://fonts.gstatic.com data:; " +
-                "img-src 'self' data: https: blob:; " +
-                "connect-src 'self' wss: ws: https:; " +
-                "frame-ancestors 'none';"
-            );
-        }
-        */
-        // Strict Transport Security (HTTPS only)
-        if (process.env.NODE_ENV === 'production') {
-            res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-        }
-        next();
-    });
+    // ===== SÉCURITÉ: Headers HTTP avec Helmet =====
+    app.use(helmet({
+        contentSecurityPolicy: {
+            directives: {
+                defaultSrc: ["'self'"],
+                scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net", "https://unpkg.com"],
+                styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net"],
+                fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+                imgSrc: ["'self'", "data:", "https:", "blob:"],
+                connectSrc: ["'self'", "wss:", "ws:", "https:"],
+                frameAncestors: ["'none'"]
+            }
+        },
+        crossOriginEmbedderPolicy: false, // Nécessaire pour les CDN
+        crossOriginResourcePolicy: { policy: "cross-origin" }
+    }));
+    
+    // HSTS en production
+    if (process.env.NODE_ENV === 'production') {
+        app.use(helmet.hsts({
+            maxAge: 31536000,
+            includeSubDomains: true
+        }));
+    }
 
     // Rate limiting
     app.use(rateLimit);
