@@ -12,6 +12,7 @@ import helmet from 'helmet';
 import routes from './routes.js';
 import authRoutes from './routes/authRoutes.js';
 import walletRoutes from './routes/walletRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import tradeEngine from './core/tradeEngine.js';
 import botManager from './core/BotManager.js';
 import logger from './services/logger.js';
@@ -137,6 +138,7 @@ export function createWebServer(port = 3000) {
     app.use('/api', routes);
     app.use('/api/auth', authRoutes);
     app.use('/api/wallets', walletRoutes);
+    app.use('/api/admin', adminRoutes);
 
     // Routes pour le nouveau frontend Vue.js (SPA)
     if (frontendMode === 'vue') {

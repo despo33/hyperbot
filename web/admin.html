@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administration - Hyperbot</title>
+    <link rel="stylesheet" href="dashboard.css">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script>
+        // Vérifie l'authentification et le rôle admin
+        (function() {
+            const token = localStorage.getItem('authToken');
+            if (!token) {
+                window.location.href = '/login.html';
+                return;
+            }
+            // Vérifie le rôle admin
+            fetch('/api/auth/me', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            }).then(r => r.json()).then(data => {
+                if (!data.success || data.user.role !== 'admin') {
+                    alert('Accès refusé. Droits administrateur requis.');
+                    window.location.href = '/dashboard.html';
+                }
+            }).catch(() => {
+                window.location.href = '/login.html';
+            });
+        })();
+    </script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i data-lucide="shield"></i>
+                </div>
+                <h2>Admin Panel</h2>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-page="users">
+                    <i data-lucide="users"></i>
+                    <span>Utilisateurs</span>
+                </a>
+                <a href="#" class="nav-item" data-page="stats">
+                    <i data-lucide="bar-chart-3"></i>
+                    <span>Statistiques</span>
+                </a>
+                <div class="nav-divider"></div>
+                <a href="/dashboard.html" class="nav-item">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" onclick="logout()">
+                    <i data-lucide="log-out"></i>
+                    <span>Déconnexion</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <div class="header-left">
+                    <h1 id="pageTitle">Gestion des Utilisateurs</h1>
+                </div>
+                <div class="header-right">
+                    <span class="admin-badge">
+                        <i data-lucide="shield-check"></i> Administrateur
+                    </span>
+                </div>
+            </header>
+
+            <!-- Users Page -->
+            <section id="usersPage" class="page active">
+                <!-- Stats Cards -->
+                <div class="admin-stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon"><i data-lucide="users"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="totalUsers">0</span>
+                            <span class="stat-label">Total Utilisateurs</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon success"><i data-lucide="user-check"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="activeUsers">0</span>
+                            <span class="stat-label">Actifs</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon warning"><i data-lucide="mail-check"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="verifiedUsers">0</span>
+                            <span class="stat-label">Email Vérifié</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon info"><i data-lucide="user-plus"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="newUsersWeek">0</span>
+                            <span class="stat-label">Nouveaux (7j)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Users Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i data-lucide="users"></i> Liste des Utilisateurs</h3>
+                        <div class="table-controls">
+                            <div class="search-box">
+                                <i data-lucide="search"></i>
+                                <input type="text" id="searchInput" placeholder="Rechercher..." onkeyup="handleSearch(event)">
+                            </div>
+                            <select id="statusFilter" onchange="loadUsers()">
+                                <option value="all">Tous</option>
+                                <option value="active">Actifs</option>
+                                <option value="inactive">Inactifs</option>
+                            </select>
+                            <button class="btn btn-primary btn-sm" onclick="loadUsers()">
+                                <i data-lucide="refresh-cw"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Utilisateur</th>
+                                        <th>Email</th>
+                                        <th>Rôle</th>
+                                        <th>Statut</th>
+                                        <th>Wallets</th>
+                                        <th>Inscrit le</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usersTableBody">
+                                    <tr>
+                                        <td colspan="7" class="loading-row">
+                                            <i data-lucide="loader" class="spin"></i> Chargement...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Pagination -->
+                        <div class="pagination" id="pagination"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Stats Page -->
+            <section id="statsPage" class="page">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i data-lucide="bar-chart-3"></i> Statistiques Globales</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="stats-overview" id="statsOverview">
+                            <p>Chargement des statistiques...</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script>
+        const API_BASE = '/api';
+        let currentPage = 1;
+        let searchTimeout = null;
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            loadStats();
+            loadUsers();
+            setupNavigation();
+        });
+
+        function getAuthToken() {
+            return localStorage.getItem('authToken');
+        }
+
+        function logout() {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('user');
+            window.location.href = '/login.html';
+        }
+
+        async function apiRequest(endpoint, options = {}) {
+            const token = getAuthToken();
+            const response = await fetch(API_BASE + endpoint, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token,
+                    ...options.headers
+                }
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Erreur API');
+            }
+            return data;
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.innerHTML = `
+                <i data-lucide="${type === 'success' ? 'check-circle' : type === 'error' ? 'x-circle' : 'info'}"></i>
+                <span>${message}</span>
+            `;
+            container.appendChild(toast);
+            lucide.createIcons();
+            setTimeout(() => toast.remove(), 4000);
+        }
+
+        function setupNavigation() {
+            document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const page = item.dataset.page;
+                    
+                    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                    item.classList.add('active');
+                    
+                    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                    document.getElementById(page + 'Page').classList.add('active');
+                    
+                    document.getElementById('pageTitle').textContent = 
+                        page === 'users' ? 'Gestion des Utilisateurs' : 'Statistiques';
+                });
+            });
+        }
+
+        async function loadStats() {
+            try {
+                const data = await apiRequest('/admin/stats');
+                document.getElementById('totalUsers').textContent = data.stats.totalUsers;
+                document.getElementById('activeUsers').textContent = data.stats.activeUsers;
+                document.getElementById('verifiedUsers').textContent = data.stats.verifiedUsers;
+                document.getElementById('newUsersWeek').textContent = data.stats.newUsersThisWeek;
+            } catch (error) {
+                console.error('Erreur stats:', error);
+            }
+        }
+
+        async function loadUsers(page = 1) {
+            currentPage = page;
+            const search = document.getElementById('searchInput').value;
+            const status = document.getElementById('statusFilter').value;
+            
+            try {
+                const data = await apiRequest(`/admin/users?page=${page}&limit=15&search=${encodeURIComponent(search)}&status=${status}`);
+                renderUsersTable(data.users);
+                renderPagination(data.pagination);
+            } catch (error) {
+                showToast('Erreur: ' + error.message, 'error');
+            }
+        }
+
+        function handleSearch(event) {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => loadUsers(1), 300);
+        }
+
+        function renderUsersTable(users) {
+            const tbody = document.getElementById('usersTableBody');
+            
+            if (users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-row">Aucun utilisateur trouvé</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = users.map(user => `
+                <tr>
+                    <td>
+                        <div class="user-cell">
+                            <div class="user-avatar">${user.username.charAt(0).toUpperCase()}</div>
+                            <span class="user-name">${user.username}</span>
+                        </div>
+                    </td>
+                    <td>${user.email}</td>
+                    <td>
+                        <span class="role-badge ${user.role}">${user.role === 'admin' ? 'Admin' : 'User'}</span>
+                    </td>
+                    <td>
+                        <span class="status-badge ${user.isActive ? 'active' : 'inactive'}">
+                            ${user.isActive ? 'Actif' : 'Inactif'}
+                        </span>
+                    </td>
+                    <td>${user.walletsCount}</td>
+                    <td>${new Date(user.createdAt).toLocaleDateString('fr-FR')}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-icon" onclick="editUser('${user.id}')" title="Modifier">
+                                <i data-lucide="edit"></i>
+                            </button>
+                            <button class="btn-icon" onclick="resetPassword('${user.id}', '${user.username}')" title="Reset MDP">
+                                <i data-lucide="key"></i>
+                            </button>
+                            <button class="btn-icon danger" onclick="deleteUser('${user.id}', '${user.username}')" title="Supprimer">
+                                <i data-lucide="trash-2"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+            
+            lucide.createIcons();
+        }
+
+        function renderPagination(pagination) {
+            const container = document.getElementById('pagination');
+            if (pagination.pages <= 1) {
+                container.innerHTML = '';
+                return;
+            }
+            
+            let html = '';
+            
+            if (pagination.page > 1) {
+                html += `<button class="btn btn-sm btn-outline" onclick="loadUsers(${pagination.page - 1})">
+                    <i data-lucide="chevron-left"></i>
+                </button>`;
+            }
+            
+            for (let i = 1; i <= pagination.pages; i++) {
+                if (i === pagination.page) {
+                    html += `<button class="btn btn-sm btn-primary">${i}</button>`;
+                } else if (i === 1 || i === pagination.pages || Math.abs(i - pagination.page) <= 2) {
+                    html += `<button class="btn btn-sm btn-outline" onclick="loadUsers(${i})">${i}</button>`;
+                } else if (Math.abs(i - pagination.page) === 3) {
+                    html += `<span class="pagination-dots">...</span>`;
+                }
+            }
+            
+            if (pagination.page < pagination.pages) {
+                html += `<button class="btn btn-sm btn-outline" onclick="loadUsers(${pagination.page + 1})">
+                    <i data-lucide="chevron-right"></i>
+                </button>`;
+            }
+            
+            container.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        async function editUser(userId) {
+            try {
+                const data = await apiRequest(`/admin/users/${userId}`);
+                const user = data.user;
+                
+                const modal = document.createElement('div');
+                modal.className = 'modal-overlay';
+                modal.innerHTML = `
+                    <div class="modal">
+                        <div class="modal-header">
+                            <h2><i data-lucide="edit"></i> Modifier l'utilisateur</h2>
+                            <button class="close-modal" onclick="this.closest('.modal-overlay').remove()">×</button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="editUserForm" onsubmit="submitEditUser(event, '${userId}')">
+                                <div class="form-group">
+                                    <label>Nom d'utilisateur</label>
+                                    <input type="text" name="username" value="${user.username}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Email</label>
+                                    <input type="email" name="email" value="${user.email}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Rôle</label>
+                                    <select name="role">
+                                        <option value="user" ${user.role === 'user' ? 'selected' : ''}>Utilisateur</option>
+                                        <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Administrateur</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Statut</label>
+                                    <select name="isActive">
+                                        <option value="true" ${user.isActive ? 'selected' : ''}>Actif</option>
+                                        <option value="false" ${!user.isActive ? 'selected' : ''}>Inactif</option>
+                                    </select>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Annuler</button>
+                                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+                lucide.createIcons();
+            } catch (error) {
+                showToast('Erreur: ' + error.message, 'error');
+            }
+        }
+
+        async function submitEditUser(event, userId) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+            
+            try {
+                await apiRequest(`/admin/users/${userId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        username: formData.get('username'),
+                        email: formData.get('email'),
+                        role: formData.get('role'),
+                        isActive: formData.get('isActive') === 'true'
+                    })
+                });
+                
+                showToast('Utilisateur mis à jour', 'success');
+                document.querySelector('.modal-overlay').remove();
+                loadUsers(currentPage);
+                loadStats();
+            } catch (error) {
+                showToast('Erreur: ' + error.message, 'error');
+            }
+        }
+
+        async function resetPassword(userId, username) {
+            const newPassword = prompt(`Nouveau mot de passe pour ${username}:\n(minimum 8 caractères)`);
+            if (!newPassword) return;
+            
+            if (newPassword.length < 8) {
+                showToast('Le mot de passe doit contenir au moins 8 caractères', 'error');
+                return;
+            }
+            
+            try {
+                await apiRequest(`/admin/users/${userId}/reset-password`, {
+                    method: 'POST',
+                    body: JSON.stringify({ newPassword })
+                });
+                showToast('Mot de passe réinitialisé', 'success');
+            } catch (error) {
+                showToast('Erreur: ' + error.message, 'error');
+            }
+        }
+
+        async function deleteUser(userId, username) {
+            if (!confirm(`Supprimer l'utilisateur "${username}" ?\n\nCette action est irréversible.`)) return;
+            
+            try {
+                await apiRequest(`/admin/users/${userId}`, { method: 'DELETE' });
+                showToast('Utilisateur supprimé', 'success');
+                loadUsers(currentPage);
+                loadStats();
+            } catch (error) {
+                showToast('Erreur: ' + error.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

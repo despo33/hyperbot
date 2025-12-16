@@ -167,6 +167,19 @@ const userSchema = new mongoose.Schema({
         minlength: 6
     },
     
+    // Rôle utilisateur
+    role: {
+        type: String,
+        enum: ['user', 'admin'],
+        default: 'user'
+    },
+    
+    // Statut du compte
+    isActive: {
+        type: Boolean,
+        default: true
+    },
+    
     // Vérification email
     isEmailVerified: {
         type: Boolean,
@@ -493,6 +506,8 @@ userSchema.methods.toPublicJSON = function() {
         id: this._id,
         email: this.email,
         username: this.username,
+        role: this.role,
+        isActive: this.isActive,
         isEmailVerified: this.isEmailVerified,
         wallets: this.wallets.map(w => ({
             id: w._id,
