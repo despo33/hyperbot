@@ -1313,6 +1313,10 @@ body {
     grid-column: span 2;
 }
 
+.positions-card.card-full-width {
+    grid-column: 1 / -1;
+}
+
 .positions-header-right {
     display: flex;
     align-items: center;
@@ -1329,11 +1333,12 @@ body {
 }
 
 .positions-list-enhanced {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 1rem;
-    max-height: 400px;
+    max-height: 450px;
     overflow-y: auto;
+    padding: 0.25rem;
 }
 
 /* État vide amélioré */
