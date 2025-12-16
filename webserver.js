@@ -75,21 +75,22 @@ export function createWebServer(port = 3000) {
                 styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
                 fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", "data:"],
                 imgSrc: ["'self'", "data:", "https:", "blob:"],
-                connectSrc: ["'self'", "wss:", "ws:", "https:"],
-                frameAncestors: ["'none'"]
+                connectSrc: ["'self'", "wss:", "ws:", "https:", "http:"],
+                frameAncestors: ["'none'"],
+                upgradeInsecureRequests: null
             }
         },
         crossOriginEmbedderPolicy: false, // Nécessaire pour les CDN
         crossOriginResourcePolicy: { policy: "cross-origin" }
     }));
     
-    // HSTS en production
-    if (process.env.NODE_ENV === 'production') {
-        app.use(helmet.hsts({
-            maxAge: 31536000,
-            includeSubDomains: true
-        }));
-    }
+    // HSTS désactivé car pas de HTTPS configuré
+    // if (process.env.NODE_ENV === 'production') {
+    //     app.use(helmet.hsts({
+    //         maxAge: 31536000,
+    //         includeSubDomains: true
+    //     }));
+    // }
 
     // Rate limiting
     app.use(rateLimit);
