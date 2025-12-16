@@ -481,6 +481,72 @@ router.put('/password', requireAuth, async (req, res) => {
 });
 
 /**
+ * PUT /api/auth/email
+ * Change l'email de l'utilisateur
+ */
+router.put('/email', requireAuth, async (req, res) => {
+    try {
+        const { newEmail, password } = req.body;
+        const user = req.user;
+
+        if (!newEmail || !password) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Nouvel email et mot de passe requis' 
+            });
+        }
+
+        // Valide le format de l'email
+        if (!isValidEmail(newEmail)) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Format d\'email invalide' 
+            });
+        }
+
+        // Vérifie le mot de passe actuel
+        const isMatch = await user.comparePassword(password);
+        if (!isMatch) {
+            return res.status(401).json({ 
+                success: false, 
+                error: 'Mot de passe incorrect' 
+            });
+        }
+
+        // Vérifie que l'email n'est pas déjà utilisé
+        const existingEmail = await User.findOne({ 
+            email: newEmail.toLowerCase(), 
+            _id: { $ne: user._id } 
+        });
+        if (existingEmail) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Cet email est déjà utilisé' 
+            });
+        }
+
+        const oldEmail = user.email;
+        user.email = newEmail.toLowerCase();
+        await user.save();
+
+        console.log(`[AUTH] Email changé: ${oldEmail} -> ${user.email} (${user.username})`);
+
+        res.json({
+            success: true,
+            message: 'Email mis à jour avec succès',
+            user: user.toPublicJSON()
+        });
+
+    } catch (error) {
+        console.error('[AUTH] Erreur changement email:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Erreur lors du changement d\'email' 
+        });
+    }
+});
+
+/**
  * POST /api/auth/forgot-password
  * Demande de reset password
  */

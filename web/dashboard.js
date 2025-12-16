@@ -70,6 +70,231 @@ function updateUserDisplay() {
         if (usernameEl) {
             usernameEl.textContent = currentUser.username || 'Utilisateur';
         }
+        const displayNameEl = document.getElementById('userDisplayName');
+        if (displayNameEl) {
+            displayNameEl.textContent = currentUser.username || 'Compte';
+        }
+        const emailDisplayEl = document.getElementById('userEmailDisplay');
+        if (emailDisplayEl) {
+            emailDisplayEl.textContent = currentUser.email || '';
+        }
+    }
+}
+
+/**
+ * Toggle le menu utilisateur
+ */
+function toggleUserMenu() {
+    const dropdown = document.getElementById('userDropdown');
+    if (dropdown) {
+        dropdown.classList.toggle('show');
+    }
+}
+
+// Ferme le menu si on clique ailleurs
+document.addEventListener('click', (e) => {
+    const userMenu = document.querySelector('.user-menu');
+    const dropdown = document.getElementById('userDropdown');
+    if (userMenu && dropdown && !userMenu.contains(e.target)) {
+        dropdown.classList.remove('show');
+    }
+});
+
+/**
+ * Ouvre la modale des paramètres du compte
+ */
+function openAccountSettings() {
+    // Ferme le dropdown
+    const dropdown = document.getElementById('userDropdown');
+    if (dropdown) dropdown.classList.remove('show');
+    
+    const modal = document.createElement('div');
+    modal.className = 'account-settings-modal-overlay';
+    modal.innerHTML = `
+        <div class="account-settings-modal">
+            <div class="modal-header">
+                <h2><i data-lucide="settings"></i> Paramètres du compte</h2>
+                <button class="close-modal" onclick="this.closest('.account-settings-modal-overlay').remove()">×</button>
+            </div>
+            
+            <div class="modal-body">
+                <!-- Tabs -->
+                <div class="settings-tabs">
+                    <button class="tab-btn active" onclick="switchSettingsTab('email', this)">
+                        <i data-lucide="mail"></i> Changer l'email
+                    </button>
+                    <button class="tab-btn" onclick="switchSettingsTab('password', this)">
+                        <i data-lucide="lock"></i> Changer le mot de passe
+                    </button>
+                </div>
+                
+                <!-- Tab: Change Email -->
+                <div class="settings-tab-content" id="emailTab">
+                    <div class="current-info">
+                        <span class="label">Email actuel:</span>
+                        <span class="value">${currentUser?.email || 'Non défini'}</span>
+                    </div>
+                    <form id="changeEmailForm" onsubmit="handleChangeEmail(event)">
+                        <div class="form-group">
+                            <label for="newEmail">Nouvel email</label>
+                            <input type="email" id="newEmail" name="newEmail" required placeholder="nouveau@email.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="emailPassword">Mot de passe actuel</label>
+                            <input type="password" id="emailPassword" name="password" required placeholder="Confirmez votre mot de passe">
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="changeEmailBtn">
+                                <i data-lucide="save"></i> Mettre à jour l'email
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Tab: Change Password -->
+                <div class="settings-tab-content hidden" id="passwordTab">
+                    <form id="changePasswordForm" onsubmit="handleChangePassword(event)">
+                        <div class="form-group">
+                            <label for="currentPassword">Mot de passe actuel</label>
+                            <input type="password" id="currentPassword" name="currentPassword" required placeholder="Votre mot de passe actuel">
+                        </div>
+                        <div class="form-group">
+                            <label for="newPassword">Nouveau mot de passe</label>
+                            <input type="password" id="newPassword" name="newPassword" required minlength="8" placeholder="Minimum 8 caractères">
+                        </div>
+                        <div class="form-group">
+                            <label for="confirmPassword">Confirmer le nouveau mot de passe</label>
+                            <input type="password" id="confirmPassword" name="confirmPassword" required placeholder="Répétez le nouveau mot de passe">
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="changePasswordBtn">
+                                <i data-lucide="save"></i> Mettre à jour le mot de passe
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Initialise les icônes Lucide
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+}
+
+/**
+ * Change d'onglet dans les paramètres
+ */
+function switchSettingsTab(tab, btn) {
+    // Update tabs
+    document.querySelectorAll('.settings-tabs .tab-btn').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    
+    // Update content
+    document.querySelectorAll('.settings-tab-content').forEach(c => c.classList.add('hidden'));
+    document.getElementById(tab + 'Tab').classList.remove('hidden');
+}
+
+/**
+ * Gère le changement d'email
+ */
+async function handleChangeEmail(event) {
+    event.preventDefault();
+    
+    const newEmail = document.getElementById('newEmail').value;
+    const password = document.getElementById('emailPassword').value;
+    const btn = document.getElementById('changeEmailBtn');
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader"></i> Mise à jour...';
+    
+    try {
+        const response = await fetch(API_BASE + '/auth/email', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + getAuthToken()
+            },
+            body: JSON.stringify({ newEmail, password })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast('Email mis à jour avec succès !', 'success');
+            // Met à jour les données locales
+            currentUser = data.user;
+            localStorage.setItem('user', JSON.stringify(currentUser));
+            updateUserDisplay();
+            // Ferme la modale
+            document.querySelector('.account-settings-modal-overlay')?.remove();
+        } else {
+            showToast(data.error || 'Erreur lors de la mise à jour', 'error');
+        }
+    } catch (error) {
+        console.error('Erreur:', error);
+        showToast('Erreur de connexion au serveur', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="save"></i> Mettre à jour l\'email';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+}
+
+/**
+ * Gère le changement de mot de passe
+ */
+async function handleChangePassword(event) {
+    event.preventDefault();
+    
+    const currentPassword = document.getElementById('currentPassword').value;
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    const btn = document.getElementById('changePasswordBtn');
+    
+    // Validation
+    if (newPassword !== confirmPassword) {
+        showToast('Les mots de passe ne correspondent pas', 'error');
+        return;
+    }
+    
+    if (newPassword.length < 8) {
+        showToast('Le mot de passe doit contenir au moins 8 caractères', 'error');
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader"></i> Mise à jour...';
+    
+    try {
+        const response = await fetch(API_BASE + '/auth/password', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + getAuthToken()
+            },
+            body: JSON.stringify({ currentPassword, newPassword })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast('Mot de passe mis à jour avec succès !', 'success');
+            // Ferme la modale
+            document.querySelector('.account-settings-modal-overlay')?.remove();
+        } else {
+            showToast(data.error || 'Erreur lors de la mise à jour', 'error');
+        }
+    } catch (error) {
+        console.error('Erreur:', error);
+        showToast('Erreur de connexion au serveur', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="save"></i> Mettre à jour le mot de passe';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 }
 

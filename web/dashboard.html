@@ -117,6 +117,24 @@
                             <i data-lucide="square"></i> Arrêter
                         </button>
                     </div>
+                    <div class="user-menu">
+                        <button class="btn btn-outline user-menu-btn" onclick="toggleUserMenu()">
+                            <i data-lucide="user"></i>
+                            <span id="userDisplayName">Compte</span>
+                            <i data-lucide="chevron-down" class="chevron-icon"></i>
+                        </button>
+                        <div class="user-dropdown" id="userDropdown">
+                            <div class="user-dropdown-header">
+                                <span class="user-email" id="userEmailDisplay">email@example.com</span>
+                            </div>
+                            <button class="dropdown-item" onclick="openAccountSettings()">
+                                <i data-lucide="settings"></i> Paramètres du compte
+                            </button>
+                            <button class="dropdown-item" onclick="logout()">
+                                <i data-lucide="log-out"></i> Déconnexion
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </header>
 
