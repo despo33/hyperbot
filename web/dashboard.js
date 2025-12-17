@@ -3959,8 +3959,8 @@ async function runBacktest() {
         atrMultiplierTP: parseFloat(document.getElementById('btATRTP')?.value || 2.5),
         customTP: tpslMode === 'percent' ? parseFloat(document.getElementById('btCustomTP')?.value || 3.0) : null,
         customSL: tpslMode === 'percent' ? parseFloat(document.getElementById('btCustomSL')?.value || 1.5) : null,
-        // RRR minimum pour mode Ichimoku
-        minRRR: tpslMode === 'ichimoku' ? parseFloat(document.getElementById('btMinRRR')?.value || 2) : null
+        // RRR minimum (pour tous les modes)
+        minRRR: parseFloat(document.getElementById('btMinRRR')?.value || 2)
     };
     
     // UI loading

@@ -554,13 +554,6 @@ class Backtester {
                     
                     slPercent = Math.abs((stopLoss - price) / price) * 100;
                     tpPercent = Math.abs((takeProfit - price) / price) * 100;
-                    
-                    // Vérifie le RRR minimum pour le mode Ichimoku
-                    const actualRRR = tpPercent / slPercent;
-                    if (actualRRR < minRRR) {
-                        // RRR insuffisant, rejette ce trade
-                        return { rejected: true, reason: `RRR ${actualRRR.toFixed(2)} < ${minRRR}` };
-                    }
                 } else {
                     // Fallback sur pourcentage si niveaux non disponibles
                     return this.calculateTPSL(price, direction, 'percent', params);
@@ -583,7 +576,13 @@ class Backtester {
                 break;
         }
 
-        return { stopLoss, takeProfit, slPercent, tpPercent };
+        // Vérifie le RRR minimum pour TOUS les modes
+        const actualRRR = tpPercent / slPercent;
+        if (minRRR > 1 && actualRRR < minRRR) {
+            return { rejected: true, reason: `RRR ${actualRRR.toFixed(2)} < ${minRRR}` };
+        }
+
+        return { stopLoss, takeProfit, slPercent, tpPercent, actualRRR };
     }
 
     /**
