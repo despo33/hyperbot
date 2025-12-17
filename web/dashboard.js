@@ -2444,10 +2444,14 @@ async function showTradeDetails(symbol) {
                 </div>
                 <div class="trade-modal-footer">
                     ${details.recommendation?.shouldTrade ? `
-                        <button class="btn btn-success" onclick="executeTrade('${symbol}', '${details.signal}', ${details.stopLoss}, ${details.takeProfit})">
+                        <button class="btn btn-success" onclick="executeTrade('${symbol}', '${details.signal}', ${details.stopLoss}, ${details.takeProfit}, ${details.suggestedSize || 'null'})">
                             <i data-lucide="check"></i> Exécuter le Trade
                         </button>
-                    ` : ''}
+                    ` : `
+                        <button class="btn btn-warning" onclick="executeTrade('${symbol}', '${details.signal || (details.score > 0 ? 'BUY' : 'SELL')}', ${details.stopLoss}, ${details.takeProfit}, ${details.suggestedSize || 'null'})" title="Trade non recommandé mais possible">
+                            <i data-lucide="alert-triangle"></i> Forcer le Trade
+                        </button>
+                    `}
                     <button class="btn btn-outline" onclick="this.closest('.trade-modal-overlay').remove()">Fermer</button>
                 </div>
             </div>
@@ -2462,31 +2466,68 @@ async function showTradeDetails(symbol) {
 }
 
 /**
- * Exécute un trade
+ * Exécute un trade sur Hyperliquid
  */
-async function executeTrade(symbol, signal, stopLoss, takeProfit) {
-    if (!confirm(`Confirmer le trade ${signal} sur ${symbol}?`)) return;
+async function executeTrade(symbol, signal, stopLoss, takeProfit, suggestedSize = null) {
+    // Récupère le prix actuel pour afficher les infos
+    const direction = signal === 'BUY' ? 'long' : 'short';
+    
+    // Demande confirmation avec détails
+    const confirmMsg = `Confirmer le trade ${signal} sur ${symbol}?\n\n` +
+        `Direction: ${direction.toUpperCase()}\n` +
+        `Stop Loss: $${formatNumber(stopLoss)}\n` +
+        `Take Profit: $${formatNumber(takeProfit)}\n\n` +
+        `⚠️ Ce trade sera exécuté sur Hyperliquid avec votre capital réel.`;
+    
+    if (!confirm(confirmMsg)) return;
     
     try {
+        showToast(`Exécution du trade ${signal} ${symbol}...`, 'info');
+        
+        // Récupère la config pour calculer la taille
+        const configData = await apiRequest('/config/trading');
+        const balance = await apiRequest('/balance');
+        
+        // Calcule la taille de position basée sur le risk management
+        let size = suggestedSize;
+        if (!size && balance?.balance) {
+            const riskPercent = configData?.riskPerTrade || 2;
+            const leverage = configData?.leverage || 5;
+            const accountBalance = balance.balance;
+            const currentPrice = (stopLoss + takeProfit) / 2; // Approximation
+            const slDistance = Math.abs(currentPrice - stopLoss);
+            const riskAmount = accountBalance * (riskPercent / 100);
+            size = (riskAmount / slDistance) * leverage;
+            // Arrondi à 4 décimales
+            size = Math.floor(size * 10000) / 10000;
+        }
+        
+        // Taille minimum de sécurité
+        if (!size || size < 0.0001) {
+            size = 0.001;
+        }
+        
         const result = await apiRequest('/trade', {
             method: 'POST',
             body: JSON.stringify({
                 symbol,
-                direction: signal === 'BUY' ? 'long' : 'short',
-                size: 0.001, // Taille minimale pour test
+                direction,
+                size,
                 stopLoss,
                 takeProfit
             })
         });
         
         if (result.success) {
-            showToast(`Trade ${signal} ${symbol} exécuté!`, 'success');
+            showToast(`✅ Trade ${signal} ${symbol} exécuté! Taille: ${size}`, 'success');
             document.querySelector('.trade-modal-overlay')?.remove();
+            // Rafraîchit les positions
+            setTimeout(() => loadPositions(), 1000);
         } else {
-            showToast('Erreur: ' + result.error, 'error');
+            showToast('❌ Erreur: ' + (result.error || 'Échec du trade'), 'error');
         }
     } catch (error) {
-        showToast('Erreur: ' + error.message, 'error');
+        showToast('❌ Erreur: ' + error.message, 'error');
     }
 }
 

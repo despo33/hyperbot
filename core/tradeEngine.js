@@ -1831,83 +1831,126 @@ class TradeEngine {
      */
     async getTradeDetails(symbol) {
         try {
-            // Analyse le symbole
+            const timeframe = this.config.timeframes[0];
+            const candles = await priceFetcher.getCandles(symbol, timeframe, 250);
+            
+            if (!candles || candles.length < 60) {
+                return { success: false, error: 'Données insuffisantes' };
+            }
+            
+            const currentPrice = candles[candles.length - 1].close;
+            
+            // Analyse complète avec signalDetector pour avoir les niveaux Ichimoku
+            const fullAnalysis = signalDetector.analyze(candles, {}, timeframe);
+            
+            // Analyse simplifiée pour le score et la direction
             const analysis = await this.analyzeSymbol(symbol);
             
             if (!analysis.success) {
                 return { success: false, error: analysis.error };
             }
             
-            const { price, score, direction, signal, levels, ichimoku } = analysis;
+            const { score, direction, tradeable, winProbability: analysisWinProb, confluence } = analysis;
+            
+            // Récupère les niveaux Ichimoku depuis fullAnalysis
+            const ichimokuData = fullAnalysis.ichimoku || {};
+            const tenkan = ichimokuData.tenkan || ichimokuData.tenkanSen;
+            const kijun = ichimokuData.kijun || ichimokuData.kijunSen;
+            const senkouA = ichimokuData.senkouA || ichimokuData.senkouSpanA;
+            const senkouB = ichimokuData.senkouB || ichimokuData.senkouSpanB;
             
             // Détermine la direction du trade
-            const tradeDirection = signal?.action === 'BUY' ? 'long' : 
-                                   signal?.action === 'SELL' ? 'short' : 
+            const tradeDirection = analysis.signal === 'BUY' ? 'long' : 
+                                   analysis.signal === 'SELL' ? 'short' : 
                                    score >= 3 ? 'long' : score <= -3 ? 'short' : null;
             
             if (!tradeDirection) {
                 return {
                     success: true,
                     symbol,
-                    price,
+                    price: currentPrice,
                     score,
+                    maxScore: 7,
                     direction,
                     tradeable: false,
-                    reason: 'Pas de signal clair (score entre -3 et 3)'
+                    reason: 'Pas de signal clair (score entre -3 et 3)',
+                    ichimokuLevels: {
+                        tenkan, kijun,
+                        kumoTop: Math.max(senkouA || 0, senkouB || 0),
+                        kumoBottom: Math.min(senkouA || Infinity, senkouB || Infinity)
+                    }
                 };
             }
             
-            // Calcul SL/TP basé sur Ichimoku
-            const sltp = riskManager.calculateSLTP(price, tradeDirection, {
-                supportLevel: levels?.supports[0]?.level,
-                resistanceLevel: levels?.resistances[0]?.level
+            // Utilise les TP/SL du preset du timeframe
+            const tpslConfig = analysis.tpsl || this.TIMEFRAME_TPSL[timeframe] || { tp: 2.0, sl: 1.0 };
+            
+            // Calcul SL/TP basé sur le mode configuré
+            const sltp = riskManager.calculateSLTP(currentPrice, tradeDirection, {
+                tpslMode: this.config.tpslMode || 'percent',
+                customSLPercent: tpslConfig.sl,
+                customTPPercent: tpslConfig.tp,
+                supportLevel: tradeDirection === 'long' ? Math.min(senkouA || currentPrice, senkouB || currentPrice) : null,
+                resistanceLevel: tradeDirection === 'short' ? Math.max(senkouA || currentPrice, senkouB || currentPrice) : null
             });
             
             // Calcul de la taille de position (simulé avec 1000$ de capital)
             const simulatedBalance = 1000;
             const positionData = riskManager.calculatePositionSize(
                 simulatedBalance,
-                price,
+                currentPrice,
                 sltp.stopLoss,
                 this.config.leverage
             );
             
-            // Calcul des probabilités de gain basées sur le score Ichimoku
-            const winProbability = this.calculateWinProbability(score, signal?.confidence);
+            // Calcul des probabilités de gain
+            const winProbability = analysisWinProb || this.calculateWinProbability(score, analysis.confidence);
             
             // Calcul du profit/perte potentiel
-            const potentialProfit = Math.abs(sltp.takeProfit - price) * positionData.size;
-            const potentialLoss = Math.abs(price - sltp.stopLoss) * positionData.size;
+            const potentialProfit = Math.abs(sltp.takeProfit - currentPrice) * positionData.size;
+            const potentialLoss = Math.abs(currentPrice - sltp.stopLoss) * positionData.size;
             
             // Expected value
             const expectedValue = (winProbability * potentialProfit) - ((1 - winProbability) * potentialLoss);
             
+            // Signaux détectés depuis fullAnalysis
+            const detectedSignals = [];
+            if (fullAnalysis.signals) {
+                for (const [name, sig] of Object.entries(fullAnalysis.signals)) {
+                    if (sig && sig.detected) {
+                        detectedSignals.push({
+                            name: name.replace(/([A-Z])/g, ' $1').trim(),
+                            signal: sig.signal || sig.direction,
+                            description: sig.description || `${name} détecté`
+                        });
+                    }
+                }
+            }
+            
             return {
                 success: true,
                 symbol,
-                price,
+                price: currentPrice,
                 score,
-                maxScore: analysis.maxScore,
+                maxScore: 7,
                 direction: tradeDirection,
-                signal: signal?.action || (tradeDirection === 'long' ? 'BUY' : 'SELL'),
-                confidence: signal?.confidence || (Math.abs(score) >= 5 ? 'high' : Math.abs(score) >= 3 ? 'medium' : 'low'),
+                signal: tradeDirection === 'long' ? 'BUY' : 'SELL',
+                confidence: Math.abs(score) >= 5 ? 'high' : Math.abs(score) >= 3 ? 'medium' : 'low',
                 
-                // Niveaux
+                // Niveaux SL/TP
                 stopLoss: sltp.stopLoss,
                 takeProfit: sltp.takeProfit,
-                slPercent: sltp.riskPercent,
-                tpPercent: sltp.rewardPercent,
+                slPercent: sltp.riskPercent?.toFixed(2) || tpslConfig.sl.toFixed(2),
+                tpPercent: sltp.rewardPercent?.toFixed(2) || tpslConfig.tp.toFixed(2),
                 riskRewardRatio: sltp.riskRewardRatio,
                 meetsMinRRR: sltp.meetsMinRRR,
                 
-                // Ichimoku levels
+                // Niveaux Ichimoku
                 ichimokuLevels: {
-                    tenkan: ichimoku?.tenkan,
-                    kijun: ichimoku?.kijun,
-                    senkouA: ichimoku?.senkouA,
-                    senkouB: ichimoku?.senkouB,
-                    kumoTop: Math.max(ichimoku?.senkouA || 0, ichimoku?.senkouB || 0),
-                    kumoBottom: Math.min(ichimoku?.senkouA || 0, ichimoku?.senkouB || 0)
+                    tenkan: tenkan || null,
+                    kijun: kijun || null,
+                    kumoTop: Math.max(senkouA || 0, senkouB || 0) || null,
+                    kumoBottom: Math.min(senkouA || Infinity, senkouB || Infinity) || null
                 },
                 
                 // Probabilités et gains
@@ -1924,12 +1967,12 @@ class TradeEngine {
                 riskPercent: positionData.riskPercent.toFixed(2) + '%',
                 
                 // Signaux détectés
-                detectedSignals: analysis.detectedSignals || [],
+                detectedSignals,
                 
                 // Recommandation
                 recommendation: this.getTradeRecommendation(score, sltp.riskRewardRatio, winProbability),
                 
-                tradeable: analysis.tradeable
+                tradeable
             };
             
         } catch (error) {
