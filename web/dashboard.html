@@ -529,9 +529,15 @@
                                         <div style="margin-top: 10px;">
                                             <label for="mtfMinConfirmation" style="display: block; margin-bottom: 5px; color: var(--text-secondary);">Confirmation minimum :</label>
                                             <select id="mtfMinConfirmation" style="padding: 8px; border-radius: 6px; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary);">
-                                                <option value="2" selected>2 TF en accord</option>
-                                                <option value="3">3 TF en accord (strict)</option>
+                                                <option value="1">1 TF (très agressif - plus de trades)</option>
+                                                <option value="2" selected>2 TF en accord (équilibré)</option>
+                                                <option value="3">3 TF en accord (modéré)</option>
+                                                <option value="4">4 TF en accord (strict)</option>
+                                                <option value="5">5 TF en accord (très strict - moins de trades)</option>
                                             </select>
+                                            <p class="form-hint" style="font-size: 0.75rem; margin-top: 5px; color: var(--text-muted);">
+                                                Plus la confirmation est élevée, moins il y aura de trades mais ils seront plus fiables.
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
