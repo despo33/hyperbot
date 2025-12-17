@@ -53,7 +53,12 @@ class Backtester {
             atrMultiplierSL = 1.5,
             atrMultiplierTP = 2.5,
             customTP = null,       // TP personnalisé en %
-            customSL = null        // SL personnalisé en %
+            customSL = null,       // SL personnalisé en %
+            // ===== FILTRES AVANCÉS =====
+            useStrictFilters = true,  // Active les filtres ADX, Volume, Bollinger
+            useChikouFilter = true,   // Confirmation Chikou Ichimoku
+            minADX = 20,              // ADX minimum pour confirmer tendance
+            maxADX = 50               // ADX maximum (évite fin de tendance)
         } = config;
 
         if (this.isRunning) {
@@ -142,7 +147,11 @@ class Backtester {
                         minScore,
                         minConfluence,
                         minWinProbability,
-                        preset
+                        preset,
+                        useStrictFilters,
+                        useChikouFilter,
+                        minADX,
+                        maxADX
                     });
 
                     if (signal.tradeable) {
@@ -282,7 +291,11 @@ class Backtester {
             minScore,
             minConfluence,
             minWinProbability,
-            preset
+            preset,
+            useStrictFilters = true,
+            useChikouFilter = true,
+            minADX = 20,
+            maxADX = 50
         } = config;
 
         // Analyse avec signalDetector
@@ -350,12 +363,84 @@ class Backtester {
             }
         }
 
-        // Filtre RSI
+        // Filtre RSI - AMÉLIORÉ: cherche les zones de retournement
         if (useRSIFilter) {
-            if (direction === 'long' && (rsi > 70 || rsi < 25)) {
+            if (direction === 'long') {
+                // LONG: RSI doit être entre 35-65 (pas en surachat, pas en survente extrême)
+                if (rsi > 65 || rsi < 30) {
+                    tradeable = false;
+                }
+            } else if (direction === 'short') {
+                // SHORT: RSI doit être entre 35-65
+                if (rsi < 35 || rsi > 70) {
+                    tradeable = false;
+                }
+            }
+        }
+
+        // ===== NOUVEAUX FILTRES POUR AMÉLIORER LE WIN RATE =====
+        
+        // 1. Filtre ADX - Ne trade que si tendance présente (si activé)
+        const adx = analysis.indicators?.adx;
+        if (useStrictFilters && adx && adx.value) {
+            // ADX < minADX = pas de tendance, éviter
+            if (adx.value < minADX) {
                 tradeable = false;
-            } else if (direction === 'short' && (rsi < 30 || rsi > 75)) {
+            }
+            // ADX > maxADX = tendance très forte, potentiellement fin de mouvement
+            if (adx.value > maxADX) {
                 tradeable = false;
+            }
+        }
+        
+        // 2. Filtre Volume - Ne trade que si volume suffisant (si activé)
+        const volume = analysis.indicators?.volume;
+        if (useStrictFilters && volume && volume.ratio) {
+            // Volume doit être au moins 80% de la moyenne
+            if (volume.ratio < 0.8) {
+                tradeable = false;
+            }
+        }
+        
+        // 3. Filtre Bollinger - Évite les entrées en zone extrême (si activé)
+        const bollinger = analysis.indicators?.bollinger;
+        if (useStrictFilters && bollinger && bollinger.position !== undefined) {
+            // Position: 0 = bande basse, 0.5 = milieu, 1 = bande haute
+            if (direction === 'long' && bollinger.position > 0.85) {
+                // Trop proche de la bande haute pour un LONG
+                tradeable = false;
+            } else if (direction === 'short' && bollinger.position < 0.15) {
+                // Trop proche de la bande basse pour un SHORT
+                tradeable = false;
+            }
+        }
+        
+        // 4. Confirmation Chikou (Ichimoku) - Signal plus fiable (si activé)
+        const chikouConfirmed = analysis.chikouConfirmation?.confirmed || false;
+        const chikouDirection = analysis.chikouConfirmation?.direction;
+        if (useChikouFilter && chikouConfirmed && chikouDirection) {
+            // Chikou doit confirmer la direction
+            if ((direction === 'long' && chikouDirection !== 'bullish') ||
+                (direction === 'short' && chikouDirection !== 'bearish')) {
+                tradeable = false;
+            }
+        }
+        
+        // 5. Filtre de momentum - MACD doit être dans la bonne direction ET en accélération
+        if (useMACDFilter && macd) {
+            const macdLine = macd.macd || 0;
+            const signalLine = macd.signal || 0;
+            
+            if (direction === 'long') {
+                // Pour LONG: MACD doit être au-dessus du signal OU en train de croiser
+                if (macdLine < signalLine - 0.1) {
+                    tradeable = false;
+                }
+            } else {
+                // Pour SHORT: MACD doit être en-dessous du signal
+                if (macdLine > signalLine + 0.1) {
+                    tradeable = false;
+                }
             }
         }
 
@@ -371,7 +456,9 @@ class Backtester {
             rsi,
             macd: macd.histogram,
             atr,
-            ichimokuLevels
+            ichimokuLevels,
+            adxValue: adx?.value,
+            volumeRatio: volume?.ratio
         };
     }
 

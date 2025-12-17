@@ -5,15 +5,15 @@
 
 // ===== TP/SL PAR TIMEFRAME =====
 // Pourcentages de Take Profit et Stop Loss optimisés par timeframe
-// AJUSTÉ: SL plus large pour éviter les stops prématurés
+// OPTIMISÉ: Ratio Risk/Reward minimum 1:2 pour être profitable même avec 40% win rate
 export const TIMEFRAME_TPSL = {
-    '1m': { tp: 0.6, sl: 0.35 },   // SL augmenté
-    '5m': { tp: 1.5, sl: 0.8 },    // SL augmenté de 0.5 à 0.8
-    '15m': { tp: 2.5, sl: 1.5 },   // SL augmenté de 1.0 à 1.5
-    '30m': { tp: 3.5, sl: 2.0 },   // SL augmenté
-    '1h': { tp: 5.0, sl: 2.5 },    // SL augmenté
-    '4h': { tp: 7.0, sl: 3.5 },    // SL augmenté
-    '1d': { tp: 12.0, sl: 6.0 }    // SL augmenté
+    '1m': { tp: 0.8, sl: 0.4 },    // RRR 1:2
+    '5m': { tp: 1.6, sl: 0.8 },    // RRR 1:2
+    '15m': { tp: 3.0, sl: 1.5 },   // RRR 1:2
+    '30m': { tp: 4.0, sl: 2.0 },   // RRR 1:2
+    '1h': { tp: 5.0, sl: 2.5 },    // RRR 1:2
+    '4h': { tp: 8.0, sl: 4.0 },    // RRR 1:2
+    '1d': { tp: 14.0, sl: 7.0 }    // RRR 1:2
 };
 
 // ===== PRESETS DE FILTRES PAR TIMEFRAME =====
