@@ -98,12 +98,21 @@ class Backtester {
                     const result = this.checkPositionExit(position, currentCandle);
                     
                     if (result.closed) {
-                        // Calcule le P&L
-                        const pnlPercent = position.direction === 'long'
-                            ? ((result.exitPrice - position.entryPrice) / position.entryPrice) * 100 * leverage
-                            : ((position.entryPrice - result.exitPrice) / position.entryPrice) * 100 * leverage;
+                        // Calcule le P&L avec le levier
+                        // pnlPercent = variation du prix × levier
+                        const priceChange = position.direction === 'long'
+                            ? (result.exitPrice - position.entryPrice) / position.entryPrice
+                            : (position.entryPrice - result.exitPrice) / position.entryPrice;
                         
-                        const pnlAmount = (capital * (riskPerTrade / 100)) * (pnlPercent / (tpsl.sl * leverage));
+                        const pnlPercent = priceChange * 100 * leverage;
+                        
+                        // Taille de la position = capital × risque% / SL%
+                        // Cela garantit que si le SL est touché, on perd exactement riskPerTrade% du capital
+                        const slPercent = position.slPercent || tpsl.sl;
+                        const positionSize = (capital * (riskPerTrade / 100)) / (slPercent / 100);
+                        
+                        // P&L en $ = taille position × variation prix × levier
+                        const pnlAmount = positionSize * priceChange * leverage;
                         
                         capital += pnlAmount;
                         
@@ -180,11 +189,17 @@ class Backtester {
             // Ferme la position restante si elle existe
             if (position) {
                 const lastCandle = candles[candles.length - 1];
-                const pnlPercent = position.direction === 'long'
-                    ? ((lastCandle.close - position.entryPrice) / position.entryPrice) * 100 * leverage
-                    : ((position.entryPrice - lastCandle.close) / position.entryPrice) * 100 * leverage;
                 
-                const pnlAmount = (capital * (riskPerTrade / 100)) * (pnlPercent / (tpsl.sl * leverage));
+                // Même calcul que pour les trades normaux
+                const priceChange = position.direction === 'long'
+                    ? (lastCandle.close - position.entryPrice) / position.entryPrice
+                    : (position.entryPrice - lastCandle.close) / position.entryPrice;
+                
+                const pnlPercent = priceChange * 100 * leverage;
+                const slPercent = position.slPercent || tpsl.sl;
+                const positionSize = (capital * (riskPerTrade / 100)) / (slPercent / 100);
+                const pnlAmount = positionSize * priceChange * leverage;
+                
                 capital += pnlAmount;
                 
                 trades.push({
