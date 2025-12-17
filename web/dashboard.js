@@ -3688,7 +3688,8 @@ async function loadProfiles() {
     
     try {
         console.log('[PROFILES] Chargement des profils...');
-        const data = await apiRequest('/profiles');
+        // Force le rechargement sans cache
+        const data = await apiRequest('/profiles?t=' + Date.now());
         console.log('[PROFILES] Données reçues:', data);
         
         if (!data.profiles || data.profiles.length === 0) {
@@ -3837,7 +3838,11 @@ async function deleteProfile(index, name) {
         console.log('[PROFILES] Résultat suppression:', result);
         
         showToast('Profil supprimé', 'success');
-        loadProfiles();
+        
+        // Attend un peu puis recharge les profils
+        console.log('[PROFILES] Rechargement des profils...');
+        await loadProfiles();
+        console.log('[PROFILES] Profils rechargés');
     } catch (error) {
         console.error('[PROFILES] Erreur suppression:', error);
         showToast('Erreur: ' + error.message, 'error');

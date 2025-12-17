@@ -815,9 +815,12 @@ router.delete('/profiles/:index', requireAuth, async (req, res) => {
                 description: 'Profil créé automatiquement'
             });
             
+            // Force Mongoose à détecter la modification
+            req.user.markModified('configProfiles');
             await req.user.save();
             
             console.log(`[PROFILES] Dernier profil "${profileName}" supprimé, profil par défaut créé pour ${req.user.username}`);
+            console.log(`[PROFILES] Nombre de profils après: ${req.user.configProfiles.length}`);
             
             return res.json({ 
                 success: true, 
@@ -833,7 +836,11 @@ router.delete('/profiles/:index', requireAuth, async (req, res) => {
             return res.status(404).json({ error: 'Profil non trouvé' });
         }
         
+        // Force Mongoose à détecter la modification
+        req.user.markModified('configProfiles');
         await req.user.save();
+        
+        console.log(`[PROFILES] Nombre de profils après: ${req.user.configProfiles.length}`);
         
         console.log(`[PROFILES] Profil "${profileName}" supprimé pour ${req.user.username}`);
         
