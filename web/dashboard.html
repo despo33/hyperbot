@@ -76,6 +76,10 @@
                     <i data-lucide="line-chart"></i>
                     <span>Graphique</span>
                 </li>
+                <li class="nav-item" data-page="backtest">
+                    <i data-lucide="flask-conical"></i>
+                    <span>Backtesting</span>
+                </li>
                 <li class="nav-item" data-page="api">
                     <i data-lucide="key"></i>
                     <span>Configuration API</span>
@@ -1464,6 +1468,161 @@
                                     <i data-lucide="alert-triangle"></i>
                                     <p>Utilisez de préférence un wallet dédié au trading avec des fonds limités.</p>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Backtesting Page -->
+            <section id="backtestPage" class="page">
+                <div class="config-grid">
+                    <!-- Info Banner -->
+                    <div class="card card-wide info-card">
+                        <div class="card-body">
+                            <div class="info-banner">
+                                <i data-lucide="flask-conical"></i>
+                                <div>
+                                    <h4>Backtesting de Stratégie</h4>
+                                    <p>Testez votre stratégie sur des données historiques pour évaluer ses performances avant de trader en réel.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Configuration Backtest -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i data-lucide="settings"></i> Configuration du Backtest</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="backtestForm">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="btSymbol">Symbole</label>
+                                        <select id="btSymbol" class="form-control">
+                                            <option value="BTC">BTC</option>
+                                            <option value="ETH">ETH</option>
+                                            <option value="SOL">SOL</option>
+                                            <option value="DOGE">DOGE</option>
+                                            <option value="XRP">XRP</option>
+                                            <option value="AVAX">AVAX</option>
+                                            <option value="LINK">LINK</option>
+                                            <option value="DOT">DOT</option>
+                                            <option value="UNI">UNI</option>
+                                            <option value="ATOM">ATOM</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="btTimeframe">Timeframe</label>
+                                        <select id="btTimeframe" class="form-control">
+                                            <option value="5m">5 minutes</option>
+                                            <option value="15m" selected>15 minutes</option>
+                                            <option value="30m">30 minutes</option>
+                                            <option value="1h">1 heure</option>
+                                            <option value="4h">4 heures</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="btCapital">Capital Initial ($)</label>
+                                        <input type="number" id="btCapital" value="1000" min="100" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="btLeverage">Levier</label>
+                                        <select id="btLeverage" class="form-control">
+                                            <option value="1">1x</option>
+                                            <option value="2">2x</option>
+                                            <option value="3">3x</option>
+                                            <option value="5" selected>5x</option>
+                                            <option value="10">10x</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="btRisk">Risque par Trade (%)</label>
+                                        <input type="number" id="btRisk" value="2" min="0.5" max="10" step="0.5" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="btMinScore">Score Minimum</label>
+                                        <input type="number" id="btMinScore" value="5" min="3" max="7" class="form-control">
+                                    </div>
+                                </div>
+                                
+                                <h4 style="margin-top: 1rem; margin-bottom: 0.5rem;">Filtres</h4>
+                                <div class="checkbox-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="btEMA200" checked>
+                                        <span>Filtre EMA200 (tendance)</span>
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="btMACD" checked>
+                                        <span>Filtre MACD</span>
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="btRSI" checked>
+                                        <span>Filtre RSI</span>
+                                    </label>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary btn-full" id="runBacktestBtn" style="margin-top: 1rem;">
+                                    <i data-lucide="play"></i> Lancer le Backtest
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Résultats Backtest -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i data-lucide="bar-chart-2"></i> Résultats</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="backtestResults" class="backtest-results">
+                                <p class="no-results">Lancez un backtest pour voir les résultats</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Statistiques Détaillées -->
+                    <div class="card card-wide">
+                        <div class="card-header">
+                            <h3><i data-lucide="pie-chart"></i> Statistiques Détaillées</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="backtestStats" class="backtest-stats-grid">
+                                <p class="no-results">Aucune statistique disponible</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Liste des Trades -->
+                    <div class="card card-wide">
+                        <div class="card-header">
+                            <h3><i data-lucide="list"></i> Trades du Backtest</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-container">
+                                <table class="data-table" id="backtestTradesTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Direction</th>
+                                            <th>Entrée</th>
+                                            <th>Sortie</th>
+                                            <th>Raison</th>
+                                            <th>P&L %</th>
+                                            <th>P&L $</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="backtestTradesBody">
+                                        <tr>
+                                            <td colspan="7" class="no-data">Aucun trade</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>

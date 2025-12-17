@@ -24,6 +24,7 @@ import signalDetector from './core/signalDetector.js';
 import auth from './services/hyperliquidAuth.js';
 import api from './services/hyperliquidApi.js';
 import scanner, { TOP_CRYPTOS } from './core/scanner.js';
+import backtester from './core/backtester.js';
 
 // Utilitaires centralisés
 import { optionalAuth, requireAuth } from './utils/auth.js';
@@ -1591,6 +1592,76 @@ router.post('/scanner/stop', requireAuth, (req, res) => {
  */
 router.get('/scanner/cryptos', (req, res) => {
     res.json({ cryptos: TOP_CRYPTOS });
+});
+
+// ==================== BACKTESTING ROUTES ====================
+
+/**
+ * POST /api/backtest/run
+ * Lance un backtest avec les paramètres spécifiés
+ */
+router.post('/backtest/run', requireAuth, async (req, res) => {
+    try {
+        const config = {
+            symbol: req.body.symbol || 'BTC',
+            timeframe: req.body.timeframe || '15m',
+            initialCapital: req.body.initialCapital || 1000,
+            leverage: req.body.leverage || 5,
+            riskPerTrade: req.body.riskPerTrade || 2,
+            useEMA200Filter: req.body.useEMA200Filter !== false,
+            useMACDFilter: req.body.useMACDFilter !== false,
+            useRSIFilter: req.body.useRSIFilter !== false,
+            minScore: req.body.minScore || 5,
+            minConfluence: req.body.minConfluence || 3,
+            minWinProbability: req.body.minWinProbability || 0.65
+        };
+
+        const result = await backtester.run(config);
+        
+        res.json({
+            success: true,
+            result
+        });
+    } catch (error) {
+        res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        });
+    }
+});
+
+/**
+ * GET /api/backtest/status
+ * Retourne le statut du backtest en cours
+ */
+router.get('/backtest/status', (req, res) => {
+    res.json(backtester.getStatus());
+});
+
+/**
+ * GET /api/backtest/list
+ * Liste les backtests sauvegardés
+ */
+router.get('/backtest/list', requireAuth, (req, res) => {
+    try {
+        const backtests = backtester.listSavedBacktests();
+        res.json({ success: true, backtests });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * GET /api/backtest/:filename
+ * Charge un backtest sauvegardé
+ */
+router.get('/backtest/:filename', requireAuth, (req, res) => {
+    try {
+        const result = backtester.loadBacktest(req.params.filename);
+        res.json({ success: true, result });
+    } catch (error) {
+        res.status(404).json({ success: false, error: error.message });
+    }
 });
 
 export default router;

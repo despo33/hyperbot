@@ -3871,3 +3871,200 @@ function getConfigFromForm() {
     };
 }
 
+// ==================== BACKTESTING ====================
+
+/**
+ * Initialise le formulaire de backtesting
+ */
+function initBacktestForm() {
+    const form = document.getElementById('backtestForm');
+    if (!form) return;
+    
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await runBacktest();
+    });
+}
+
+/**
+ * Lance un backtest
+ */
+async function runBacktest() {
+    const btn = document.getElementById('runBacktestBtn');
+    const resultsDiv = document.getElementById('backtestResults');
+    const statsDiv = document.getElementById('backtestStats');
+    const tradesBody = document.getElementById('backtestTradesBody');
+    
+    // Récupère les paramètres
+    const config = {
+        symbol: document.getElementById('btSymbol').value,
+        timeframe: document.getElementById('btTimeframe').value,
+        initialCapital: parseFloat(document.getElementById('btCapital').value),
+        leverage: parseInt(document.getElementById('btLeverage').value),
+        riskPerTrade: parseFloat(document.getElementById('btRisk').value),
+        minScore: parseInt(document.getElementById('btMinScore').value),
+        useEMA200Filter: document.getElementById('btEMA200').checked,
+        useMACDFilter: document.getElementById('btMACD').checked,
+        useRSIFilter: document.getElementById('btRSI').checked
+    };
+    
+    // UI loading
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader"></i> Backtest en cours...';
+    resultsDiv.innerHTML = '<div class="loading-spinner"></div><p>Analyse des données historiques...</p>';
+    statsDiv.innerHTML = '';
+    tradesBody.innerHTML = '<tr><td colspan="7">Chargement...</td></tr>';
+    
+    try {
+        const response = await apiRequest('/backtest/run', {
+            method: 'POST',
+            body: JSON.stringify(config)
+        });
+        
+        if (response.success && response.result) {
+            displayBacktestResults(response.result);
+        } else {
+            throw new Error(response.error || 'Erreur inconnue');
+        }
+    } catch (error) {
+        resultsDiv.innerHTML = `<div class="error-message"><i data-lucide="alert-circle"></i> ${error.message}</div>`;
+        showToast('Erreur backtest: ' + error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="play"></i> Lancer le Backtest';
+        lucide.createIcons();
+    }
+}
+
+/**
+ * Affiche les résultats du backtest
+ */
+function displayBacktestResults(result) {
+    const { stats, trades, config, period } = result;
+    
+    // Résumé principal
+    const resultsDiv = document.getElementById('backtestResults');
+    const isProfit = parseFloat(stats.totalPnL) >= 0;
+    
+    resultsDiv.innerHTML = `
+        <div class="backtest-summary">
+            <div class="summary-header ${isProfit ? 'profit' : 'loss'}">
+                <h3>${config.symbol} - ${config.timeframe}</h3>
+                <span class="period">${new Date(period.start).toLocaleDateString()} → ${new Date(period.end).toLocaleDateString()}</span>
+            </div>
+            <div class="summary-metrics">
+                <div class="metric ${isProfit ? 'positive' : 'negative'}">
+                    <span class="label">P&L Total</span>
+                    <span class="value">${isProfit ? '+' : ''}$${stats.totalPnL}</span>
+                </div>
+                <div class="metric ${isProfit ? 'positive' : 'negative'}">
+                    <span class="label">Rendement</span>
+                    <span class="value">${isProfit ? '+' : ''}${stats.totalReturn}%</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Win Rate</span>
+                    <span class="value">${stats.winRate}%</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Trades</span>
+                    <span class="value">${stats.totalTrades}</span>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Statistiques détaillées
+    const statsDiv = document.getElementById('backtestStats');
+    statsDiv.innerHTML = `
+        <div class="stat-card">
+            <i data-lucide="trophy"></i>
+            <div class="stat-info">
+                <span class="stat-value">${stats.wins}</span>
+                <span class="stat-label">Trades Gagnants</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <i data-lucide="x-circle"></i>
+            <div class="stat-info">
+                <span class="stat-value">${stats.losses}</span>
+                <span class="stat-label">Trades Perdants</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <i data-lucide="percent"></i>
+            <div class="stat-info">
+                <span class="stat-value">${stats.profitFactor}</span>
+                <span class="stat-label">Profit Factor</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <i data-lucide="trending-down"></i>
+            <div class="stat-info">
+                <span class="stat-value negative">-${stats.maxDrawdown}%</span>
+                <span class="stat-label">Max Drawdown</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <i data-lucide="arrow-up"></i>
+            <div class="stat-info">
+                <span class="stat-value positive">+$${stats.avgWin}</span>
+                <span class="stat-label">Gain Moyen</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <i data-lucide="arrow-down"></i>
+            <div class="stat-info">
+                <span class="stat-value negative">-$${stats.avgLoss}</span>
+                <span class="stat-label">Perte Moyenne</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <i data-lucide="trending-up"></i>
+            <div class="stat-info">
+                <span class="stat-value">${stats.longTrades} (${stats.longWinRate}%)</span>
+                <span class="stat-label">Trades LONG</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <i data-lucide="trending-down"></i>
+            <div class="stat-info">
+                <span class="stat-value">${stats.shortTrades} (${stats.shortWinRate}%)</span>
+                <span class="stat-label">Trades SHORT</span>
+            </div>
+        </div>
+    `;
+    
+    // Liste des trades
+    const tradesBody = document.getElementById('backtestTradesBody');
+    if (trades.length === 0) {
+        tradesBody.innerHTML = '<tr><td colspan="7" class="no-data">Aucun trade généré</td></tr>';
+    } else {
+        tradesBody.innerHTML = trades.slice(0, 50).map(trade => {
+            const pnl = parseFloat(trade.pnlAmount);
+            const isWin = pnl >= 0;
+            return `
+                <tr class="${isWin ? 'win-row' : 'loss-row'}">
+                    <td>${new Date(trade.entryTime).toLocaleString()}</td>
+                    <td><span class="direction-badge ${trade.direction}">${trade.direction.toUpperCase()}</span></td>
+                    <td>$${parseFloat(trade.entryPrice).toFixed(2)}</td>
+                    <td>$${parseFloat(trade.exitPrice).toFixed(2)}</td>
+                    <td><span class="exit-reason ${trade.exitReason}">${trade.exitReason}</span></td>
+                    <td class="${isWin ? 'positive' : 'negative'}">${isWin ? '+' : ''}${trade.pnlPercent}%</td>
+                    <td class="${isWin ? 'positive' : 'negative'}">${isWin ? '+' : ''}$${trade.pnlAmount}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        if (trades.length > 50) {
+            tradesBody.innerHTML += `<tr><td colspan="7" class="more-trades">... et ${trades.length - 50} autres trades</td></tr>`;
+        }
+    }
+    
+    lucide.createIcons();
+}
+
+// Initialise le backtest au chargement
+document.addEventListener('DOMContentLoaded', () => {
+    initBacktestForm();
+});
+
