@@ -490,6 +490,16 @@
                                         </div>
                                     </div>
                                     
+                                    <!-- Sélection de la stratégie -->
+                                    <div class="form-group" style="margin-top: 15px;">
+                                        <label for="configStrategy"><strong>Stratégie de Trading</strong></label>
+                                        <select id="configStrategy" class="form-control" style="margin-top: 5px;">
+                                            <option value="ichimoku">🔮 Ichimoku Kinko Hyo (Classique)</option>
+                                            <option value="smc">💎 Smart Money Concepts (SMC)</option>
+                                        </select>
+                                        <span class="form-hint" id="configStrategyHint">Ichimoku: Signaux TK Cross, Kumo, Chikou. SMC: Order Blocks, FVG, Break of Structure.</span>
+                                    </div>
+                                    
                                     <!-- Mode Multi-Timeframe -->
                                     <div class="form-group" style="margin-top: 15px;">
                                         <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
@@ -707,6 +717,121 @@
                                             <label>Survente (pas de SHORT en-dessous)</label>
                                             <input type="number" id="rsiOversold" value="30" min="10" max="50" step="5">
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Multi-Timeframe Analysis -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i data-lucide="layers"></i> Analyse Multi-Timeframe (MTF)</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="section-desc">Confirme les signaux avec plusieurs timeframes pour améliorer le win rate</p>
+                            
+                            <div class="toggle-item">
+                                <label class="toggle">
+                                    <input type="checkbox" id="useMTF" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <div class="toggle-info">
+                                    <span class="toggle-label">Activer Multi-Timeframe</span>
+                                    <span class="toggle-desc">Vérifie la tendance sur plusieurs timeframes avant d'entrer</span>
+                                </div>
+                            </div>
+                            
+                            <div class="mtf-settings" id="mtfSettings">
+                                <div class="form-row" style="margin-top: 1rem;">
+                                    <div class="form-group">
+                                        <label>Timeframe Principal</label>
+                                        <select id="mtfPrimary" class="form-control">
+                                            <option value="5m">5 minutes</option>
+                                            <option value="15m" selected>15 minutes</option>
+                                            <option value="30m">30 minutes</option>
+                                            <option value="1h">1 heure</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Timeframe Supérieur (tendance)</label>
+                                        <select id="mtfHigher" class="form-control">
+                                            <option value="1h">1 heure</option>
+                                            <option value="4h" selected>4 heures</option>
+                                            <option value="1d">1 jour</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group" style="margin-top: 0.5rem;">
+                                    <label>Confirmations MTF requises</label>
+                                    <div class="slider-with-value">
+                                        <input type="range" id="mtfConfirmations" value="2" min="1" max="3" step="1">
+                                        <span class="slider-value" id="mtfConfirmationsValue">2</span>
+                                    </div>
+                                    <div class="range-labels">
+                                        <span>1 (plus de trades)</span>
+                                        <span>3 (très sélectif)</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="info-banner info-small" style="margin-top: 1rem;">
+                                    <i data-lucide="info"></i>
+                                    <div>
+                                        <p><strong>Fonctionnement:</strong> Le signal est validé uniquement si la tendance du timeframe supérieur confirme la direction. Ex: LONG sur 15m uniquement si 4h est aussi haussier.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Indicateurs Avancés -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i data-lucide="trending-up"></i> Indicateurs Avancés</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="section-desc">Indicateurs supplémentaires pour améliorer la qualité des signaux</p>
+                            
+                            <div class="toggle-group">
+                                <div class="toggle-item">
+                                    <label class="toggle">
+                                        <input type="checkbox" id="useSupertrend" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <div class="toggle-info">
+                                        <span class="toggle-label">🎯 Supertrend</span>
+                                        <span class="toggle-desc">Ne trade que dans le sens de la tendance Supertrend (ATR-based)</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-item">
+                                    <label class="toggle">
+                                        <input type="checkbox" id="useFibonacci" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <div class="toggle-info">
+                                        <span class="toggle-label">📐 Fibonacci</span>
+                                        <span class="toggle-desc">Utilise les niveaux Fibonacci (38.2%, 50%, 61.8%) pour TP/SL dynamiques</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-item">
+                                    <label class="toggle">
+                                        <input type="checkbox" id="useChikouAdvanced" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <div class="toggle-info">
+                                        <span class="toggle-label">🔮 Chikou Span Avancé</span>
+                                        <span class="toggle-desc">Confirmation Chikou au-dessus/en-dessous du prix passé</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-item">
+                                    <label class="toggle">
+                                        <input type="checkbox" id="useKumoTwist" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <div class="toggle-info">
+                                        <span class="toggle-label">☁️ Kumo Twist</span>
+                                        <span class="toggle-desc">Détecte les changements de couleur du nuage Ichimoku</span>
                                     </div>
                                 </div>
                             </div>
@@ -1497,6 +1622,18 @@
                         </div>
                         <div class="card-body">
                             <form id="backtestForm">
+                                <!-- Sélection de la stratégie -->
+                                <div class="form-group" style="margin-bottom: 1rem;">
+                                    <label for="btStrategy">Stratégie de Trading</label>
+                                    <select id="btStrategy" class="form-control">
+                                        <option value="ichimoku">🔮 Ichimoku Kinko Hyo (Classique)</option>
+                                        <option value="smc">💎 Smart Money Concepts (SMC)</option>
+                                    </select>
+                                    <p class="form-hint" id="btStrategyHint" style="font-size: 0.8rem; margin-top: 0.3rem; color: var(--text-secondary);">
+                                        Ichimoku: Signaux basés sur Tenkan/Kijun, Kumo, Chikou. SMC: Order Blocks, FVG, Break of Structure.
+                                    </p>
+                                </div>
+                                
                                 <div class="form-row">
                                     <div class="form-group">
                                         <label for="btSymbol">Symbole</label>
@@ -1536,8 +1673,8 @@
                                         <input type="date" id="btEndDate" class="form-control">
                                     </div>
                                 </div>
-                                <p class="form-hint" style="color: var(--text-muted); font-size: 0.8rem; margin-top: -0.5rem;">
-                                    Laissez vide pour utiliser toutes les données disponibles (~1000 candles max)
+                                <p class="form-hint" id="btDateHint" style="color: var(--warning); font-size: 0.8rem; margin-top: -0.5rem;">
+                                    Période minimum recommandée pour 15m: 3 jours (250 bougies)
                                 </p>
                                 <div class="form-row">
                                     <div class="form-group">
@@ -1574,6 +1711,7 @@
                                             <option value="percent">Pourcentage fixe</option>
                                             <option value="atr">ATR (volatilité)</option>
                                             <option value="ichimoku">Ichimoku (niveaux techniques)</option>
+                                            <option value="fibonacci">Fibonacci (retracements)</option>
                                         </select>
                                     </div>
                                     <div class="form-group" id="btATRGroup" style="display: none;">
@@ -1614,7 +1752,7 @@
                                     </div>
                                 </div>
 
-                                <h4 style="margin-top: 1rem; margin-bottom: 0.5rem;">Filtres</h4>
+                                <h4 style="margin-top: 1rem; margin-bottom: 0.5rem;">Filtres de base</h4>
                                 <div class="checkbox-group">
                                     <label class="checkbox-label">
                                         <input type="checkbox" id="btEMA200" checked>
@@ -1627,6 +1765,22 @@
                                     <label class="checkbox-label">
                                         <input type="checkbox" id="btRSI" checked>
                                         <span>Filtre RSI</span>
+                                    </label>
+                                </div>
+                                
+                                <h4 style="margin-top: 1rem; margin-bottom: 0.5rem;">Filtres avancés (améliore le win rate)</h4>
+                                <div class="checkbox-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="btSupertrend" checked>
+                                        <span>🎯 Filtre Supertrend (ne trade que dans le sens de la tendance)</span>
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="btStrictFilters" checked>
+                                        <span>📊 Filtres stricts (ADX, Volume, Bollinger)</span>
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="btChikou" checked>
+                                        <span>🔮 Confirmation Chikou Span (Ichimoku)</span>
                                     </label>
                                 </div>
 

@@ -7,6 +7,7 @@ import api from '../services/hyperliquidApi.js';
 import auth from '../services/hyperliquidAuth.js';
 import priceFetcher from './priceFetcher.js';
 import signalDetector from './signalDetector.js';
+import smcSignalDetector from './smcSignalDetector.js';
 import riskManager from './riskManager.js';
 import ichimoku from './ichimoku.js';
 import indicators from './indicators.js';
@@ -60,16 +61,24 @@ class TradeEngine {
             rsiOverbought: 70,            // Seuil de surachat (pas de LONG au-dessus)
             rsiOversold: 30,              // Seuil de survente (pas de SHORT en-dessous)
             // ===== MODE MULTI-TIMEFRAME =====
-            multiTimeframeMode: false,    // Activer l'analyse multi-timeframe
-            mtfTimeframes: ['5m', '15m', '1h'], // Timeframes à analyser en mode MTF
-            mtfMinConfirmation: 2,        // Minimum de TF en accord pour valider
+            useMTF: true,                 // Activer l'analyse multi-timeframe
+            mtfPrimary: '15m',            // Timeframe principal
+            mtfHigher: '4h',              // Timeframe supérieur pour confirmer la tendance
+            mtfConfirmations: 2,          // Minimum de confirmations requises
             mtfWeights: {                 // Poids de chaque timeframe
                 '1m': 0.15,
                 '5m': 0.25,
                 '15m': 0.30,
                 '1h': 0.20,
                 '4h': 0.10
-            }
+            },
+            // ===== INDICATEURS AVANCÉS =====
+            useSupertrend: true,          // Filtre Supertrend (ne trade que dans le sens de la tendance)
+            useFibonacci: true,           // Utilise Fibonacci pour TP/SL dynamiques
+            useChikouAdvanced: true,      // Confirmation Chikou Span avancée
+            useKumoTwist: true,           // Détection Kumo Twist
+            // ===== STRATÉGIE =====
+            strategy: 'ichimoku'          // 'ichimoku' ou 'smc' (Smart Money Concepts)
         };
 
         // État
@@ -627,7 +636,14 @@ class TradeEngine {
         }
         
         const currentPrice = candles[candles.length - 1].close;
+        const strategy = this.config.strategy || 'ichimoku';
         
+        // ===== STRATÉGIE SMC (Smart Money Concepts) =====
+        if (strategy === 'smc') {
+            return this.analyzeWithSMC(symbol, timeframe, candles, currentPrice, preset, tpsl);
+        }
+        
+        // ===== STRATÉGIE ICHIMOKU (par défaut) =====
         // Analyse avec signalDetector
         const analysis = signalDetector.analyze(candles, {}, timeframe);
         
@@ -691,6 +707,30 @@ class TradeEngine {
             }
         }
         
+        // ===== FILTRE SUPERTREND (NOUVEAU) =====
+        let supertrendOK = true;
+        const supertrend = analysis.indicators?.supertrend;
+        if (this.config.useSupertrend && supertrend && supertrend.direction !== 'neutral') {
+            // Ne trade que dans le sens du Supertrend
+            if (signalDirection === 'long' && supertrend.direction !== 'bullish') {
+                supertrendOK = false;
+            } else if (signalDirection === 'short' && supertrend.direction !== 'bearish') {
+                supertrendOK = false;
+            }
+        }
+        
+        // ===== FILTRE CHIKOU AVANCÉ (NOUVEAU) =====
+        let chikouOK = true;
+        const chikouAdvanced = analysis.indicators?.chikouAdvanced;
+        if (this.config.useChikouAdvanced && chikouAdvanced && chikouAdvanced.confirmed) {
+            // Chikou doit confirmer la direction
+            if (signalDirection === 'long' && chikouAdvanced.direction !== 'bullish') {
+                chikouOK = false;
+            } else if (signalDirection === 'short' && chikouAdvanced.direction !== 'bearish') {
+                chikouOK = false;
+            }
+        }
+        
         // Vérifie les filtres avec les presets du timeframe
         const hasStrongScore = absIchimokuScore >= preset.minScore;
         const hasMinConfluence = confluence >= preset.minConfluence;
@@ -715,8 +755,8 @@ class TradeEngine {
         const winProbability = this.calculateWinProbability(analysis, confluence, 0);
         const meetsWinProb = winProbability >= preset.minWinProbability;
         
-        // Signal tradeable ? - FILTRES RENFORCÉS
-        const tradeable = signalDirection && hasStrongScore && hasMinConfluence && rsiOK && adxOK && meetsWinProb && trendOK && macdTrendOK;
+        // Signal tradeable ? - FILTRES RENFORCÉS (incluant Supertrend et Chikou)
+        const tradeable = signalDirection && hasStrongScore && hasMinConfluence && rsiOK && adxOK && meetsWinProb && trendOK && macdTrendOK && supertrendOK && chikouOK;
         
         // Qualité du signal
         let signalQuality = { score: 0, grade: 'D' };
@@ -759,23 +799,116 @@ class TradeEngine {
             minRRR: preset.minRRR,
             trendFilter: { ok: trendOK, direction: trendDirection, ema200: ema200?.value },
             macdTrendFilter: { ok: macdTrendOK, histogram: macd?.histogram },
-            rejectReason: !tradeable ? this.getRejectReason(signalDirection, hasStrongScore, hasMinConfluence, rsiOK, adxOK, meetsWinProb, preset, trendOK, macdTrendOK) : null
+            supertrendFilter: { ok: supertrendOK, direction: supertrend?.direction, value: supertrend?.value },
+            chikouFilter: { ok: chikouOK, direction: chikouAdvanced?.direction, confirmed: chikouAdvanced?.confirmed },
+            rejectReason: !tradeable ? this.getRejectReason(signalDirection, hasStrongScore, hasMinConfluence, rsiOK, adxOK, meetsWinProb, preset, trendOK, macdTrendOK, supertrendOK, chikouOK) : null
         };
     }
     
     /**
      * Retourne la raison du rejet
      */
-    getRejectReason(direction, hasScore, hasConf, rsiOK, adxOK, winProbOK, preset, trendOK = true, macdTrendOK = true) {
+    getRejectReason(direction, hasScore, hasConf, rsiOK, adxOK, winProbOK, preset, trendOK = true, macdTrendOK = true, supertrendOK = true, chikouOK = true) {
         if (!direction) return 'Pas de signal directionnel';
         if (!trendOK) return 'Contre-tendance EMA200 (BLOQUÉ)';
         if (!macdTrendOK) return 'MACD contre le signal (BLOQUÉ)';
+        if (!supertrendOK) return 'Supertrend contre le signal (BLOQUÉ)';
+        if (!chikouOK) return 'Chikou ne confirme pas (BLOQUÉ)';
         if (!hasScore) return `Score insuffisant (min: ${preset.minScore})`;
         if (!hasConf) return `Confluence insuffisante (min: ${preset.minConfluence})`;
         if (!rsiOK) return 'RSI hors limites';
         if (!adxOK) return `ADX trop faible (min: ${preset.adxMin})`;
         if (!winProbOK) return `Probabilité trop faible (min: ${(preset.minWinProbability*100).toFixed(0)}%)`;
         return 'Inconnu';
+    }
+
+    /**
+     * Analyse avec la stratégie Smart Money Concepts (SMC)
+     * @param {string} symbol 
+     * @param {string} timeframe 
+     * @param {Array} candles 
+     * @param {number} currentPrice 
+     * @param {Object} preset 
+     * @param {Object} tpsl 
+     * @returns {Object}
+     */
+    async analyzeWithSMC(symbol, timeframe, candles, currentPrice, preset, tpsl) {
+        // Analyse SMC
+        const smcAnalysis = smcSignalDetector.analyze(candles, {
+            minScore: this.config.minScore || preset.minScore,
+            minConfluence: preset.minConfluence,
+            useRSIFilter: this.config.useRSIFilter,
+            useMACDFilter: true,
+            useVolumeFilter: true,
+            useSessionFilter: true
+        }, timeframe);
+
+        if (!smcAnalysis || !smcAnalysis.signal) {
+            return {
+                success: true,
+                symbol,
+                timeframe,
+                strategy: 'smc',
+                currentPrice,
+                tradeable: false,
+                rejectReason: smcAnalysis?.rejectReason || 'Pas de signal SMC'
+            };
+        }
+
+        const signal = smcAnalysis.signal;
+        const tradeable = smcAnalysis.tradeable;
+
+        // Calcul des niveaux TP/SL
+        let stopLoss = smcAnalysis.suggestedSL;
+        let takeProfit = smcAnalysis.suggestedTP;
+        let slPercent = smcAnalysis.suggestedSLPercent;
+        let tpPercent = smcAnalysis.suggestedTPPercent;
+
+        // Fallback sur les valeurs par défaut si pas de niveaux SMC
+        if (!stopLoss || !takeProfit) {
+            if (signal.direction === 'long') {
+                slPercent = tpsl.sl;
+                tpPercent = tpsl.tp;
+                stopLoss = currentPrice * (1 - slPercent / 100);
+                takeProfit = currentPrice * (1 + tpPercent / 100);
+            } else if (signal.direction === 'short') {
+                slPercent = tpsl.sl;
+                tpPercent = tpsl.tp;
+                stopLoss = currentPrice * (1 + slPercent / 100);
+                takeProfit = currentPrice * (1 - tpPercent / 100);
+            }
+        }
+
+        const rrr = slPercent && tpPercent ? tpPercent / slPercent : 2;
+
+        return {
+            success: true,
+            symbol,
+            timeframe,
+            strategy: 'smc',
+            currentPrice,
+            tradeable,
+            direction: signal.direction,
+            score: signal.absScore,
+            confluence: smcAnalysis.confluence,
+            winProbability: smcAnalysis.winProbability,
+            // Niveaux TP/SL
+            stopLoss,
+            takeProfit,
+            slPercent,
+            tpPercent,
+            rrr,
+            // Données SMC
+            smcData: smcAnalysis.smcData,
+            marketStructure: smcAnalysis.smcData?.structure?.trend,
+            currentZone: smcAnalysis.smcData?.premiumDiscount?.currentZone,
+            session: smcAnalysis.smcData?.session,
+            // Indicateurs
+            indicators: smcAnalysis.indicators,
+            // Raisons
+            reasons: signal.reasons,
+            rejectReason: !tradeable ? smcAnalysis.rejectReason : null
+        };
     }
 
     /**

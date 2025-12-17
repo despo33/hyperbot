@@ -1332,6 +1332,10 @@ class TechnicalIndicators {
         const adx = this.calculateADX(candles);
         const momentum = this.calculateMomentum(closes);
         const liquidity = this.checkLiquidity(candles);
+        
+        // ===== NOUVEAUX INDICATEURS (Supertrend, Fibonacci) =====
+        const supertrend = this.calculateSupertrend(candles, 10, 3);
+        const fibonacci = this.calculateFibonacci(candles, 50);
 
         // ===== SYSTÈME DE CONFLUENCE PONDÉRÉ =====
         // Poids des indicateurs (total = 100)
@@ -1667,6 +1671,9 @@ class TechnicalIndicators {
             momentum,
             liquidity,
             fakeout,
+            // Nouveaux indicateurs (Supertrend, Fibonacci)
+            supertrend,
+            fibonacci,
             // Analyse globale
             score: normalizedScore,
             weightedScore,
@@ -1986,6 +1993,405 @@ class TechnicalIndicators {
             rejections,
             reasons,
             confidence: confirmations >= 7 ? 'high' : confirmations >= 5 ? 'medium' : 'low'
+        };
+    }
+
+    /**
+     * Calcule l'indicateur Supertrend
+     * Formule: Supertrend = (High + Low) / 2 ± (Multiplier × ATR)
+     * @param {Array} candles - Bougies OHLCV
+     * @param {number} period - Période ATR (défaut: 10)
+     * @param {number} multiplier - Multiplicateur (défaut: 3)
+     * @returns {Object} Supertrend value, direction et signal
+     */
+    calculateSupertrend(candles, period = 10, multiplier = 3) {
+        if (!candles || candles.length < period + 1) {
+            return { 
+                value: 0, 
+                direction: 'neutral', 
+                signal: 'neutral',
+                trend: 'neutral',
+                trendStrength: 0
+            };
+        }
+
+        // Calcul de l'ATR
+        const atrData = this.calculateATR(candles, period);
+        const atr = atrData.atr;
+
+        const currentCandle = candles[candles.length - 1];
+        const prevCandle = candles[candles.length - 2];
+        
+        // Calcul des bandes de base
+        const hl2 = (currentCandle.high + currentCandle.low) / 2;
+        const prevHl2 = (prevCandle.high + prevCandle.low) / 2;
+        
+        const basicUpperBand = hl2 + (multiplier * atr);
+        const basicLowerBand = hl2 - (multiplier * atr);
+
+        // Calcul des bandes finales (avec logique de continuation)
+        // Pour simplifier, on utilise une approche basée sur les dernières bougies
+        let upperBand = basicUpperBand;
+        let lowerBand = basicLowerBand;
+        
+        // Détermine la direction basée sur la position du prix
+        let direction = 'neutral';
+        let supertrend = 0;
+        
+        // Si le prix clôture au-dessus de la bande supérieure précédente = tendance haussière
+        // Si le prix clôture en-dessous de la bande inférieure précédente = tendance baissière
+        const prevClose = prevCandle.close;
+        const currentClose = currentCandle.close;
+        
+        // Logique Supertrend simplifiée mais efficace
+        if (currentClose > basicLowerBand && prevClose > (prevHl2 - multiplier * atr)) {
+            direction = 'bullish';
+            supertrend = basicLowerBand;
+        } else if (currentClose < basicUpperBand && prevClose < (prevHl2 + multiplier * atr)) {
+            direction = 'bearish';
+            supertrend = basicUpperBand;
+        } else if (currentClose > hl2) {
+            direction = 'bullish';
+            supertrend = basicLowerBand;
+        } else {
+            direction = 'bearish';
+            supertrend = basicUpperBand;
+        }
+
+        // Signal de trading
+        let signal = 'neutral';
+        if (direction === 'bullish' && currentClose > supertrend) {
+            signal = 'buy';
+        } else if (direction === 'bearish' && currentClose < supertrend) {
+            signal = 'sell';
+        }
+
+        // Force de la tendance (distance par rapport au Supertrend)
+        const distance = Math.abs(currentClose - supertrend);
+        const trendStrength = Math.min(1, (distance / currentClose) * 100 / 2);
+
+        return {
+            value: parseFloat(supertrend.toFixed(6)),
+            upperBand: parseFloat(basicUpperBand.toFixed(6)),
+            lowerBand: parseFloat(basicLowerBand.toFixed(6)),
+            direction,
+            signal,
+            trend: direction,
+            trendStrength: parseFloat(trendStrength.toFixed(3)),
+            atr: atr
+        };
+    }
+
+    /**
+     * Calcule les niveaux de Fibonacci Retracement
+     * Niveaux: 0%, 23.6%, 38.2%, 50%, 61.8%, 78.6%, 100%
+     * @param {Array} candles - Bougies OHLCV
+     * @param {number} lookback - Période pour trouver high/low (défaut: 50)
+     * @returns {Object} Niveaux Fibonacci et position du prix
+     */
+    calculateFibonacci(candles, lookback = 50) {
+        if (!candles || candles.length < lookback) {
+            return { 
+                levels: {}, 
+                trend: 'neutral', 
+                currentLevel: null,
+                nearestSupport: null,
+                nearestResistance: null,
+                retracement: 0
+            };
+        }
+
+        const recentCandles = candles.slice(-lookback);
+        
+        // Trouve le high et low de la période
+        let swingHigh = -Infinity;
+        let swingLow = Infinity;
+        let highIndex = 0;
+        let lowIndex = 0;
+        
+        for (let i = 0; i < recentCandles.length; i++) {
+            if (recentCandles[i].high > swingHigh) {
+                swingHigh = recentCandles[i].high;
+                highIndex = i;
+            }
+            if (recentCandles[i].low < swingLow) {
+                swingLow = recentCandles[i].low;
+                lowIndex = i;
+            }
+        }
+
+        const range = swingHigh - swingLow;
+        const currentPrice = candles[candles.length - 1].close;
+        
+        // Détermine si on est en tendance haussière ou baissière
+        // Haussier: low avant high, Baissier: high avant low
+        const isUptrend = lowIndex < highIndex;
+        
+        // Calcul des niveaux Fibonacci
+        let levels = {};
+        if (isUptrend) {
+            // Retracement depuis le high (tendance haussière)
+            levels = {
+                '0': swingHigh,                           // 0% (sommet)
+                '23.6': swingHigh - range * 0.236,
+                '38.2': swingHigh - range * 0.382,
+                '50': swingHigh - range * 0.5,
+                '61.8': swingHigh - range * 0.618,
+                '78.6': swingHigh - range * 0.786,
+                '100': swingLow                           // 100% (creux)
+            };
+        } else {
+            // Retracement depuis le low (tendance baissière)
+            levels = {
+                '0': swingLow,                            // 0% (creux)
+                '23.6': swingLow + range * 0.236,
+                '38.2': swingLow + range * 0.382,
+                '50': swingLow + range * 0.5,
+                '61.8': swingLow + range * 0.618,
+                '78.6': swingLow + range * 0.786,
+                '100': swingHigh                          // 100% (sommet)
+            };
+        }
+
+        // Trouve le niveau actuel et les supports/résistances les plus proches
+        const levelValues = Object.entries(levels).sort((a, b) => a[1] - b[1]);
+        let nearestSupport = null;
+        let nearestResistance = null;
+        let currentLevel = null;
+
+        for (let i = 0; i < levelValues.length; i++) {
+            const [name, value] = levelValues[i];
+            if (value < currentPrice) {
+                nearestSupport = { level: name, price: value };
+            } else if (value > currentPrice && !nearestResistance) {
+                nearestResistance = { level: name, price: value };
+            }
+            
+            // Vérifie si le prix est proche d'un niveau (±0.5%)
+            if (Math.abs(currentPrice - value) / currentPrice < 0.005) {
+                currentLevel = name;
+            }
+        }
+
+        // Calcul du retracement actuel en %
+        const retracement = isUptrend 
+            ? ((swingHigh - currentPrice) / range) * 100
+            : ((currentPrice - swingLow) / range) * 100;
+
+        return {
+            levels,
+            trend: isUptrend ? 'bullish' : 'bearish',
+            swingHigh,
+            swingLow,
+            currentLevel,
+            nearestSupport,
+            nearestResistance,
+            retracement: parseFloat(retracement.toFixed(2)),
+            isUptrend
+        };
+    }
+
+    /**
+     * Calcule les TP/SL basés sur Fibonacci
+     * @param {number} entryPrice - Prix d'entrée
+     * @param {string} direction - 'long' ou 'short'
+     * @param {Object} fibData - Données Fibonacci
+     * @returns {Object} TP et SL suggérés
+     */
+    calculateFibonacciTPSL(entryPrice, direction, fibData) {
+        if (!fibData || !fibData.levels) {
+            return { tp: null, sl: null, rrr: 0 };
+        }
+
+        const levels = fibData.levels;
+        let tp = null;
+        let sl = null;
+
+        if (direction === 'long') {
+            // LONG: SL sous le support, TP vers la résistance
+            if (fibData.nearestSupport) {
+                sl = fibData.nearestSupport.price * 0.998; // 0.2% sous le support
+            } else {
+                sl = entryPrice * 0.98; // Fallback 2%
+            }
+            
+            // TP au niveau 0% (sommet) ou extension
+            if (fibData.isUptrend) {
+                tp = levels['0']; // Retour au sommet
+            } else {
+                tp = levels['100']; // Extension vers le haut
+            }
+            
+            // Si le TP est trop proche, utilise l'extension 161.8%
+            if (tp && (tp - entryPrice) / entryPrice < 0.01) {
+                const range = fibData.swingHigh - fibData.swingLow;
+                tp = fibData.swingHigh + range * 0.618; // Extension 161.8%
+            }
+        } else {
+            // SHORT: SL au-dessus de la résistance, TP vers le support
+            if (fibData.nearestResistance) {
+                sl = fibData.nearestResistance.price * 1.002; // 0.2% au-dessus
+            } else {
+                sl = entryPrice * 1.02; // Fallback 2%
+            }
+            
+            // TP au niveau 100% (creux) ou extension
+            if (fibData.isUptrend) {
+                tp = levels['100']; // Vers le creux
+            } else {
+                tp = levels['0']; // Retour au creux
+            }
+            
+            // Si le TP est trop proche, utilise l'extension
+            if (tp && (entryPrice - tp) / entryPrice < 0.01) {
+                const range = fibData.swingHigh - fibData.swingLow;
+                tp = fibData.swingLow - range * 0.618; // Extension 161.8%
+            }
+        }
+
+        // Calcul du RRR
+        const risk = Math.abs(entryPrice - sl);
+        const reward = Math.abs(tp - entryPrice);
+        const rrr = risk > 0 ? reward / risk : 0;
+
+        return {
+            tp: tp ? parseFloat(tp.toFixed(6)) : null,
+            sl: sl ? parseFloat(sl.toFixed(6)) : null,
+            tpPercent: tp ? parseFloat(((Math.abs(tp - entryPrice) / entryPrice) * 100).toFixed(2)) : 0,
+            slPercent: sl ? parseFloat(((Math.abs(sl - entryPrice) / entryPrice) * 100).toFixed(2)) : 0,
+            rrr: parseFloat(rrr.toFixed(2))
+        };
+    }
+
+    /**
+     * Détecte le Kumo Twist (changement de couleur du nuage Ichimoku)
+     * @param {Object} ichimokuData - Données Ichimoku avec senkouA et senkouB
+     * @param {number} lookback - Nombre de périodes à analyser
+     * @returns {Object} Signal Kumo Twist
+     */
+    detectKumoTwist(ichimokuData, lookback = 5) {
+        if (!ichimokuData || !ichimokuData.senkouA || !ichimokuData.senkouB) {
+            return { twist: false, direction: 'neutral', strength: 0 };
+        }
+
+        const { senkouA, senkouB } = ichimokuData;
+        
+        // Couleur actuelle du nuage
+        const currentCloudBullish = senkouA > senkouB;
+        
+        // Vérifie s'il y a eu un twist récent (changement de couleur)
+        // On regarde si senkouA et senkouB se sont croisés récemment
+        // Pour cela, on compare les valeurs actuelles avec les valeurs passées
+        
+        let twist = false;
+        let direction = 'neutral';
+        let strength = 0;
+
+        // Distance entre les deux lignes (épaisseur du nuage)
+        const cloudThickness = Math.abs(senkouA - senkouB);
+        const avgPrice = (senkouA + senkouB) / 2;
+        const thicknessPercent = (cloudThickness / avgPrice) * 100;
+
+        // Si le nuage est très fin, un twist est probable
+        if (thicknessPercent < 0.3) {
+            twist = true;
+            direction = currentCloudBullish ? 'bullish' : 'bearish';
+            strength = 0.5;
+        }
+
+        // Force basée sur l'épaisseur du nuage après le twist
+        if (currentCloudBullish) {
+            direction = 'bullish';
+            strength = Math.min(1, thicknessPercent / 2);
+        } else {
+            direction = 'bearish';
+            strength = Math.min(1, thicknessPercent / 2);
+        }
+
+        return {
+            twist,
+            direction,
+            cloudColor: currentCloudBullish ? 'green' : 'red',
+            cloudThickness: parseFloat(thicknessPercent.toFixed(3)),
+            strength: parseFloat(strength.toFixed(3)),
+            senkouA,
+            senkouB
+        };
+    }
+
+    /**
+     * Analyse la confirmation Chikou Span
+     * Chikou au-dessus du prix passé = bullish, en-dessous = bearish
+     * @param {Array} candles - Bougies OHLCV
+     * @param {Object} ichimokuData - Données Ichimoku
+     * @param {number} displacement - Décalage Chikou (défaut: 26)
+     * @returns {Object} Signal Chikou
+     */
+    analyzeChikouConfirmation(candles, ichimokuData, displacement = 26) {
+        if (!candles || candles.length < displacement + 5 || !ichimokuData || !ichimokuData.chikou) {
+            return { 
+                confirmed: false, 
+                direction: 'neutral', 
+                strength: 0,
+                abovePrice: false,
+                aboveCloud: false
+            };
+        }
+
+        const chikou = ichimokuData.chikou;
+        const currentPrice = candles[candles.length - 1].close;
+        
+        // Prix il y a 26 périodes (où le Chikou est tracé)
+        const pastIndex = candles.length - 1 - displacement;
+        if (pastIndex < 0) {
+            return { confirmed: false, direction: 'neutral', strength: 0 };
+        }
+        
+        const pastCandle = candles[pastIndex];
+        const pastPrice = pastCandle.close;
+        const pastHigh = pastCandle.high;
+        const pastLow = pastCandle.low;
+
+        // Chikou est le prix actuel tracé 26 périodes en arrière
+        // On compare avec le prix passé
+        const abovePrice = currentPrice > pastPrice;
+        const belowPrice = currentPrice < pastPrice;
+        
+        // Distance par rapport au prix passé
+        const distance = ((currentPrice - pastPrice) / pastPrice) * 100;
+
+        let direction = 'neutral';
+        let strength = 0;
+        let confirmed = false;
+
+        if (abovePrice && currentPrice > pastHigh) {
+            // Chikou clairement au-dessus = confirmation haussière forte
+            direction = 'bullish';
+            strength = Math.min(1, Math.abs(distance) / 3);
+            confirmed = true;
+        } else if (belowPrice && currentPrice < pastLow) {
+            // Chikou clairement en-dessous = confirmation baissière forte
+            direction = 'bearish';
+            strength = Math.min(1, Math.abs(distance) / 3);
+            confirmed = true;
+        } else if (abovePrice) {
+            direction = 'bullish';
+            strength = Math.min(0.7, Math.abs(distance) / 3);
+            confirmed = Math.abs(distance) > 1;
+        } else if (belowPrice) {
+            direction = 'bearish';
+            strength = Math.min(0.7, Math.abs(distance) / 3);
+            confirmed = Math.abs(distance) > 1;
+        }
+
+        return {
+            confirmed,
+            direction,
+            strength: parseFloat(strength.toFixed(3)),
+            abovePrice,
+            distance: parseFloat(distance.toFixed(2)),
+            chikouValue: currentPrice,
+            pastPrice
         };
     }
 }

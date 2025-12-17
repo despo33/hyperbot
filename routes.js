@@ -799,11 +799,32 @@ router.delete('/profiles/:index', requireAuth, async (req, res) => {
     try {
         const index = parseInt(req.params.index);
         
+        const profileName = req.user.configProfiles[index]?.name;
+        
+        // Si c'est le dernier profil, on le supprime et on en crée un nouveau par défaut
         if (req.user.configProfiles.length <= 1) {
-            return res.status(400).json({ error: 'Impossible de supprimer le dernier profil' });
+            // Supprime le profil actuel
+            req.user.configProfiles = [];
+            req.user.activeProfileIndex = 0;
+            
+            // Crée un profil par défaut
+            req.user.addProfile({
+                name: 'Profil par défaut',
+                description: 'Profil créé automatiquement'
+            });
+            
+            await req.user.save();
+            
+            console.log(`[PROFILES] Dernier profil "${profileName}" supprimé, profil par défaut créé pour ${req.user.username}`);
+            
+            return res.json({ 
+                success: true, 
+                message: 'Profil supprimé, un nouveau profil par défaut a été créé',
+                activeProfileIndex: 0,
+                remainingProfiles: 1
+            });
         }
         
-        const profileName = req.user.configProfiles[index]?.name;
         const success = req.user.deleteProfile(index);
         
         if (!success) {
@@ -1611,20 +1632,26 @@ router.post('/backtest/run', requireAuth, async (req, res) => {
             useEMA200Filter: req.body.useEMA200Filter !== false,
             useMACDFilter: req.body.useMACDFilter !== false,
             useRSIFilter: req.body.useRSIFilter !== false,
+            // Filtres avancés
+            useSupertrendFilter: req.body.useSupertrendFilter !== false,
+            useStrictFilters: req.body.useStrictFilters !== false,
+            useChikouFilter: req.body.useChikouFilter !== false,
             minScore: req.body.minScore || 5,
             minConfluence: req.body.minConfluence || 3,
             minWinProbability: req.body.minWinProbability || 0.65,
             // Dates de période
             startDate: req.body.startDate || null,
             endDate: req.body.endDate || null,
-            // Modes TP/SL
+            // Modes TP/SL (percent, atr, ichimoku, fibonacci)
             tpslMode: req.body.tpslMode || 'percent',
             atrMultiplierSL: req.body.atrMultiplierSL || 1.5,
             atrMultiplierTP: req.body.atrMultiplierTP || 2.5,
             customTP: req.body.customTP || null,
             customSL: req.body.customSL || null,
-            // RRR minimum pour mode Ichimoku
-            minRRR: req.body.minRRR || 2
+            // RRR minimum pour tous les modes
+            minRRR: req.body.minRRR || 2,
+            // Stratégie de trading (ichimoku ou smc)
+            strategy: req.body.strategy || 'ichimoku'
         };
 
         const result = await backtester.run(config);

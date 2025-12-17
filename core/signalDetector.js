@@ -25,7 +25,11 @@ class SignalDetector {
             bollinger: true,      // Bollinger Bands
             volume: true,         // Volume analysis
             patterns: true,       // Pattern detection
-            multiTimeframe: true  // Multi-timeframe confirmation
+            multiTimeframe: true, // Multi-timeframe confirmation
+            // Indicateurs avancés ajoutés
+            supertrend: true,     // Supertrend (tendance)
+            fibonacci: true,      // Fibonacci Retracement
+            chikouAdvanced: true  // Chikou Span avancé
         };
 
         // Seuils de force minimum pour valider un signal
@@ -178,6 +182,36 @@ class SignalDetector {
         // Analyse des indicateurs avancés (RSI, MACD, StochRSI, EMA200, OBV, etc.)
         const advancedAnalysis = indicators.analyzeAll(candles, timeframe);
         
+        // ===== NOUVEAUX INDICATEURS AVANCÉS =====
+        // NOTE: Ces indicateurs sont utilisés comme FILTRES, pas comme signaux additionnels
+        // pour éviter le double comptage avec Ichimoku
+        // Ils sont déjà calculés dans advancedAnalysis (indicators.analyzeAll())
+        
+        // 5. Supertrend - Utilise les données de advancedAnalysis (déjà calculé)
+        const supertrendData = advancedAnalysis?.supertrend || null;
+        // NOTE: Le Supertrend est utilisé comme FILTRE dans tradeEngine.js et backtester.js
+
+        // 6. Fibonacci Retracement - Utilise les données de advancedAnalysis (déjà calculé)
+        const fibonacciData = advancedAnalysis?.fibonacci || null;
+        // NOTE: Fibonacci est utilisé pour les niveaux TP/SL dynamiques
+
+        // 7. Kumo Twist amélioré - Données supplémentaires (déjà compté dans Ichimoku)
+        let kumoTwistData = null;
+        if (this.enabledSignals.kumoTwist && ichimokuData?.current) {
+            kumoTwistData = indicators.detectKumoTwist(ichimokuData.current);
+            // NOTE: Kumo Twist est déjà détecté par ichimoku.detectKumoTwist() ci-dessus
+            // Cette version fournit des données supplémentaires (épaisseur, force)
+        }
+
+        // 8. Chikou Span avancé - Données supplémentaires (déjà compté dans chikouConfirmation)
+        let chikouAdvancedData = null;
+        if (this.enabledSignals.chikouAdvanced && ichimokuData?.current) {
+            const displacement = finalIchimokuParams.displacement || 26;
+            chikouAdvancedData = indicators.analyzeChikouConfirmation(candles, ichimokuData.current, displacement);
+            // NOTE: Chikou est déjà vérifié par ichimoku.checkChikouConfirmation()
+            // Cette version fournit des données supplémentaires (distance, force)
+        }
+
         // Confirmation du signal Ichimoku par les autres indicateurs
         let indicatorConfirmation = null;
         if (finalSignal && finalSignal.action) {
@@ -245,6 +279,11 @@ class SignalDetector {
                 // Divergences
                 obv: advancedAnalysis.obv,
                 rsiDivergence: advancedAnalysis.rsiDivergence,
+                // ===== NOUVEAUX INDICATEURS =====
+                supertrend: supertrendData,
+                fibonacci: fibonacciData,
+                kumoTwist: kumoTwistData,
+                chikouAdvanced: chikouAdvancedData,
                 // Scores et confluence
                 score: advancedAnalysis.score,
                 weightedScore: advancedAnalysis.weightedScore,
@@ -259,7 +298,7 @@ class SignalDetector {
                 bearishSignals: advancedAnalysis.bearishSignals
             } : null,
             indicatorConfirmation,
-            recommendation: this.generateRecommendation(finalSignal, ichimokuScore, levels, advancedAnalysis)
+            recommendation: this.generateRecommendation(finalSignal, ichimokuScore, levels, advancedAnalysis, supertrendData, fibonacciData)
         };
     }
 
@@ -380,9 +419,11 @@ class SignalDetector {
      * @param {Object} score 
      * @param {Object} levels 
      * @param {Object} advancedAnalysis - Analyse des indicateurs avancés
+     * @param {Object} supertrendData - Données Supertrend
+     * @param {Object} fibonacciData - Données Fibonacci
      * @returns {Object}
      */
-    generateRecommendation(finalSignal, score, levels, advancedAnalysis = null) {
+    generateRecommendation(finalSignal, score, levels, advancedAnalysis = null, supertrendData = null, fibonacciData = null) {
         if (!finalSignal || !finalSignal.action) {
             return {
                 action: 'WAIT',
@@ -395,14 +436,21 @@ class SignalDetector {
         }
 
         const { action, direction, confidence } = finalSignal;
+        const entryPrice = finalSignal.signals[0]?.price || levels.currentPrice;
 
         // Calcul des niveaux SL/TP basés sur les indicateurs techniques
         const technicalLevels = this.calculateTechnicalSLTP(
             direction, 
-            finalSignal.signals[0]?.price || levels.currentPrice,
+            entryPrice,
             levels, 
             advancedAnalysis
         );
+        
+        // Alternative: TP/SL basés sur Fibonacci si disponible
+        let fibonacciLevels = null;
+        if (fibonacciData && fibonacciData.levels) {
+            fibonacciLevels = indicators.calculateFibonacciTPSL(entryPrice, direction === 'bullish' ? 'long' : 'short', fibonacciData);
+        }
         
         const { suggestedSL, suggestedTP, slSource, tpSource } = technicalLevels;
 
@@ -474,6 +522,14 @@ class SignalDetector {
         const isTradeable = advancedAnalysis?.signalQuality?.tradeable || 
                           (advancedAnalysis?.confluence >= 3 && Math.abs(advancedAnalysis?.score || 0) >= 25);
 
+        // Bonus Supertrend: augmente la confiance si aligné
+        let supertrendBonus = false;
+        if (supertrendData && supertrendData.direction === direction) {
+            supertrendBonus = true;
+            if (signalQuality === 'C') signalQuality = 'B';
+            else if (signalQuality === 'B') signalQuality = 'A';
+        }
+
         return {
             action,
             direction,
@@ -485,6 +541,17 @@ class SignalDetector {
             suggestedTP,
             slSource,
             tpSource,
+            // Niveaux Fibonacci alternatifs
+            fibonacciLevels: fibonacciLevels ? {
+                tp: fibonacciLevels.tp,
+                sl: fibonacciLevels.sl,
+                tpPercent: fibonacciLevels.tpPercent,
+                slPercent: fibonacciLevels.slPercent,
+                rrr: fibonacciLevels.rrr
+            } : null,
+            // Supertrend
+            supertrendConfirmed: supertrendBonus,
+            supertrendDirection: supertrendData?.direction || null,
             scoreContext: {
                 ichimokuScore: score.score,
                 indicatorScore: advancedAnalysis?.score || 0,

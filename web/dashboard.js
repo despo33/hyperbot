@@ -1661,10 +1661,18 @@ async function saveTradingConfig() {
             useRSIFilter: document.getElementById('useRSIFilter')?.checked ?? true,
             rsiOverbought: parseInt(document.getElementById('rsiOverbought')?.value || 70),
             rsiOversold: parseInt(document.getElementById('rsiOversold')?.value || 30),
-            // Multi-Timeframe
-            multiTimeframeMode: document.getElementById('configMultiTimeframe')?.checked || false,
-            mtfTimeframes: Array.from(document.querySelectorAll('input[name="mtfTimeframes"]:checked')).map(cb => cb.value),
-            mtfMinConfirmation: parseInt(document.getElementById('mtfMinConfirmation')?.value || 2)
+            // Multi-Timeframe (nouveau)
+            useMTF: document.getElementById('useMTF')?.checked ?? true,
+            mtfPrimary: document.getElementById('mtfPrimary')?.value || '15m',
+            mtfHigher: document.getElementById('mtfHigher')?.value || '4h',
+            mtfConfirmations: parseInt(document.getElementById('mtfConfirmations')?.value || 2),
+            // Indicateurs avancés (nouveau)
+            useSupertrend: document.getElementById('useSupertrend')?.checked ?? true,
+            useFibonacci: document.getElementById('useFibonacci')?.checked ?? true,
+            useChikouAdvanced: document.getElementById('useChikouAdvanced')?.checked ?? true,
+            useKumoTwist: document.getElementById('useKumoTwist')?.checked ?? true,
+            // Stratégie de trading
+            strategy: document.getElementById('configStrategy')?.value || 'ichimoku'
         };
 
         await apiRequest('/config/trading', {
@@ -2071,9 +2079,9 @@ async function stopBot() {
 }
 
 /**
- * Ferme la position actuelle
+ * Ferme la position actuelle (version simple)
  */
-async function closePosition() {
+async function closeCurrentPosition() {
     if (!confirm('Voulez-vous vraiment fermer la position?')) return;
 
     try {
@@ -2719,6 +2727,16 @@ function initConfigControls() {
     // Sliders avec valeurs
     setupSlider('minScore', 'minScoreValue', '');
     setupSlider('minWinProbability', 'minWinProbabilityValue', '%');
+    setupSlider('mtfConfirmations', 'mtfConfirmationsValue', '');
+    
+    // Toggle MTF settings visibility
+    const useMTFCheckbox = document.getElementById('useMTF');
+    const mtfSettings = document.getElementById('mtfSettings');
+    if (useMTFCheckbox && mtfSettings) {
+        useMTFCheckbox.addEventListener('change', () => {
+            mtfSettings.style.display = useMTFCheckbox.checked ? 'block' : 'none';
+        });
+    }
     
     // TP/SL Mode selector (4 modes: auto, ichimoku_pure, atr, percent)
     document.querySelectorAll('input[name="tpslMode"]').forEach(radio => {
@@ -3702,11 +3720,9 @@ async function loadProfiles() {
                     <button class="btn btn-secondary btn-sm" onclick="duplicateProfile(${profile.index})">
                         <i data-lucide="copy"></i>
                     </button>
-                    ${data.profiles.length > 1 ? `
-                        <button class="btn btn-danger btn-sm" onclick="deleteProfile(${profile.index}, '${profile.name}')">
-                            <i data-lucide="trash-2"></i>
-                        </button>
-                    ` : ''}
+                    <button class="btn btn-danger btn-sm" onclick="deleteProfile(${profile.index}, '${profile.name.replace(/'/g, "\\'")}')">
+                        <i data-lucide="trash-2"></i>
+                    </button>
                 </div>
             </div>
         `).join('');
@@ -3910,14 +3926,49 @@ function initBacktestForm() {
         });
     }
     
-    // Initialise les dates par défaut (7 derniers jours)
-    const endDate = document.getElementById('btEndDate');
-    const startDate = document.getElementById('btStartDate');
-    if (endDate && startDate) {
+    // Initialise les dates par défaut selon le timeframe
+    const timeframeSelect = document.getElementById('btTimeframe');
+    const endDateInput = document.getElementById('btEndDate');
+    const startDateInput = document.getElementById('btStartDate');
+    
+    // Fonction pour calculer la période minimale selon le timeframe (min 250 bougies)
+    function updateDatesForTimeframe(timeframe) {
+        const minCandles = 250;
+        const timeframeMinutes = {
+            '1m': 1,
+            '5m': 5,
+            '15m': 15,
+            '30m': 30,
+            '1h': 60,
+            '4h': 240,
+            '1d': 1440
+        };
+        
+        const minutes = timeframeMinutes[timeframe] || 15;
+        const minPeriodMs = minCandles * minutes * 60 * 1000;
+        
         const today = new Date();
-        const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-        endDate.value = today.toISOString().split('T')[0];
-        startDate.value = weekAgo.toISOString().split('T')[0];
+        const minStartDate = new Date(today.getTime() - minPeriodMs);
+        
+        if (endDateInput) endDateInput.value = today.toISOString().split('T')[0];
+        if (startDateInput) startDateInput.value = minStartDate.toISOString().split('T')[0];
+        
+        // Met à jour le hint avec la période recommandée
+        const hint = document.getElementById('btDateHint');
+        if (hint) {
+            const days = Math.ceil(minPeriodMs / (24 * 60 * 60 * 1000));
+            hint.textContent = `Période minimum recommandée pour ${timeframe}: ${days} jours (${minCandles} bougies)`;
+        }
+    }
+    
+    // Initialise avec le timeframe par défaut
+    if (timeframeSelect && endDateInput && startDateInput) {
+        updateDatesForTimeframe(timeframeSelect.value);
+        
+        // Met à jour les dates quand le timeframe change
+        timeframeSelect.addEventListener('change', () => {
+            updateDatesForTimeframe(timeframeSelect.value);
+        });
     }
 }
 
@@ -3938,6 +3989,29 @@ async function runBacktest() {
     const endDateStr = document.getElementById('btEndDate')?.value;
     const startDate = startDateStr ? new Date(startDateStr).getTime() : null;
     const endDate = endDateStr ? new Date(endDateStr).getTime() : null;
+    const timeframe = document.getElementById('btTimeframe').value;
+    
+    // Validation: vérifie que la période est suffisante pour le timeframe
+    const timeframeMinutes = {
+        '1m': 1, '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240, '1d': 1440
+    };
+    const minCandles = 250;
+    const minutes = timeframeMinutes[timeframe] || 15;
+    const minPeriodMs = minCandles * minutes * 60 * 1000;
+    
+    if (startDate && endDate) {
+        const periodMs = endDate - startDate;
+        const estimatedCandles = Math.floor(periodMs / (minutes * 60 * 1000));
+        
+        if (estimatedCandles < minCandles) {
+            const minDays = Math.ceil(minPeriodMs / (24 * 60 * 60 * 1000));
+            showToast(`Période trop courte! Pour ${timeframe}, il faut au moins ${minDays} jours (~${minCandles} bougies). Vous avez ~${estimatedCandles} bougies.`, 'error');
+            return;
+        }
+    }
+    
+    // Récupère la stratégie sélectionnée
+    const strategy = document.getElementById('btStrategy')?.value || 'ichimoku';
     
     // Récupère les paramètres
     const config = {
@@ -3950,6 +4024,10 @@ async function runBacktest() {
         useEMA200Filter: document.getElementById('btEMA200').checked,
         useMACDFilter: document.getElementById('btMACD').checked,
         useRSIFilter: document.getElementById('btRSI').checked,
+        // Filtres avancés
+        useSupertrendFilter: document.getElementById('btSupertrend')?.checked ?? true,
+        useStrictFilters: document.getElementById('btStrictFilters')?.checked ?? true,
+        useChikouFilter: document.getElementById('btChikou')?.checked ?? true,
         // Dates
         startDate: startDate,
         endDate: endDate,
@@ -3960,7 +4038,9 @@ async function runBacktest() {
         customTP: tpslMode === 'percent' ? parseFloat(document.getElementById('btCustomTP')?.value || 3.0) : null,
         customSL: tpslMode === 'percent' ? parseFloat(document.getElementById('btCustomSL')?.value || 1.5) : null,
         // RRR minimum (pour tous les modes)
-        minRRR: parseFloat(document.getElementById('btMinRRR')?.value || 2)
+        minRRR: parseFloat(document.getElementById('btMinRRR')?.value || 2),
+        // Stratégie de trading
+        strategy: strategy
     };
     
     // UI loading
@@ -4122,4 +4202,17 @@ function displayBacktestResults(result) {
 document.addEventListener('DOMContentLoaded', () => {
     initBacktestForm();
 });
+
+// ==================== EXPOSE FUNCTIONS TO GLOBAL SCOPE ====================
+// Ces fonctions doivent être accessibles via onclick dans le HTML dynamique
+window.activateProfile = activateProfile;
+window.editProfile = editProfile;
+window.duplicateProfile = duplicateProfile;
+window.deleteProfile = deleteProfile;
+window.logout = logout;
+window.showPage = showPage;
+window.startBot = startBot;
+window.stopBot = stopBot;
+window.executeTrade = executeTrade;
+window.closePosition = closePosition;
 

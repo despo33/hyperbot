@@ -5,6 +5,7 @@
 
 import priceFetcher from './priceFetcher.js';
 import signalDetector from './signalDetector.js';
+import smcSignalDetector from './smcSignalDetector.js';
 import indicators from './indicators.js';
 import ichimoku from './ichimoku.js';
 import { TIMEFRAME_TPSL, TIMEFRAME_PRESETS } from './config.js';
@@ -49,7 +50,7 @@ class Backtester {
             minConfluence = 3,
             minWinProbability = 0.65,
             // ===== MODES TP/SL =====
-            tpslMode = 'percent',  // 'percent', 'atr', 'ichimoku'
+            tpslMode = 'percent',  // 'percent', 'atr', 'ichimoku', 'fibonacci'
             atrMultiplierSL = 1.5,
             atrMultiplierTP = 2.5,
             customTP = null,       // TP personnalisé en %
@@ -57,10 +58,13 @@ class Backtester {
             // ===== FILTRES AVANCÉS =====
             useStrictFilters = true,  // Active les filtres ADX, Volume, Bollinger
             useChikouFilter = true,   // Confirmation Chikou Ichimoku
+            useSupertrendFilter = true, // Filtre Supertrend (ne trade que dans le sens de la tendance)
             minADX = 20,              // ADX minimum pour confirmer tendance
             maxADX = 50,              // ADX maximum (évite fin de tendance)
             // ===== RRR MINIMUM =====
-            minRRR = 2                // RRR minimum pour mode Ichimoku
+            minRRR = 2,               // RRR minimum pour tous les modes
+            // ===== STRATÉGIE =====
+            strategy = 'ichimoku'     // 'ichimoku' ou 'smc' (Smart Money Concepts)
         } = config;
 
         if (this.isRunning) {
@@ -71,7 +75,7 @@ class Backtester {
         this.progress = 0;
 
         try {
-            console.log(`[BACKTEST] Démarrage: ${symbol} ${timeframe}`);
+            console.log(`[BACKTEST] Démarrage: ${symbol} ${timeframe} - Stratégie: ${strategy.toUpperCase()}`);
             
             // Récupère les données historiques (max disponible)
             let candles = await this.fetchHistoricalData(symbol, timeframe, 1000);
@@ -119,21 +123,26 @@ class Backtester {
                     const result = this.checkPositionExit(position, currentCandle);
                     
                     if (result.closed) {
-                        // Calcule le P&L avec le levier
-                        // pnlPercent = variation du prix × levier
+                        // Calcule le P&L
+                        // priceChange = variation du prix en décimal
                         const priceChange = position.direction === 'long'
                             ? (result.exitPrice - position.entryPrice) / position.entryPrice
                             : (position.entryPrice - result.exitPrice) / position.entryPrice;
                         
+                        // pnlPercent = variation du prix × levier (pour affichage)
                         const pnlPercent = priceChange * 100 * leverage;
                         
-                        // Taille de la position = capital × risque% / SL%
-                        // Cela garantit que si le SL est touché, on perd exactement riskPerTrade% du capital
+                        // Calcul du P&L basé sur le risque par trade
+                        // riskAmount = montant risqué par trade (ex: 2% de 1000$ = 20$)
+                        // Si SL touché, on perd exactement riskAmount
+                        // Si TP touché, on gagne riskAmount × RRR (ratio TP/SL)
                         const slPercent = position.slPercent || tpsl.sl;
-                        const positionSize = (capital * (riskPerTrade / 100)) / (slPercent / 100);
+                        const riskAmount = capital * (riskPerTrade / 100);
                         
-                        // P&L en $ = taille position × variation prix × levier
-                        const pnlAmount = positionSize * priceChange * leverage;
+                        // P&L = riskAmount × (variation réelle / SL prévu)
+                        // Exemple: SL = 1.5%, variation = -1.5% → P&L = -riskAmount
+                        // Exemple: SL = 1.5%, variation = +3% → P&L = +2 × riskAmount
+                        const pnlAmount = riskAmount * (priceChange * 100 / slPercent);
                         
                         capital += pnlAmount;
                         
@@ -166,8 +175,10 @@ class Backtester {
                         preset,
                         useStrictFilters,
                         useChikouFilter,
+                        useSupertrendFilter,
                         minADX,
-                        maxADX
+                        maxADX,
+                        strategy
                     });
 
                     if (signal.tradeable) {
@@ -175,20 +186,40 @@ class Backtester {
                         const direction = signal.direction;
                         
                         // Calcule TP/SL selon le mode choisi
-                        const tpslResult = this.calculateTPSL(
-                            currentPrice,
-                            direction,
-                            tpslMode,
-                            {
-                                defaultTP: customTP || tpsl.tp,
-                                defaultSL: customSL || tpsl.sl,
-                                atrMultiplierSL,
-                                atrMultiplierTP,
-                                atr: signal.atr,
-                                ichimokuLevels: signal.ichimokuLevels,
-                                minRRR: minRRR
+                        // Pour SMC, utilise les niveaux suggérés par la stratégie si disponibles
+                        let tpslResult;
+                        if (signal.strategy === 'smc' && signal.smcLevels && signal.smcLevels.stopLoss) {
+                            // Utilise les niveaux SMC (basés sur la structure du marché)
+                            tpslResult = {
+                                stopLoss: signal.smcLevels.stopLoss,
+                                takeProfit: signal.smcLevels.takeProfit,
+                                slPercent: signal.smcLevels.slPercent,
+                                tpPercent: signal.smcLevels.tpPercent,
+                                actualRRR: signal.smcLevels.tpPercent / signal.smcLevels.slPercent
+                            };
+                            
+                            // Vérifie le RRR minimum
+                            if (tpslResult.actualRRR < minRRR) {
+                                tpslResult = { rejected: true, reason: `RRR SMC insuffisant (${tpslResult.actualRRR.toFixed(2)})` };
                             }
-                        );
+                        } else {
+                            // Utilise le calcul standard pour Ichimoku
+                            tpslResult = this.calculateTPSL(
+                                currentPrice,
+                                direction,
+                                tpslMode,
+                                {
+                                    defaultTP: customTP || tpsl.tp,
+                                    defaultSL: customSL || tpsl.sl,
+                                    atrMultiplierSL,
+                                    atrMultiplierTP,
+                                    atr: signal.atr,
+                                    ichimokuLevels: signal.ichimokuLevels,
+                                    fibonacciData: signal.fibonacciData,
+                                    minRRR: minRRR
+                                }
+                            );
+                        }
                         
                         // Vérifie si le RRR est suffisant (surtout pour mode Ichimoku)
                         if (!tpslResult || tpslResult.rejected) {
@@ -230,8 +261,8 @@ class Backtester {
                 
                 const pnlPercent = priceChange * 100 * leverage;
                 const slPercent = position.slPercent || tpsl.sl;
-                const positionSize = (capital * (riskPerTrade / 100)) / (slPercent / 100);
-                const pnlAmount = positionSize * priceChange * leverage;
+                const riskAmount = capital * (riskPerTrade / 100);
+                const pnlAmount = riskAmount * (priceChange * 100 / slPercent);
                 
                 capital += pnlAmount;
                 
@@ -318,15 +349,53 @@ class Backtester {
             preset,
             useStrictFilters = true,
             useChikouFilter = true,
+            useSupertrendFilter = true,
             minADX = 20,
-            maxADX = 50
+            maxADX = 50,
+            strategy = 'ichimoku'
         } = config;
 
-        // Analyse avec signalDetector
+        const currentPrice = candles[candles.length - 1].close;
+
+        // ===== STRATÉGIE SMC (Smart Money Concepts) =====
+        if (strategy === 'smc') {
+            const smcAnalysis = smcSignalDetector.analyze(candles, {
+                minScore,
+                minConfluence,
+                useRSIFilter,
+                useMACDFilter,
+                useVolumeFilter: useStrictFilters,
+                useSessionFilter: true
+            }, timeframe);
+
+            if (!smcAnalysis || !smcAnalysis.tradeable) {
+                return { tradeable: false, strategy: 'smc' };
+            }
+
+            return {
+                tradeable: true,
+                strategy: 'smc',
+                direction: smcAnalysis.signal.direction,
+                score: smcAnalysis.smcScore.absScore,
+                confluence: smcAnalysis.confluence,
+                winProbability: smcAnalysis.winProbability,
+                atr: smcAnalysis.indicators?.atr?.value,
+                // Niveaux SMC pour TP/SL
+                smcLevels: {
+                    stopLoss: smcAnalysis.suggestedSL,
+                    takeProfit: smcAnalysis.suggestedTP,
+                    slPercent: smcAnalysis.suggestedSLPercent,
+                    tpPercent: smcAnalysis.suggestedTPPercent
+                },
+                smcData: smcAnalysis.smcData
+            };
+        }
+
+        // ===== STRATÉGIE ICHIMOKU (par défaut) =====
         const analysis = signalDetector.analyze(candles, {}, timeframe);
         
         if (!analysis || !analysis.ichimokuScore) {
-            return { tradeable: false };
+            return { tradeable: false, strategy: 'ichimoku' };
         }
 
         const ichimokuScore = analysis.ichimokuScore.score || 0;
@@ -334,10 +403,8 @@ class Backtester {
         const direction = ichimokuScore > 0 ? 'long' : ichimokuScore < 0 ? 'short' : null;
         
         if (!direction) {
-            return { tradeable: false };
+            return { tradeable: false, strategy: 'ichimoku' };
         }
-
-        const currentPrice = candles[candles.length - 1].close;
 
         // Indicateurs
         const rsi = analysis.indicators?.rsi?.value || 50;
@@ -468,6 +535,22 @@ class Backtester {
             }
         }
 
+        // ===== 6. FILTRE SUPERTREND - Ne trade que dans le sens de la tendance =====
+        const supertrend = analysis.indicators?.supertrend;
+        if (useSupertrendFilter && supertrend && supertrend.direction !== 'neutral') {
+            // LONG uniquement si Supertrend est bullish
+            if (direction === 'long' && supertrend.direction !== 'bullish') {
+                tradeable = false;
+            }
+            // SHORT uniquement si Supertrend est bearish
+            if (direction === 'short' && supertrend.direction !== 'bearish') {
+                tradeable = false;
+            }
+        }
+
+        // ===== 7. Calcul Fibonacci pour TP/SL dynamiques =====
+        const fibonacciData = analysis.indicators?.fibonacci || indicators.calculateFibonacci(candles, 50);
+
         // Récupère l'ATR et les niveaux Ichimoku pour les modes TP/SL
         const atr = analysis.indicators?.atr?.atr || 0;
         const ichimokuLevels = analysis.levels || null;
@@ -481,6 +564,8 @@ class Backtester {
             macd: macd.histogram,
             atr,
             ichimokuLevels,
+            fibonacciData,
+            supertrend,
             adxValue: adx?.value,
             volumeRatio: volume?.ratio
         };
@@ -502,12 +587,68 @@ class Backtester {
             atrMultiplierTP = 2.5,
             atr = 0,
             ichimokuLevels = null,
+            fibonacciData = null,
             minRRR = 2
         } = params;
 
         let stopLoss, takeProfit, slPercent, tpPercent;
 
         switch (mode) {
+            case 'fibonacci':
+                // Mode Fibonacci: TP/SL basés sur les niveaux de retracement
+                if (fibonacciData && fibonacciData.levels) {
+                    const levels = fibonacciData.levels;
+                    
+                    if (direction === 'long') {
+                        // LONG: SL sous le support Fibonacci, TP vers la résistance
+                        if (fibonacciData.nearestSupport) {
+                            stopLoss = fibonacciData.nearestSupport.price * 0.998;
+                        } else {
+                            stopLoss = price * (1 - defaultSL / 100);
+                        }
+                        
+                        // TP au niveau 0% (sommet) ou extension
+                        if (fibonacciData.isUptrend) {
+                            takeProfit = levels['0']; // Retour au sommet
+                        } else {
+                            takeProfit = levels['100']; // Extension vers le haut
+                        }
+                        
+                        // Si le TP est trop proche, utilise l'extension 161.8%
+                        if (takeProfit && (takeProfit - price) / price < 0.01) {
+                            const range = fibonacciData.swingHigh - fibonacciData.swingLow;
+                            takeProfit = fibonacciData.swingHigh + range * 0.618;
+                        }
+                    } else {
+                        // SHORT: SL au-dessus de la résistance Fibonacci, TP vers le support
+                        if (fibonacciData.nearestResistance) {
+                            stopLoss = fibonacciData.nearestResistance.price * 1.002;
+                        } else {
+                            stopLoss = price * (1 + defaultSL / 100);
+                        }
+                        
+                        // TP au niveau 100% (creux) ou extension
+                        if (fibonacciData.isUptrend) {
+                            takeProfit = levels['100']; // Vers le creux
+                        } else {
+                            takeProfit = levels['0']; // Retour au creux
+                        }
+                        
+                        // Si le TP est trop proche, utilise l'extension
+                        if (takeProfit && (price - takeProfit) / price < 0.01) {
+                            const range = fibonacciData.swingHigh - fibonacciData.swingLow;
+                            takeProfit = fibonacciData.swingLow - range * 0.618;
+                        }
+                    }
+                    
+                    slPercent = Math.abs((stopLoss - price) / price) * 100;
+                    tpPercent = Math.abs((takeProfit - price) / price) * 100;
+                } else {
+                    // Fallback sur pourcentage si Fibonacci non disponible
+                    return this.calculateTPSL(price, direction, 'percent', params);
+                }
+                break;
+
             case 'atr':
                 // Mode ATR: SL/TP basés sur la volatilité
                 if (atr > 0) {
