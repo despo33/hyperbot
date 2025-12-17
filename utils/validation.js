@@ -146,7 +146,14 @@ export const tradingConfigSchema = Joi.object({
         kumoBreakout: Joi.boolean(),
         kumoTwist: Joi.boolean(),
         kijunBounce: Joi.boolean()
-    })
+    }),
+    // Stratégie de trading
+    strategy: Joi.string()
+        .valid('ichimoku', 'smc'),
+    // Indicateurs avancés
+    useSupertrend: Joi.boolean(),
+    useFibonacci: Joi.boolean(),
+    useKumoTwist: Joi.boolean()
 }).unknown(false);
 
 // ===== PROFILS =====
