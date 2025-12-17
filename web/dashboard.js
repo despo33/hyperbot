@@ -27,8 +27,6 @@ function getAuthToken() {
     return localStorage.getItem('authToken');
 }
 
-// Note: authApiRequest supprimée - utiliser apiRequest à la place
-
 /**
  * Déconnexion
  */
@@ -3643,18 +3641,12 @@ function hideActiveConfigCard() {
  * Charge et affiche les profils de configuration
  */
 async function loadProfiles() {
-    console.log('[PROFILES] loadProfiles appelé');
     const container = document.getElementById('profilesContainer');
-    if (!container) {
-        console.log('[PROFILES] Container non trouvé');
-        return;
-    }
+    if (!container) return;
     
     try {
-        console.log('[PROFILES] Chargement des profils...');
         // Force le rechargement sans cache
         const data = await apiRequest('/profiles?t=' + Date.now());
-        console.log('[PROFILES] Données reçues:', data);
         
         if (!data.profiles || data.profiles.length === 0) {
             container.innerHTML = `
@@ -3791,22 +3783,12 @@ async function duplicateProfile(index) {
  * Supprime un profil
  */
 async function deleteProfile(index, name) {
-    console.log('[PROFILES] deleteProfile appelé:', index, name);
     if (!confirm(`Supprimer le profil "${name}" ?`)) return;
     
     try {
-        console.log('[PROFILES] Envoi requête DELETE /profiles/' + index);
-        const result = await apiRequest(`/profiles/${index}`, {
-            method: 'DELETE'
-        });
-        console.log('[PROFILES] Résultat suppression:', result);
-        
+        await apiRequest(`/profiles/${index}`, { method: 'DELETE' });
         showToast('Profil supprimé', 'success');
-        
-        // Attend un peu puis recharge les profils
-        console.log('[PROFILES] Rechargement des profils...');
         await loadProfiles();
-        console.log('[PROFILES] Profils rechargés');
     } catch (error) {
         console.error('[PROFILES] Erreur suppression:', error);
         showToast('Erreur: ' + error.message, 'error');

@@ -118,9 +118,9 @@ class TradeEngine {
         // Intervalle d'analyse
         this.analysisInterval = null;
 
-        // Logs en mémoire pour le dashboard
+        // Logs en mémoire pour le dashboard (limité pour éviter fuite mémoire)
         this.logs = [];
-        this.maxLogs = 500;
+        this.maxLogs = 200; // Réduit de 500 à 200 pour économiser la mémoire
 
         // Callbacks pour les événements
         this.eventCallbacks = {

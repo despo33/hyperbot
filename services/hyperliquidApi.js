@@ -19,9 +19,17 @@ const EXCHANGE_URL = `${API_URL}/exchange`;
 class HyperliquidApi {
     constructor() {
         this.auth = auth;
+        // Cache pour les métadonnées
         this.cachedMeta = null;
         this.lastMetaUpdate = 0;
         this.META_CACHE_DURATION = 60000; // 1 minute
+        // Cache pour les prix (évite les requêtes répétées)
+        this.cachedMids = null;
+        this.lastMidsUpdate = 0;
+        this.MIDS_CACHE_DURATION = 2000; // 2 secondes (prix changent vite)
+        // Cache pour les candles par symbole/timeframe
+        this.candleCache = new Map();
+        this.CANDLE_CACHE_DURATION = 5000; // 5 secondes
     }
 
     /**
@@ -280,11 +288,19 @@ class HyperliquidApi {
     }
 
     /**
-     * Récupère tous les prix mid des actifs
-     * @returns {Promise<Array>}
+     * Récupère tous les prix mid des actifs (avec cache)
+     * @returns {Promise<Object>}
      */
     async getAllMids() {
-        return await this.infoRequest({ type: 'allMids' });
+        // Cache pour éviter trop de requêtes
+        if (this.cachedMids && Date.now() - this.lastMidsUpdate < this.MIDS_CACHE_DURATION) {
+            return this.cachedMids;
+        }
+        
+        const data = await this.infoRequest({ type: 'allMids' });
+        this.cachedMids = data;
+        this.lastMidsUpdate = Date.now();
+        return data;
     }
 
     /**
@@ -304,7 +320,7 @@ class HyperliquidApi {
     }
 
     /**
-     * Récupère les données de candles (OHLCV)
+     * Récupère les données de candles (OHLCV) avec cache intelligent
      * @param {string} symbol - Ex: "BTC"
      * @param {string} interval - "1m", "5m", "15m", "1h", "4h", "1d"
      * @param {number} startTime - Timestamp début en ms
@@ -312,6 +328,16 @@ class HyperliquidApi {
      * @returns {Promise<Array>}
      */
     async getCandles(symbol, interval, startTime, endTime = Date.now()) {
+        // Cache key basée sur symbole + interval (pas startTime pour permettre le cache)
+        const cacheKey = `${symbol}_${interval}`;
+        const cached = this.candleCache.get(cacheKey);
+        
+        // Utilise le cache si récent (sauf si on demande des données historiques spécifiques)
+        const isRecentRequest = endTime >= Date.now() - 60000;
+        if (cached && isRecentRequest && Date.now() - cached.timestamp < this.CANDLE_CACHE_DURATION) {
+            return cached.data;
+        }
+        
         const response = await this.infoRequest({
             type: 'candleSnapshot',
             req: {
@@ -323,7 +349,7 @@ class HyperliquidApi {
         });
 
         // Formatage des candles
-        return response.map(candle => ({
+        const candles = response.map(candle => ({
             timestamp: candle.t,
             open: parseFloat(candle.o),
             high: parseFloat(candle.h),
@@ -331,6 +357,18 @@ class HyperliquidApi {
             close: parseFloat(candle.c),
             volume: parseFloat(candle.v)
         }));
+        
+        // Met en cache si requête récente
+        if (isRecentRequest) {
+            this.candleCache.set(cacheKey, { data: candles, timestamp: Date.now() });
+            // Nettoie le cache si trop grand (max 50 entrées)
+            if (this.candleCache.size > 50) {
+                const firstKey = this.candleCache.keys().next().value;
+                this.candleCache.delete(firstKey);
+            }
+        }
+        
+        return candles;
     }
 
     /**
