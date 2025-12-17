@@ -47,7 +47,13 @@ class Backtester {
             useRSIFilter = true,
             minScore = 5,
             minConfluence = 3,
-            minWinProbability = 0.65
+            minWinProbability = 0.65,
+            // ===== MODES TP/SL =====
+            tpslMode = 'percent',  // 'percent', 'atr', 'ichimoku'
+            atrMultiplierSL = 1.5,
+            atrMultiplierTP = 2.5,
+            customTP = null,       // TP personnalisé en %
+            customSL = null        // SL personnalisé en %
         } = config;
 
         if (this.isRunning) {
@@ -133,18 +139,30 @@ class Backtester {
                     if (signal.tradeable) {
                         // Ouvre une position
                         const direction = signal.direction;
-                        const stopLoss = direction === 'long'
-                            ? currentPrice * (1 - tpsl.sl / 100)
-                            : currentPrice * (1 + tpsl.sl / 100);
-                        const takeProfit = direction === 'long'
-                            ? currentPrice * (1 + tpsl.tp / 100)
-                            : currentPrice * (1 - tpsl.tp / 100);
+                        
+                        // Calcule TP/SL selon le mode choisi
+                        const { stopLoss, takeProfit, slPercent, tpPercent } = this.calculateTPSL(
+                            currentPrice,
+                            direction,
+                            tpslMode,
+                            {
+                                defaultTP: customTP || tpsl.tp,
+                                defaultSL: customSL || tpsl.sl,
+                                atrMultiplierSL,
+                                atrMultiplierTP,
+                                atr: signal.atr,
+                                ichimokuLevels: signal.ichimokuLevels
+                            }
+                        );
 
                         position = {
                             direction,
                             entryPrice: currentPrice,
                             stopLoss,
                             takeProfit,
+                            slPercent,
+                            tpPercent,
+                            tpslMode,
                             entryTime: currentCandle.timestamp,
                             score: signal.score,
                             confluence: signal.confluence
@@ -326,14 +344,112 @@ class Backtester {
             }
         }
 
+        // Récupère l'ATR et les niveaux Ichimoku pour les modes TP/SL
+        const atr = analysis.indicators?.atr?.atr || 0;
+        const ichimokuLevels = analysis.levels || null;
+
         return {
             tradeable,
             direction,
             score: ichimokuScore,
             confluence,
             rsi,
-            macd: macd.histogram
+            macd: macd.histogram,
+            atr,
+            ichimokuLevels
         };
+    }
+
+    /**
+     * Calcule les niveaux TP/SL selon le mode choisi
+     * @param {number} price - Prix d'entrée
+     * @param {string} direction - 'long' ou 'short'
+     * @param {string} mode - 'percent', 'atr', 'ichimoku'
+     * @param {Object} params - Paramètres supplémentaires
+     * @returns {Object} { stopLoss, takeProfit, slPercent, tpPercent }
+     */
+    calculateTPSL(price, direction, mode, params) {
+        const {
+            defaultTP = 2.0,
+            defaultSL = 1.0,
+            atrMultiplierSL = 1.5,
+            atrMultiplierTP = 2.5,
+            atr = 0,
+            ichimokuLevels = null
+        } = params;
+
+        let stopLoss, takeProfit, slPercent, tpPercent;
+
+        switch (mode) {
+            case 'atr':
+                // Mode ATR: SL/TP basés sur la volatilité
+                if (atr > 0) {
+                    const slDistance = atr * atrMultiplierSL;
+                    const tpDistance = atr * atrMultiplierTP;
+                    
+                    if (direction === 'long') {
+                        stopLoss = price - slDistance;
+                        takeProfit = price + tpDistance;
+                    } else {
+                        stopLoss = price + slDistance;
+                        takeProfit = price - tpDistance;
+                    }
+                    
+                    slPercent = (slDistance / price) * 100;
+                    tpPercent = (tpDistance / price) * 100;
+                } else {
+                    // Fallback sur pourcentage si ATR non disponible
+                    return this.calculateTPSL(price, direction, 'percent', params);
+                }
+                break;
+
+            case 'ichimoku':
+                // Mode Ichimoku: utilise les niveaux techniques
+                if (ichimokuLevels && ichimokuLevels.supports && ichimokuLevels.resistances) {
+                    const supports = ichimokuLevels.supports || [];
+                    const resistances = ichimokuLevels.resistances || [];
+                    
+                    if (direction === 'long') {
+                        // SL sous le support le plus proche, TP à la résistance
+                        const nearestSupport = supports.find(s => s.level < price);
+                        const nearestResistance = resistances.find(r => r.level > price);
+                        
+                        stopLoss = nearestSupport ? nearestSupport.level * 0.998 : price * (1 - defaultSL / 100);
+                        takeProfit = nearestResistance ? nearestResistance.level * 0.998 : price * (1 + defaultTP / 100);
+                    } else {
+                        // Short: SL au-dessus de la résistance, TP au support
+                        const nearestResistance = resistances.find(r => r.level > price);
+                        const nearestSupport = supports.find(s => s.level < price);
+                        
+                        stopLoss = nearestResistance ? nearestResistance.level * 1.002 : price * (1 + defaultSL / 100);
+                        takeProfit = nearestSupport ? nearestSupport.level * 1.002 : price * (1 - defaultTP / 100);
+                    }
+                    
+                    slPercent = Math.abs((stopLoss - price) / price) * 100;
+                    tpPercent = Math.abs((takeProfit - price) / price) * 100;
+                } else {
+                    // Fallback sur pourcentage si niveaux non disponibles
+                    return this.calculateTPSL(price, direction, 'percent', params);
+                }
+                break;
+
+            case 'percent':
+            default:
+                // Mode pourcentage fixe
+                slPercent = defaultSL;
+                tpPercent = defaultTP;
+                
+                if (direction === 'long') {
+                    stopLoss = price * (1 - defaultSL / 100);
+                    takeProfit = price * (1 + defaultTP / 100);
+                } else {
+                    stopLoss = price * (1 + defaultSL / 100);
+                    takeProfit = price * (1 - defaultTP / 100);
+                }
+                break;
+        }
+
+        return { stopLoss, takeProfit, slPercent, tpPercent };
     }
 
     /**

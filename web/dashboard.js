@@ -3884,6 +3884,27 @@ function initBacktestForm() {
         e.preventDefault();
         await runBacktest();
     });
+    
+    // Gère l'affichage des options selon le mode TP/SL
+    const tpslModeSelect = document.getElementById('btTPSLMode');
+    if (tpslModeSelect) {
+        tpslModeSelect.addEventListener('change', () => {
+            const mode = tpslModeSelect.value;
+            const atrGroup = document.getElementById('btATRGroup');
+            const percentGroup = document.getElementById('btPercentGroup');
+            
+            if (mode === 'atr') {
+                atrGroup.style.display = 'block';
+                percentGroup.style.display = 'none';
+            } else if (mode === 'ichimoku') {
+                atrGroup.style.display = 'none';
+                percentGroup.style.display = 'none';
+            } else {
+                atrGroup.style.display = 'none';
+                percentGroup.style.display = 'block';
+            }
+        });
+    }
 }
 
 /**
@@ -3895,6 +3916,9 @@ async function runBacktest() {
     const statsDiv = document.getElementById('backtestStats');
     const tradesBody = document.getElementById('backtestTradesBody');
     
+    // Récupère le mode TP/SL
+    const tpslMode = document.getElementById('btTPSLMode')?.value || 'percent';
+    
     // Récupère les paramètres
     const config = {
         symbol: document.getElementById('btSymbol').value,
@@ -3905,7 +3929,13 @@ async function runBacktest() {
         minScore: parseInt(document.getElementById('btMinScore').value),
         useEMA200Filter: document.getElementById('btEMA200').checked,
         useMACDFilter: document.getElementById('btMACD').checked,
-        useRSIFilter: document.getElementById('btRSI').checked
+        useRSIFilter: document.getElementById('btRSI').checked,
+        // Mode TP/SL
+        tpslMode: tpslMode,
+        atrMultiplierSL: parseFloat(document.getElementById('btATRSL')?.value || 1.5),
+        atrMultiplierTP: parseFloat(document.getElementById('btATRTP')?.value || 2.5),
+        customTP: tpslMode === 'percent' ? parseFloat(document.getElementById('btCustomTP')?.value || 2.5) : null,
+        customSL: tpslMode === 'percent' ? parseFloat(document.getElementById('btCustomSL')?.value || 1.5) : null
     };
     
     // UI loading

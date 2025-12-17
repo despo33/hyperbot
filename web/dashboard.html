@@ -1551,6 +1551,32 @@
                                     </div>
                                 </div>
                                 
+                                <h4 style="margin-top: 1rem; margin-bottom: 0.5rem;">Mode TP/SL</h4>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="btTPSLMode">Mode de calcul</label>
+                                        <select id="btTPSLMode" class="form-control">
+                                            <option value="percent">Pourcentage fixe</option>
+                                            <option value="atr">ATR (volatilité)</option>
+                                            <option value="ichimoku">Ichimoku (niveaux techniques)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group" id="btATRGroup" style="display: none;">
+                                        <label for="btATRMultiplier">Multiplicateur ATR</label>
+                                        <div class="form-row" style="gap: 0.5rem;">
+                                            <input type="number" id="btATRSL" value="1.5" min="0.5" max="5" step="0.1" class="form-control" placeholder="SL">
+                                            <input type="number" id="btATRTP" value="2.5" min="0.5" max="10" step="0.1" class="form-control" placeholder="TP">
+                                        </div>
+                                    </div>
+                                    <div class="form-group" id="btPercentGroup">
+                                        <label>TP / SL (%)</label>
+                                        <div class="form-row" style="gap: 0.5rem;">
+                                            <input type="number" id="btCustomTP" value="2.5" min="0.5" max="20" step="0.1" class="form-control" placeholder="TP%">
+                                            <input type="number" id="btCustomSL" value="1.5" min="0.2" max="10" step="0.1" class="form-control" placeholder="SL%">
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <h4 style="margin-top: 1rem; margin-bottom: 0.5rem;">Filtres</h4>
                                 <div class="checkbox-group">
                                     <label class="checkbox-label">

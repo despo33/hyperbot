@@ -1613,7 +1613,13 @@ router.post('/backtest/run', requireAuth, async (req, res) => {
             useRSIFilter: req.body.useRSIFilter !== false,
             minScore: req.body.minScore || 5,
             minConfluence: req.body.minConfluence || 3,
-            minWinProbability: req.body.minWinProbability || 0.65
+            minWinProbability: req.body.minWinProbability || 0.65,
+            // Modes TP/SL
+            tpslMode: req.body.tpslMode || 'percent',
+            atrMultiplierSL: req.body.atrMultiplierSL || 1.5,
+            atrMultiplierTP: req.body.atrMultiplierTP || 2.5,
+            customTP: req.body.customTP || null,
+            customSL: req.body.customSL || null
         };
 
         const result = await backtester.run(config);
