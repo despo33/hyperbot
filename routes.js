@@ -1632,19 +1632,26 @@ router.get('/scanner/cryptos', (req, res) => {
  */
 router.post('/backtest/run', requireAuth, async (req, res) => {
     try {
+        const strategy = req.body.strategy || 'ichimoku';
+        
         const config = {
             symbol: req.body.symbol || 'BTC',
             timeframe: req.body.timeframe || '15m',
             initialCapital: req.body.initialCapital || 1000,
             leverage: req.body.leverage || 5,
             riskPerTrade: req.body.riskPerTrade || 2,
+            // Filtres de base
             useEMA200Filter: req.body.useEMA200Filter !== false,
             useMACDFilter: req.body.useMACDFilter !== false,
             useRSIFilter: req.body.useRSIFilter !== false,
-            // Filtres avancés
+            // Filtres avancés Ichimoku
             useSupertrendFilter: req.body.useSupertrendFilter !== false,
             useStrictFilters: req.body.useStrictFilters !== false,
             useChikouFilter: req.body.useChikouFilter !== false,
+            // Filtres SMC
+            useVolumeFilter: req.body.useVolumeFilter !== false,
+            useSessionFilter: req.body.useSessionFilter !== false,
+            // Scores
             minScore: req.body.minScore || 5,
             minConfluence: req.body.minConfluence || 3,
             minWinProbability: req.body.minWinProbability || 0.65,
@@ -1660,8 +1667,10 @@ router.post('/backtest/run', requireAuth, async (req, res) => {
             // RRR minimum pour tous les modes
             minRRR: req.body.minRRR || 2,
             // Stratégie de trading (ichimoku ou smc)
-            strategy: req.body.strategy || 'ichimoku'
+            strategy: strategy
         };
+        
+        console.log(`[BACKTEST] Stratégie: ${strategy}, Filtres: EMA200=${config.useEMA200Filter}, MACD=${config.useMACDFilter}, RSI=${config.useRSIFilter}, Volume=${config.useVolumeFilter}, Session=${config.useSessionFilter}`);
 
         const result = await backtester.run(config);
         

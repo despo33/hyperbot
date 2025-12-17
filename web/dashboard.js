@@ -3941,6 +3941,48 @@ function initBacktestForm() {
         });
     }
     
+    // ===== GESTION DU CHANGEMENT DE STRATÉGIE =====
+    const strategySelect = document.getElementById('btStrategy');
+    if (strategySelect) {
+        strategySelect.addEventListener('change', () => {
+            const strategy = strategySelect.value;
+            const ichimokuFilters = document.getElementById('btIchimokuFilters');
+            const smcFilters = document.getElementById('btSMCFilters');
+            const tpslModeSelect = document.getElementById('btTPSLMode');
+            
+            if (strategy === 'smc') {
+                // Affiche les filtres SMC, cache les filtres Ichimoku
+                if (ichimokuFilters) ichimokuFilters.style.display = 'none';
+                if (smcFilters) smcFilters.style.display = 'block';
+                
+                // Pour SMC, le mode TP/SL est automatique (basé sur la structure)
+                // On peut désactiver l'option Ichimoku dans le select
+                if (tpslModeSelect) {
+                    const ichimokuOption = tpslModeSelect.querySelector('option[value="ichimoku"]');
+                    if (ichimokuOption) ichimokuOption.disabled = true;
+                    // Si Ichimoku était sélectionné, bascule sur percent
+                    if (tpslModeSelect.value === 'ichimoku') {
+                        tpslModeSelect.value = 'percent';
+                        tpslModeSelect.dispatchEvent(new Event('change'));
+                    }
+                }
+            } else {
+                // Affiche les filtres Ichimoku, cache les filtres SMC
+                if (ichimokuFilters) ichimokuFilters.style.display = 'block';
+                if (smcFilters) smcFilters.style.display = 'none';
+                
+                // Réactive l'option Ichimoku
+                if (tpslModeSelect) {
+                    const ichimokuOption = tpslModeSelect.querySelector('option[value="ichimoku"]');
+                    if (ichimokuOption) ichimokuOption.disabled = false;
+                }
+            }
+        });
+        
+        // Déclenche l'événement au chargement pour initialiser l'état
+        strategySelect.dispatchEvent(new Event('change'));
+    }
+    
     // Initialise les dates par défaut selon le timeframe
     const timeframeSelect = document.getElementById('btTimeframe');
     const endDateInput = document.getElementById('btEndDate');
@@ -4028,7 +4070,7 @@ async function runBacktest() {
     // Récupère la stratégie sélectionnée
     const strategy = document.getElementById('btStrategy')?.value || 'ichimoku';
     
-    // Récupère les paramètres
+    // Récupère les paramètres de base
     const config = {
         symbol: document.getElementById('btSymbol').value,
         timeframe: document.getElementById('btTimeframe').value,
@@ -4036,13 +4078,6 @@ async function runBacktest() {
         leverage: parseInt(document.getElementById('btLeverage').value),
         riskPerTrade: parseFloat(document.getElementById('btRisk').value),
         minScore: parseInt(document.getElementById('btMinScore').value),
-        useEMA200Filter: document.getElementById('btEMA200').checked,
-        useMACDFilter: document.getElementById('btMACD').checked,
-        useRSIFilter: document.getElementById('btRSI').checked,
-        // Filtres avancés
-        useSupertrendFilter: document.getElementById('btSupertrend')?.checked ?? true,
-        useStrictFilters: document.getElementById('btStrictFilters')?.checked ?? true,
-        useChikouFilter: document.getElementById('btChikou')?.checked ?? true,
         // Dates
         startDate: startDate,
         endDate: endDate,
@@ -4057,6 +4092,28 @@ async function runBacktest() {
         // Stratégie de trading
         strategy: strategy
     };
+    
+    // ===== FILTRES SELON LA STRATÉGIE =====
+    if (strategy === 'smc') {
+        // Filtres SMC
+        config.useRSIFilter = document.getElementById('btSMCRSI')?.checked ?? true;
+        config.useMACDFilter = document.getElementById('btSMCMACD')?.checked ?? true;
+        config.useVolumeFilter = document.getElementById('btSMCVolume')?.checked ?? true;
+        config.useSessionFilter = document.getElementById('btSMCSession')?.checked ?? true;
+        // Désactive les filtres Ichimoku pour SMC
+        config.useEMA200Filter = false;
+        config.useSupertrendFilter = false;
+        config.useStrictFilters = false;
+        config.useChikouFilter = false;
+    } else {
+        // Filtres Ichimoku
+        config.useEMA200Filter = document.getElementById('btEMA200')?.checked ?? true;
+        config.useMACDFilter = document.getElementById('btMACD')?.checked ?? true;
+        config.useRSIFilter = document.getElementById('btRSI')?.checked ?? true;
+        config.useSupertrendFilter = document.getElementById('btSupertrend')?.checked ?? true;
+        config.useStrictFilters = document.getElementById('btStrictFilters')?.checked ?? true;
+        config.useChikouFilter = document.getElementById('btChikou')?.checked ?? true;
+    }
     
     // UI loading
     btn.disabled = true;

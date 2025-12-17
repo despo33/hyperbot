@@ -55,12 +55,15 @@ class Backtester {
             atrMultiplierTP = 2.5,
             customTP = null,       // TP personnalisé en %
             customSL = null,       // SL personnalisé en %
-            // ===== FILTRES AVANCÉS =====
+            // ===== FILTRES AVANCÉS ICHIMOKU =====
             useStrictFilters = true,  // Active les filtres ADX, Volume, Bollinger
             useChikouFilter = true,   // Confirmation Chikou Ichimoku
             useSupertrendFilter = true, // Filtre Supertrend (ne trade que dans le sens de la tendance)
             minADX = 20,              // ADX minimum pour confirmer tendance
             maxADX = 50,              // ADX maximum (évite fin de tendance)
+            // ===== FILTRES SMC =====
+            useVolumeFilter = true,   // Filtre volume pour SMC
+            useSessionFilter = true,  // Filtre session London/NY pour SMC
             // ===== RRR MINIMUM =====
             minRRR = 2,               // RRR minimum pour tous les modes
             // ===== STRATÉGIE =====
@@ -178,6 +181,9 @@ class Backtester {
                         useSupertrendFilter,
                         minADX,
                         maxADX,
+                        // Filtres SMC
+                        useVolumeFilter,
+                        useSessionFilter,
                         strategy
                     });
 
@@ -352,6 +358,9 @@ class Backtester {
             useSupertrendFilter = true,
             minADX = 20,
             maxADX = 50,
+            // Filtres SMC
+            useVolumeFilter = true,
+            useSessionFilter = true,
             strategy = 'ichimoku'
         } = config;
 
@@ -364,8 +373,8 @@ class Backtester {
                 minConfluence,
                 useRSIFilter,
                 useMACDFilter,
-                useVolumeFilter: useStrictFilters,
-                useSessionFilter: true
+                useVolumeFilter,
+                useSessionFilter
             }, timeframe);
 
             if (!smcAnalysis || !smcAnalysis.tradeable) {
