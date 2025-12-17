@@ -499,47 +499,6 @@
                                         </select>
                                         <span class="form-hint" id="configStrategyHint">Ichimoku: Signaux TK Cross, Kumo, Chikou. SMC: Order Blocks, FVG, Break of Structure.</span>
                                     </div>
-                                    
-                                    <!-- Mode Multi-Timeframe -->
-                                    <div class="form-group" style="margin-top: 15px;">
-                                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                                            <input type="checkbox" id="configMultiTimeframe" style="width: 18px; height: 18px;">
-                                            <span><strong>Mode Multi-Timeframe</strong> - Analyse sur plusieurs TF simultanément</span>
-                                        </label>
-                                    </div>
-                                    <div id="mtfOptions" style="display: none; margin-top: 10px; padding: 12px; background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 8px;">
-                                        <label style="display: block; margin-bottom: 8px; color: var(--text-secondary);">Timeframes à analyser :</label>
-                                        <div style="display: flex; flex-wrap: wrap; gap: 15px;">
-                                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                                <input type="checkbox" name="mtfTimeframes" value="1m"> 1m
-                                            </label>
-                                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                                <input type="checkbox" name="mtfTimeframes" value="5m" checked> 5m
-                                            </label>
-                                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                                <input type="checkbox" name="mtfTimeframes" value="15m" checked> 15m
-                                            </label>
-                                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                                <input type="checkbox" name="mtfTimeframes" value="1h" checked> 1h
-                                            </label>
-                                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                                <input type="checkbox" name="mtfTimeframes" value="4h"> 4h
-                                            </label>
-                                        </div>
-                                        <div style="margin-top: 10px;">
-                                            <label for="mtfMinConfirmation" style="display: block; margin-bottom: 5px; color: var(--text-secondary);">Confirmation minimum :</label>
-                                            <select id="mtfMinConfirmation" style="padding: 8px; border-radius: 6px; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary);">
-                                                <option value="1">1 TF (très agressif - plus de trades)</option>
-                                                <option value="2" selected>2 TF en accord (équilibré)</option>
-                                                <option value="3">3 TF en accord (modéré)</option>
-                                                <option value="4">4 TF en accord (strict)</option>
-                                                <option value="5">5 TF en accord (très strict - moins de trades)</option>
-                                            </select>
-                                            <p class="form-hint" style="font-size: 0.75rem; margin-top: 5px; color: var(--text-muted);">
-                                                Plus la confirmation est élevée, moins il y aura de trades mais ils seront plus fiables.
-                                            </p>
-                                        </div>
-                                    </div>
                                 </div>
 
                                 <!-- Paramètres d'analyse -->

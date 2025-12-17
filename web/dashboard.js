@@ -1563,33 +1563,32 @@ async function loadTradingConfig() {
         const rsiOversoldEl = document.getElementById('rsiOversold');
         if (rsiOversoldEl) rsiOversoldEl.value = config.rsiOversold || 30;
         
-        // Multi-Timeframe
-        const mtfEl = document.getElementById('configMultiTimeframe');
-        const mtfOptionsEl = document.getElementById('mtfOptions');
+        // Multi-Timeframe (version moderne)
+        const mtfEl = document.getElementById('useMTF');
+        const mtfSettingsEl = document.getElementById('mtfSettings');
         if (mtfEl) {
             const isMultiTF = config.multiTimeframeMode || false;
             mtfEl.checked = isMultiTF;
-            if (mtfOptionsEl) mtfOptionsEl.style.display = isMultiTF ? 'block' : 'none';
-            
-            // Grise les timeframes uniques si MTF est activé
-            const tfRadios = document.querySelectorAll('input[name="configTimeframe"]');
-            const tfCards = document.querySelectorAll('.timeframe-card');
-            tfRadios.forEach(radio => radio.disabled = isMultiTF);
-            tfCards.forEach(card => {
-                card.style.opacity = isMultiTF ? '0.4' : '1';
-                card.style.pointerEvents = isMultiTF ? 'none' : 'auto';
-            });
+            if (mtfSettingsEl) mtfSettingsEl.style.opacity = isMultiTF ? '1' : '0.5';
         }
         
-        // MTF Timeframes
-        if (config.mtfTimeframes) {
-            document.querySelectorAll('input[name="mtfTimeframes"]').forEach(cb => {
-                cb.checked = config.mtfTimeframes.includes(cb.value);
-            });
+        // MTF Primary/Higher Timeframes
+        const mtfPrimaryEl = document.getElementById('mtfPrimary');
+        const mtfHigherEl = document.getElementById('mtfHigher');
+        if (mtfPrimaryEl && config.mtfTimeframes && config.mtfTimeframes[0]) {
+            mtfPrimaryEl.value = config.mtfTimeframes[0];
+        }
+        if (mtfHigherEl && config.mtfTimeframes && config.mtfTimeframes[1]) {
+            mtfHigherEl.value = config.mtfTimeframes[1];
         }
         
-        const mtfMinConfEl = document.getElementById('mtfMinConfirmation');
-        if (mtfMinConfEl) mtfMinConfEl.value = config.mtfMinConfirmation || 2;
+        // MTF Confirmations (slider)
+        const mtfConfEl = document.getElementById('mtfConfirmations');
+        const mtfConfValueEl = document.getElementById('mtfConfirmationsValue');
+        if (mtfConfEl) {
+            mtfConfEl.value = config.mtfMinConfirmation || 2;
+            if (mtfConfValueEl) mtfConfValueEl.textContent = config.mtfMinConfirmation || 2;
+        }
         
     } catch (error) {
         console.error('Erreur chargement config trading:', error);
@@ -2684,58 +2683,23 @@ function initConfigControls() {
         updateTPSLPreview(selectedTF.value);
     }
     
-    // Multi-Timeframe toggle
-    const mtfToggle = document.getElementById('configMultiTimeframe');
-    const mtfOptions = document.getElementById('mtfOptions');
-    if (mtfToggle && mtfOptions) {
-        mtfToggle.addEventListener('change', (e) => {
-            const isMultiTF = e.target.checked;
-            mtfOptions.style.display = isMultiTF ? 'block' : 'none';
-            
-            // Désactive/grise les boutons de timeframe unique quand MTF est activé
-            const tfRadios = document.querySelectorAll('input[name="configTimeframe"]');
-            const tfCards = document.querySelectorAll('.timeframe-card');
-            
-            tfRadios.forEach(radio => {
-                radio.disabled = isMultiTF;
-            });
-            
-            tfCards.forEach(card => {
-                if (isMultiTF) {
-                    card.style.opacity = '0.4';
-                    card.style.pointerEvents = 'none';
-                } else {
-                    card.style.opacity = '1';
-                    card.style.pointerEvents = 'auto';
-                }
-            });
-        });
-        
-        // Applique l'état initial au chargement
-        if (mtfToggle.checked) {
-            mtfOptions.style.display = 'block';
-            const tfRadios = document.querySelectorAll('input[name="configTimeframe"]');
-            const tfCards = document.querySelectorAll('.timeframe-card');
-            tfRadios.forEach(radio => radio.disabled = true);
-            tfCards.forEach(card => {
-                card.style.opacity = '0.4';
-                card.style.pointerEvents = 'none';
-            });
-        }
-    }
-    
     // Sliders avec valeurs
     setupSlider('minScore', 'minScoreValue', '');
     setupSlider('minWinProbability', 'minWinProbabilityValue', '%');
     setupSlider('mtfConfirmations', 'mtfConfirmationsValue', '');
     
-    // Toggle MTF settings visibility
+    // Toggle MTF settings visibility (version moderne)
     const useMTFCheckbox = document.getElementById('useMTF');
     const mtfSettings = document.getElementById('mtfSettings');
     if (useMTFCheckbox && mtfSettings) {
         useMTFCheckbox.addEventListener('change', () => {
-            mtfSettings.style.display = useMTFCheckbox.checked ? 'block' : 'none';
+            mtfSettings.style.opacity = useMTFCheckbox.checked ? '1' : '0.5';
+            mtfSettings.style.pointerEvents = useMTFCheckbox.checked ? 'auto' : 'none';
         });
+        
+        // État initial
+        mtfSettings.style.opacity = useMTFCheckbox.checked ? '1' : '0.5';
+        mtfSettings.style.pointerEvents = useMTFCheckbox.checked ? 'auto' : 'none';
     }
     
     // TP/SL Mode selector (4 modes: auto, ichimoku_pure, atr, percent)
@@ -3893,9 +3857,13 @@ function getConfigFromForm() {
         defaultTP: parseFloat(document.getElementById('defaultTP')?.value || 2),
         defaultSL: parseFloat(document.getElementById('defaultSL')?.value || 1),
         analysisInterval: parseInt(document.getElementById('analysisInterval')?.value || 30) * 1000,
-        multiTimeframeMode: document.getElementById('configMultiTimeframe')?.checked || false,
-        mtfTimeframes: Array.from(document.querySelectorAll('input[name="mtfTimeframes"]:checked')).map(cb => cb.value),
-        mtfMinConfirmation: parseInt(document.getElementById('mtfMinConfirmation')?.value || 2),
+        // Multi-Timeframe (version moderne)
+        multiTimeframeMode: document.getElementById('useMTF')?.checked || false,
+        mtfTimeframes: [
+            document.getElementById('mtfPrimary')?.value || '15m',
+            document.getElementById('mtfHigher')?.value || '4h'
+        ],
+        mtfMinConfirmation: parseInt(document.getElementById('mtfConfirmations')?.value || 2),
         useRSIFilter: document.getElementById('useRSIFilter')?.checked ?? true,
         rsiOverbought: parseInt(document.getElementById('rsiOverbought')?.value || 70),
         rsiOversold: parseInt(document.getElementById('rsiOversold')?.value || 30)
