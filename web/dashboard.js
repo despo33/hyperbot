@@ -3892,18 +3892,32 @@ function initBacktestForm() {
             const mode = tpslModeSelect.value;
             const atrGroup = document.getElementById('btATRGroup');
             const percentGroup = document.getElementById('btPercentGroup');
+            const ichimokuGroup = document.getElementById('btIchimokuGroup');
             
             if (mode === 'atr') {
                 atrGroup.style.display = 'block';
                 percentGroup.style.display = 'none';
+                ichimokuGroup.style.display = 'none';
             } else if (mode === 'ichimoku') {
                 atrGroup.style.display = 'none';
                 percentGroup.style.display = 'none';
+                ichimokuGroup.style.display = 'block';
             } else {
                 atrGroup.style.display = 'none';
                 percentGroup.style.display = 'block';
+                ichimokuGroup.style.display = 'none';
             }
         });
+    }
+    
+    // Initialise les dates par défaut (7 derniers jours)
+    const endDate = document.getElementById('btEndDate');
+    const startDate = document.getElementById('btStartDate');
+    if (endDate && startDate) {
+        const today = new Date();
+        const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+        endDate.value = today.toISOString().split('T')[0];
+        startDate.value = weekAgo.toISOString().split('T')[0];
     }
 }
 
@@ -3919,6 +3933,12 @@ async function runBacktest() {
     // Récupère le mode TP/SL
     const tpslMode = document.getElementById('btTPSLMode')?.value || 'percent';
     
+    // Récupère les dates
+    const startDateStr = document.getElementById('btStartDate')?.value;
+    const endDateStr = document.getElementById('btEndDate')?.value;
+    const startDate = startDateStr ? new Date(startDateStr).getTime() : null;
+    const endDate = endDateStr ? new Date(endDateStr).getTime() : null;
+    
     // Récupère les paramètres
     const config = {
         symbol: document.getElementById('btSymbol').value,
@@ -3930,12 +3950,17 @@ async function runBacktest() {
         useEMA200Filter: document.getElementById('btEMA200').checked,
         useMACDFilter: document.getElementById('btMACD').checked,
         useRSIFilter: document.getElementById('btRSI').checked,
+        // Dates
+        startDate: startDate,
+        endDate: endDate,
         // Mode TP/SL
         tpslMode: tpslMode,
         atrMultiplierSL: parseFloat(document.getElementById('btATRSL')?.value || 1.5),
         atrMultiplierTP: parseFloat(document.getElementById('btATRTP')?.value || 2.5),
-        customTP: tpslMode === 'percent' ? parseFloat(document.getElementById('btCustomTP')?.value || 2.5) : null,
-        customSL: tpslMode === 'percent' ? parseFloat(document.getElementById('btCustomSL')?.value || 1.5) : null
+        customTP: tpslMode === 'percent' ? parseFloat(document.getElementById('btCustomTP')?.value || 3.0) : null,
+        customSL: tpslMode === 'percent' ? parseFloat(document.getElementById('btCustomSL')?.value || 1.5) : null,
+        // RRR minimum pour mode Ichimoku
+        minRRR: tpslMode === 'ichimoku' ? parseFloat(document.getElementById('btMinRRR')?.value || 2) : null
     };
     
     // UI loading

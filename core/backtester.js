@@ -58,7 +58,9 @@ class Backtester {
             useStrictFilters = true,  // Active les filtres ADX, Volume, Bollinger
             useChikouFilter = true,   // Confirmation Chikou Ichimoku
             minADX = 20,              // ADX minimum pour confirmer tendance
-            maxADX = 50               // ADX maximum (évite fin de tendance)
+            maxADX = 50,              // ADX maximum (évite fin de tendance)
+            // ===== RRR MINIMUM =====
+            minRRR = 2                // RRR minimum pour mode Ichimoku
         } = config;
 
         if (this.isRunning) {
@@ -72,10 +74,24 @@ class Backtester {
             console.log(`[BACKTEST] Démarrage: ${symbol} ${timeframe}`);
             
             // Récupère les données historiques (max disponible)
-            const candles = await this.fetchHistoricalData(symbol, timeframe, 1000);
+            let candles = await this.fetchHistoricalData(symbol, timeframe, 1000);
             
             if (!candles || candles.length < 200) {
                 throw new Error(`Données insuffisantes: ${candles?.length || 0} candles (min: 200)`);
+            }
+
+            // Filtre par dates si spécifiées
+            if (startDate || endDate) {
+                candles = candles.filter(c => {
+                    const candleTime = c.timestamp || c.time;
+                    if (startDate && candleTime < startDate) return false;
+                    if (endDate && candleTime > endDate) return false;
+                    return true;
+                });
+                
+                if (candles.length < 200) {
+                    throw new Error(`Données insuffisantes pour la période: ${candles.length} candles (min: 200)`);
+                }
             }
 
             console.log(`[BACKTEST] ${candles.length} candles récupérées`);
@@ -159,7 +175,7 @@ class Backtester {
                         const direction = signal.direction;
                         
                         // Calcule TP/SL selon le mode choisi
-                        const { stopLoss, takeProfit, slPercent, tpPercent } = this.calculateTPSL(
+                        const tpslResult = this.calculateTPSL(
                             currentPrice,
                             direction,
                             tpslMode,
@@ -169,9 +185,17 @@ class Backtester {
                                 atrMultiplierSL,
                                 atrMultiplierTP,
                                 atr: signal.atr,
-                                ichimokuLevels: signal.ichimokuLevels
+                                ichimokuLevels: signal.ichimokuLevels,
+                                minRRR: minRRR
                             }
                         );
+                        
+                        // Vérifie si le RRR est suffisant (surtout pour mode Ichimoku)
+                        if (!tpslResult || tpslResult.rejected) {
+                            continue; // Skip ce trade si RRR insuffisant
+                        }
+                        
+                        const { stopLoss, takeProfit, slPercent, tpPercent } = tpslResult;
 
                         position = {
                             direction,
@@ -477,7 +501,8 @@ class Backtester {
             atrMultiplierSL = 1.5,
             atrMultiplierTP = 2.5,
             atr = 0,
-            ichimokuLevels = null
+            ichimokuLevels = null,
+            minRRR = 2
         } = params;
 
         let stopLoss, takeProfit, slPercent, tpPercent;
@@ -529,6 +554,13 @@ class Backtester {
                     
                     slPercent = Math.abs((stopLoss - price) / price) * 100;
                     tpPercent = Math.abs((takeProfit - price) / price) * 100;
+                    
+                    // Vérifie le RRR minimum pour le mode Ichimoku
+                    const actualRRR = tpPercent / slPercent;
+                    if (actualRRR < minRRR) {
+                        // RRR insuffisant, rejette ce trade
+                        return { rejected: true, reason: `RRR ${actualRRR.toFixed(2)} < ${minRRR}` };
+                    }
                 } else {
                     // Fallback sur pourcentage si niveaux non disponibles
                     return this.calculateTPSL(price, direction, 'percent', params);
