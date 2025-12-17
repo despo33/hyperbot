@@ -1940,8 +1940,8 @@ class TradeEngine {
                 // Niveaux SL/TP
                 stopLoss: sltp.stopLoss,
                 takeProfit: sltp.takeProfit,
-                slPercent: sltp.riskPercent?.toFixed(2) || tpslConfig.sl.toFixed(2),
-                tpPercent: sltp.rewardPercent?.toFixed(2) || tpslConfig.tp.toFixed(2),
+                slPercent: typeof sltp.riskPercent === 'number' ? sltp.riskPercent.toFixed(2) : (sltp.riskPercent || tpslConfig.sl.toFixed(2)),
+                tpPercent: typeof sltp.rewardPercent === 'number' ? sltp.rewardPercent.toFixed(2) : (sltp.rewardPercent || tpslConfig.tp.toFixed(2)),
                 riskRewardRatio: sltp.riskRewardRatio,
                 meetsMinRRR: sltp.meetsMinRRR,
                 
