@@ -798,6 +798,8 @@ router.post('/profiles/:index/activate', requireAuth, async (req, res) => {
 router.delete('/profiles/:index', requireAuth, async (req, res) => {
     try {
         const index = parseInt(req.params.index);
+        console.log(`[PROFILES] DELETE demandé pour index ${index} par ${req.user.username}`);
+        console.log(`[PROFILES] Nombre de profils avant: ${req.user.configProfiles.length}`);
         
         const profileName = req.user.configProfiles[index]?.name;
         

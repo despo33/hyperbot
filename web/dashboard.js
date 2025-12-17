@@ -3679,11 +3679,17 @@ function hideActiveConfigCard() {
  * Charge et affiche les profils de configuration
  */
 async function loadProfiles() {
+    console.log('[PROFILES] loadProfiles appelé');
     const container = document.getElementById('profilesContainer');
-    if (!container) return;
+    if (!container) {
+        console.log('[PROFILES] Container non trouvé');
+        return;
+    }
     
     try {
+        console.log('[PROFILES] Chargement des profils...');
         const data = await apiRequest('/profiles');
+        console.log('[PROFILES] Données reçues:', data);
         
         if (!data.profiles || data.profiles.length === 0) {
             container.innerHTML = `
@@ -3820,16 +3826,20 @@ async function duplicateProfile(index) {
  * Supprime un profil
  */
 async function deleteProfile(index, name) {
+    console.log('[PROFILES] deleteProfile appelé:', index, name);
     if (!confirm(`Supprimer le profil "${name}" ?`)) return;
     
     try {
-        await apiRequest(`/profiles/${index}`, {
+        console.log('[PROFILES] Envoi requête DELETE /profiles/' + index);
+        const result = await apiRequest(`/profiles/${index}`, {
             method: 'DELETE'
         });
+        console.log('[PROFILES] Résultat suppression:', result);
         
         showToast('Profil supprimé', 'success');
         loadProfiles();
     } catch (error) {
+        console.error('[PROFILES] Erreur suppression:', error);
         showToast('Erreur: ' + error.message, 'error');
     }
 }
@@ -4209,6 +4219,8 @@ window.activateProfile = activateProfile;
 window.editProfile = editProfile;
 window.duplicateProfile = duplicateProfile;
 window.deleteProfile = deleteProfile;
+window.createProfile = createProfile;
+window.loadProfiles = loadProfiles;
 window.logout = logout;
 window.showPage = showPage;
 window.startBot = startBot;
