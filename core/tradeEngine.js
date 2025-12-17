@@ -96,11 +96,15 @@ class TradeEngine {
         
         // ===== CONFIGURATION ANTI-OVERTRADING =====
         this.antiOvertradingConfig = {
-            symbolCooldownMs: 5 * 60 * 1000,  // 5 minutes entre trades sur même symbole
-            maxConsecutiveSameDirection: 5,   // Max 5 trades consécutifs dans la même direction
-            globalCooldownMs: 30 * 1000       // 30 secondes minimum entre tous les trades
+            symbolCooldownMs: 10 * 60 * 1000,  // 10 minutes entre trades sur même symbole (AUGMENTÉ)
+            maxConsecutiveSameDirection: 4,    // Max 4 trades consécutifs dans la même direction
+            globalCooldownMs: 2 * 60 * 1000,   // 2 minutes minimum entre tous les trades (AUGMENTÉ)
+            maxConsecutiveLosses: 3,           // NOUVEAU: arrête après 3 pertes consécutives
+            pauseAfterLossesMs: 30 * 60 * 1000 // NOUVEAU: pause 30 min après pertes consécutives
         };
         this.lastGlobalTradeTime = 0;
+        this.consecutiveLosses = 0;            // Compteur de pertes consécutives
+        this.pausedUntil = 0;                  // Timestamp jusqu'auquel le bot est en pause
 
         // Intervalle d'analyse
         this.analysisInterval = null;
@@ -466,6 +470,11 @@ class TradeEngine {
         // Démarre le Position Manager (surveillance des fermetures)
         positionManager.start();
         
+        // Configure le callback pour gérer les pertes consécutives
+        positionManager.setOnPositionClosed((symbol, pnl, exitReason) => {
+            this.handlePositionClosed(symbol, pnl, exitReason);
+        });
+        
         // Configure le Connection Manager
         connectionManager.setCallbacks({
             apiHealthCheck: () => api.getAccountBalance(auth.getBalanceAddress()),
@@ -645,28 +654,69 @@ class TradeEngine {
         if (analysis.indicators?.vwap?.signal) confluence++;
         if (analysis.indicators?.cvd?.signal) confluence++;
         
+        // ===== FILTRE TENDANCE EMA200 (CRITIQUE) =====
+        // Ne pas trader contre la tendance de fond
+        const ema200 = analysis.indicators?.ema200;
+        let trendOK = true;
+        let trendDirection = 'neutral';
+        
+        if (ema200 && ema200.value) {
+            const priceAboveEMA = currentPrice > ema200.value;
+            const priceBelowEMA = currentPrice < ema200.value;
+            const emaDistance = Math.abs((currentPrice - ema200.value) / ema200.value * 100);
+            
+            // Détermine la tendance
+            if (priceAboveEMA && emaDistance > 0.5) {
+                trendDirection = 'bullish';
+            } else if (priceBelowEMA && emaDistance > 0.5) {
+                trendDirection = 'bearish';
+            }
+            
+            // RÈGLE STRICTE: Ne pas LONG sous EMA200, ne pas SHORT au-dessus
+            if (signalDirection === 'long' && priceBelowEMA && emaDistance > 1.0) {
+                trendOK = false; // Interdit LONG si prix significativement sous EMA200
+            } else if (signalDirection === 'short' && priceAboveEMA && emaDistance > 1.0) {
+                trendOK = false; // Interdit SHORT si prix significativement au-dessus EMA200
+            }
+        }
+        
+        // ===== FILTRE MACD TENDANCE =====
+        let macdTrendOK = true;
+        if (macd && macd.histogram !== undefined) {
+            // MACD doit confirmer la direction
+            if (signalDirection === 'long' && macd.histogram < -0.5) {
+                macdTrendOK = false; // MACD très négatif = pas de LONG
+            } else if (signalDirection === 'short' && macd.histogram > 0.5) {
+                macdTrendOK = false; // MACD très positif = pas de SHORT
+            }
+        }
+        
         // Vérifie les filtres avec les presets du timeframe
         const hasStrongScore = absIchimokuScore >= preset.minScore;
         const hasMinConfluence = confluence >= preset.minConfluence;
         
-        // Filtre RSI selon le preset
+        // Filtre RSI selon le preset - RENFORCÉ
         let rsiOK = true;
         if (signalDirection === 'long') {
-            rsiOK = rsi <= preset.rsiLongMax;
+            rsiOK = rsi <= preset.rsiLongMax && rsi > 25; // Pas de LONG si RSI trop bas (survente extrême)
         } else if (signalDirection === 'short') {
-            rsiOK = rsi >= preset.rsiShortMin;
+            rsiOK = rsi >= preset.rsiShortMin && rsi < 75; // Pas de SHORT si RSI trop haut
         }
         
-        // Filtre ADX
+        // Filtre ADX - RENFORCÉ
         const adxValue = adx.value || 0;
-        const adxOK = adxValue === 0 || adxValue >= preset.adxMin; // 0 = calcul échoué, on ignore
+        const adxOK = adxValue === 0 || adxValue >= preset.adxMin;
+        
+        // ===== FILTRE QUALITÉ SIGNAL MINIMUM =====
+        // Exige un grade minimum de C pour trader
+        const minGradeRequired = 'C';
         
         // Calcul probabilité de gain
         const winProbability = this.calculateWinProbability(analysis, confluence, 0);
         const meetsWinProb = winProbability >= preset.minWinProbability;
         
-        // Signal tradeable ?
-        const tradeable = signalDirection && hasStrongScore && hasMinConfluence && rsiOK && adxOK && meetsWinProb;
+        // Signal tradeable ? - FILTRES RENFORCÉS
+        const tradeable = signalDirection && hasStrongScore && hasMinConfluence && rsiOK && adxOK && meetsWinProb && trendOK && macdTrendOK;
         
         // Qualité du signal
         let signalQuality = { score: 0, grade: 'D' };
@@ -707,15 +757,19 @@ class TradeEngine {
             preset: preset.name,
             tpsl: { tp: tpsl.tp, sl: tpsl.sl },
             minRRR: preset.minRRR,
-            rejectReason: !tradeable ? this.getRejectReason(signalDirection, hasStrongScore, hasMinConfluence, rsiOK, adxOK, meetsWinProb, preset) : null
+            trendFilter: { ok: trendOK, direction: trendDirection, ema200: ema200?.value },
+            macdTrendFilter: { ok: macdTrendOK, histogram: macd?.histogram },
+            rejectReason: !tradeable ? this.getRejectReason(signalDirection, hasStrongScore, hasMinConfluence, rsiOK, adxOK, meetsWinProb, preset, trendOK, macdTrendOK) : null
         };
     }
     
     /**
      * Retourne la raison du rejet
      */
-    getRejectReason(direction, hasScore, hasConf, rsiOK, adxOK, winProbOK, preset) {
+    getRejectReason(direction, hasScore, hasConf, rsiOK, adxOK, winProbOK, preset, trendOK = true, macdTrendOK = true) {
         if (!direction) return 'Pas de signal directionnel';
+        if (!trendOK) return 'Contre-tendance EMA200 (BLOQUÉ)';
+        if (!macdTrendOK) return 'MACD contre le signal (BLOQUÉ)';
         if (!hasScore) return `Score insuffisant (min: ${preset.minScore})`;
         if (!hasConf) return `Confluence insuffisante (min: ${preset.minConfluence})`;
         if (!rsiOK) return 'RSI hors limites';
@@ -1271,6 +1325,14 @@ class TradeEngine {
         // VERROU GLOBAL: Empêche les traitements simultanés
         if (this.state.isProcessingTrades) {
             this.log(`Traitement en cours, skip...`, 'info');
+            return;
+        }
+        
+        // ===== PROTECTION PERTES CONSÉCUTIVES =====
+        // Vérifie si le bot est en pause après trop de pertes
+        if (this.pausedUntil > Date.now()) {
+            const remainingMin = Math.ceil((this.pausedUntil - Date.now()) / 60000);
+            this.log(`⏸️ Bot en pause (${this.consecutiveLosses} pertes consécutives). Reprise dans ${remainingMin} min`, 'warn');
             return;
         }
         
@@ -2066,6 +2128,46 @@ class TradeEngine {
             this.log(`Erreur fermeture position: ${error.message}`, 'error');
             throw error;
         }
+    }
+
+    /**
+     * Gère la fermeture d'une position (appelé par positionManager)
+     * Met à jour le compteur de pertes consécutives et déclenche la pause si nécessaire
+     * @param {string} symbol 
+     * @param {number} pnl 
+     * @param {string} exitReason 
+     */
+    handlePositionClosed(symbol, pnl, exitReason) {
+        this.log(`📊 Position ${symbol} fermée: ${exitReason} | P&L: $${pnl.toFixed(2)}`, pnl > 0 ? 'success' : 'warn');
+        
+        // Enregistre dans le risk manager
+        riskManager.recordTrade({
+            pnl,
+            isWin: pnl > 0
+        });
+        
+        // Gestion des pertes consécutives
+        if (pnl < 0) {
+            this.consecutiveLosses++;
+            this.log(`⚠️ Perte #${this.consecutiveLosses} consécutive`, 'warn');
+            
+            // Vérifie si on doit mettre en pause
+            if (this.consecutiveLosses >= this.antiOvertradingConfig.maxConsecutiveLosses) {
+                this.pausedUntil = Date.now() + this.antiOvertradingConfig.pauseAfterLossesMs;
+                const pauseMinutes = this.antiOvertradingConfig.pauseAfterLossesMs / 60000;
+                this.log(`🛑 PAUSE AUTOMATIQUE: ${this.consecutiveLosses} pertes consécutives. Reprise dans ${pauseMinutes} minutes.`, 'error');
+            }
+        } else {
+            // Réinitialise le compteur après un gain
+            if (this.consecutiveLosses > 0) {
+                this.log(`✅ Série de pertes interrompue après ${this.consecutiveLosses} pertes`, 'success');
+            }
+            this.consecutiveLosses = 0;
+            this.pausedUntil = 0;
+        }
+        
+        // Supprime la position de notre état interne
+        this.state.activePositions.delete(symbol);
     }
 
     /**

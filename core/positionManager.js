@@ -23,7 +23,18 @@ class PositionManager {
         this.intervalId = null;
         this.storagePath = path.join(__dirname, '../storage/positions.json');
         
+        // Callback pour notifier les fermetures de positions
+        this.onPositionClosed = null;
+        
         this.loadState();
+    }
+    
+    /**
+     * Définit le callback pour les fermetures de positions
+     * @param {Function} callback - (symbol, pnl, exitReason) => void
+     */
+    setOnPositionClosed(callback) {
+        this.onPositionClosed = callback;
     }
 
     /**
@@ -106,7 +117,42 @@ class PositionManager {
                 // Vérifie si la position existe encore (fermée par TP/SL)
                 const livePosition = positionMap.get(symbol);
                 if (!livePosition || parseFloat(livePosition.szi) === 0) {
-                    console.log(`[POSITION] ✅ Position ${symbol} fermée (TP/SL atteint)`);
+                    // Calcule le P&L approximatif
+                    let pnl = 0;
+                    let exitReason = 'unknown';
+                    
+                    if (tracked.entryPrice && tracked.size) {
+                        // Récupère le prix actuel pour estimer le P&L
+                        try {
+                            const currentPrice = livePosition?.markPx || tracked.entryPrice;
+                            if (tracked.side === 'long') {
+                                pnl = (currentPrice - tracked.entryPrice) * tracked.size;
+                            } else {
+                                pnl = (tracked.entryPrice - currentPrice) * tracked.size;
+                            }
+                            
+                            // Détermine si c'était un TP ou SL
+                            if (pnl > 0) {
+                                exitReason = 'tp_hit';
+                            } else {
+                                exitReason = 'sl_hit';
+                            }
+                        } catch (e) {
+                            console.error(`[POSITION] Erreur calcul P&L ${symbol}:`, e.message);
+                        }
+                    }
+                    
+                    console.log(`[POSITION] ✅ Position ${symbol} fermée (${exitReason}) | P&L: $${pnl.toFixed(2)}`);
+                    
+                    // Notifie le callback si défini
+                    if (this.onPositionClosed) {
+                        try {
+                            this.onPositionClosed(symbol, pnl, exitReason);
+                        } catch (e) {
+                            console.error('[POSITION] Erreur callback onPositionClosed:', e.message);
+                        }
+                    }
+                    
                     this.untrackPosition(symbol);
                 }
             }

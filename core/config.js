@@ -5,14 +5,15 @@
 
 // ===== TP/SL PAR TIMEFRAME =====
 // Pourcentages de Take Profit et Stop Loss optimisés par timeframe
+// AJUSTÉ: SL plus large pour éviter les stops prématurés
 export const TIMEFRAME_TPSL = {
-    '1m': { tp: 0.5, sl: 0.25 },
-    '5m': { tp: 1.0, sl: 0.5 },
-    '15m': { tp: 2.0, sl: 1.0 },
-    '30m': { tp: 3.0, sl: 1.5 },
-    '1h': { tp: 4.0, sl: 2.0 },
-    '4h': { tp: 6.0, sl: 3.0 },
-    '1d': { tp: 10.0, sl: 5.0 }
+    '1m': { tp: 0.6, sl: 0.35 },   // SL augmenté
+    '5m': { tp: 1.5, sl: 0.8 },    // SL augmenté de 0.5 à 0.8
+    '15m': { tp: 2.5, sl: 1.5 },   // SL augmenté de 1.0 à 1.5
+    '30m': { tp: 3.5, sl: 2.0 },   // SL augmenté
+    '1h': { tp: 5.0, sl: 2.5 },    // SL augmenté
+    '4h': { tp: 7.0, sl: 3.5 },    // SL augmenté
+    '1d': { tp: 12.0, sl: 6.0 }    // SL augmenté
 };
 
 // ===== PRESETS DE FILTRES PAR TIMEFRAME =====
@@ -31,25 +32,25 @@ export const TIMEFRAME_PRESETS = {
     },
     '5m': {
         name: 'Scalping',
-        minScore: 4,
-        minWinProbability: 0.60,
-        minConfluence: 2,
-        rsiLongMax: 72,
-        rsiShortMin: 28,
-        adxMin: 12,
-        minRRR: 0.8,
-        analysisInterval: 60000
+        minScore: 5,              // AUGMENTÉ: était 4
+        minWinProbability: 0.65,  // AUGMENTÉ: était 0.60
+        minConfluence: 3,         // AUGMENTÉ: était 2
+        rsiLongMax: 68,           // RÉDUIT: était 72
+        rsiShortMin: 32,          // AUGMENTÉ: était 28
+        adxMin: 15,               // AUGMENTÉ: était 12
+        minRRR: 1.2,              // AUGMENTÉ: était 0.8
+        analysisInterval: 90000   // AUGMENTÉ: 1.5 min au lieu de 1
     },
     '15m': {
         name: 'Intraday Court',
-        minScore: 5,
-        minWinProbability: 0.62,
-        minConfluence: 3,
-        rsiLongMax: 70,
-        rsiShortMin: 30,
-        adxMin: 15,
-        minRRR: 1.0,
-        analysisInterval: 120000
+        minScore: 6,              // AUGMENTÉ: était 5
+        minWinProbability: 0.68,  // AUGMENTÉ: était 0.62
+        minConfluence: 4,         // AUGMENTÉ: était 3
+        rsiLongMax: 65,           // RÉDUIT: était 70
+        rsiShortMin: 35,          // AUGMENTÉ: était 30
+        adxMin: 18,               // AUGMENTÉ: était 15
+        minRRR: 1.5,              // AUGMENTÉ: était 1.0
+        analysisInterval: 180000  // AUGMENTÉ: 3 min au lieu de 2
     },
     '30m': {
         name: 'Intraday',
@@ -130,11 +131,14 @@ export const DEFAULT_BOT_CONFIG = {
 };
 
 // ===== ANTI-OVERTRADING =====
+// RENFORCÉ pour éviter les séries de pertes
 export const ANTI_OVERTRADING_CONFIG = {
-    symbolCooldownMs: 300000,      // 5 minutes entre trades sur même symbole
-    globalCooldownMs: 60000,       // 1 minute entre tous les trades
-    maxTradesPerHour: 10,
-    maxTradesPerDay: 50
+    symbolCooldownMs: 600000,      // 10 minutes entre trades sur même symbole (était 5)
+    globalCooldownMs: 120000,      // 2 minutes entre tous les trades (était 1)
+    maxTradesPerHour: 5,           // RÉDUIT: était 10
+    maxTradesPerDay: 20,           // RÉDUIT: était 50
+    maxConsecutiveLosses: 3,       // NOUVEAU: arrête après 3 pertes consécutives
+    pauseAfterLossesMs: 1800000    // NOUVEAU: pause 30 min après maxConsecutiveLosses
 };
 
 // ===== LISTE DES CRYPTOS SUPPORTÉES =====
