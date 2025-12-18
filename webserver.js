@@ -353,6 +353,7 @@ export function createWebServer(port = 3000) {
 
     // Abonne aux événements du BotManager (multi-utilisateurs)
     botManager.on('onLog', (log) => {
+        console.log('[WS] Broadcasting log:', log.message?.substring(0, 50));
         broadcast('log', log, 'logs');
     });
 
