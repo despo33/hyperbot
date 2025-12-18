@@ -4208,7 +4208,25 @@ async function runBacktest() {
  * Affiche les résultats du backtest
  */
 function displayBacktestResults(result) {
-    const { stats, trades, config, period } = result;
+    const { trades, config, period } = result;
+    
+    // Valeurs par défaut pour éviter "undefined"
+    const stats = {
+        totalPnL: result.stats?.totalPnL ?? 0,
+        totalReturn: result.stats?.totalReturn ?? 0,
+        winRate: result.stats?.winRate ?? 0,
+        totalTrades: result.stats?.totalTrades ?? 0,
+        wins: result.stats?.wins ?? 0,
+        losses: result.stats?.losses ?? 0,
+        profitFactor: result.stats?.profitFactor ?? 0,
+        maxDrawdown: result.stats?.maxDrawdown ?? 0,
+        avgWin: result.stats?.avgWin ?? 0,
+        avgLoss: result.stats?.avgLoss ?? 0,
+        longTrades: result.stats?.longTrades ?? 0,
+        shortTrades: result.stats?.shortTrades ?? 0,
+        longWinRate: result.stats?.longWinRate ?? 0,
+        shortWinRate: result.stats?.shortWinRate ?? 0
+    };
     
     // Résumé principal
     const resultsDiv = document.getElementById('backtestResults');
