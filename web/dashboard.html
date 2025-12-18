@@ -496,6 +496,7 @@
                                         <select id="configStrategy" class="form-control" style="margin-top: 5px;">
                                             <option value="ichimoku">🔮 Ichimoku Kinko Hyo (Classique)</option>
                                             <option value="smc">💎 Smart Money Concepts (SMC)</option>
+                                            <option value="bollinger">📊 Bollinger Squeeze (Breakout)</option>
                                         </select>
                                         <span class="form-hint" id="configStrategyHint">Ichimoku: Signaux TK Cross, Kumo, Chikou. SMC: Order Blocks, FVG, Break of Structure.</span>
                                     </div>
@@ -919,6 +920,108 @@
                                     <div class="toggle-info">
                                         <span class="toggle-label">🎯 Inducement Detection</span>
                                         <span class="toggle-desc">Détecte les faux signaux créés pour piéger les traders retail</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Signaux Bollinger Squeeze (visible quand stratégie = bollinger) -->
+                    <div class="card strategy-section bollinger-section hidden">
+                        <div class="card-header">
+                            <h3><i data-lucide="activity"></i> Signaux Bollinger Squeeze</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="section-desc">Configurez les paramètres de détection du Squeeze:</p>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="bbPeriod">Période Bollinger</label>
+                                    <input type="number" id="bbPeriod" value="20" min="10" max="50" step="1">
+                                    <span class="form-hint">Période des bandes (défaut: 20)</span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="bbStdDev">Écart-type</label>
+                                    <input type="number" id="bbStdDev" value="2" min="1" max="3" step="0.1">
+                                    <span class="form-hint">Multiplicateur (défaut: 2)</span>
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="kcPeriod">Période Keltner</label>
+                                    <input type="number" id="kcPeriod" value="20" min="10" max="50" step="1">
+                                    <span class="form-hint">Pour confirmer le squeeze</span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="kcMultiplier">Multiplicateur Keltner</label>
+                                    <input type="number" id="kcMultiplier" value="1.5" min="1" max="3" step="0.1">
+                                    <span class="form-hint">ATR multiplier (défaut: 1.5)</span>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="momentumPeriod">Période Momentum</label>
+                                <input type="number" id="momentumPeriod" value="12" min="5" max="30" step="1">
+                                <span class="form-hint">Pour déterminer la direction du breakout</span>
+                            </div>
+                            
+                            <div class="info-banner info-small" style="margin-top: 1rem;">
+                                <i data-lucide="info"></i>
+                                <div>
+                                    <p><strong>Bollinger Squeeze:</strong> Détecte les périodes de faible volatilité (squeeze) suivies de breakouts explosifs. Le Keltner Channel confirme le squeeze, le momentum détermine la direction.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Indicateurs Avancés Bollinger -->
+                    <div class="card strategy-section bollinger-section hidden">
+                        <div class="card-header">
+                            <h3><i data-lucide="trending-up"></i> Filtres Bollinger Squeeze</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="section-desc">Filtres de confirmation pour améliorer les signaux:</p>
+                            
+                            <div class="toggle-group">
+                                <div class="toggle-item">
+                                    <label class="toggle">
+                                        <input type="checkbox" id="bbRsiFilter" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <div class="toggle-info">
+                                        <span class="toggle-label">📈 Filtre RSI</span>
+                                        <span class="toggle-desc">Évite les LONG en surachat et SHORT en survente</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-item">
+                                    <label class="toggle">
+                                        <input type="checkbox" id="bbVolumeFilter" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <div class="toggle-info">
+                                        <span class="toggle-label">📊 Filtre Volume</span>
+                                        <span class="toggle-desc">Confirme le breakout avec un volume supérieur à la moyenne</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-item">
+                                    <label class="toggle">
+                                        <input type="checkbox" id="bbMomentumFilter" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <div class="toggle-info">
+                                        <span class="toggle-label">🚀 Filtre Momentum</span>
+                                        <span class="toggle-desc">Exige un momentum croissant pour confirmer la direction</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-item">
+                                    <label class="toggle">
+                                        <input type="checkbox" id="bbSqueezeOnly" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <div class="toggle-info">
+                                        <span class="toggle-label">🎯 Squeeze Only</span>
+                                        <span class="toggle-desc">Trade uniquement après un squeeze (pas les breakouts simples)</span>
                                     </div>
                                 </div>
                             </div>
@@ -1715,9 +1818,10 @@
                                     <select id="btStrategy" class="form-control">
                                         <option value="ichimoku">🔮 Ichimoku Kinko Hyo (Classique)</option>
                                         <option value="smc">💎 Smart Money Concepts (SMC)</option>
+                                        <option value="bollinger">📊 Bollinger Squeeze (Breakout)</option>
                                     </select>
                                     <p class="form-hint" id="btStrategyHint" style="font-size: 0.8rem; margin-top: 0.3rem; color: var(--text-secondary);">
-                                        Ichimoku: Signaux basés sur Tenkan/Kijun, Kumo, Chikou. SMC: Order Blocks, FVG, Break of Structure.
+                                        Ichimoku: Signaux basés sur Tenkan/Kijun, Kumo, Chikou. SMC: Order Blocks, FVG, Break of Structure. Bollinger: Squeeze + Breakout.
                                     </p>
                                 </div>
                                 

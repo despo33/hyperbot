@@ -400,6 +400,63 @@ class Backtester {
             };
         }
 
+        // ===== STRATÉGIE BOLLINGER SQUEEZE =====
+        if (strategy === 'bollinger') {
+            const bbAnalysis = signalDetector.analyzeBollingerSqueeze(candles, timeframe, config.bollingerConfig || {});
+
+            if (!bbAnalysis || !bbAnalysis.success || !bbAnalysis.signal) {
+                return { tradeable: false, strategy: 'bollinger' };
+            }
+
+            const signal = bbAnalysis.signal;
+            const direction = signal.action === 'BUY' ? 'long' : 'short';
+            const absScore = Math.abs(signal.score);
+
+            // Filtres
+            let tradeable = true;
+
+            // Filtre Score
+            if (absScore < minScore) {
+                tradeable = false;
+            }
+
+            // Filtre RSI
+            if (useRSIFilter && !signal.rsiConfirms) {
+                tradeable = false;
+            }
+
+            // Filtre Volume
+            if (useVolumeFilter && !signal.volumeConfirms) {
+                tradeable = false;
+            }
+
+            // Calcul de la confluence
+            let confluence = 0;
+            if (signal.rsiConfirms) confluence++;
+            if (signal.volumeConfirms) confluence++;
+            if (bbAnalysis.momentum.increasing) confluence++;
+            if (bbAnalysis.squeeze.squeezeRelease) confluence++;
+
+            if (confluence < minConfluence) {
+                tradeable = false;
+            }
+
+            return {
+                tradeable,
+                strategy: 'bollinger',
+                direction,
+                score: absScore,
+                confluence,
+                winProbability: bbAnalysis.winProbability,
+                atr: null, // Sera calculé séparément si nécessaire
+                bollingerData: {
+                    squeeze: bbAnalysis.squeeze,
+                    momentum: bbAnalysis.momentum,
+                    levels: bbAnalysis.levels
+                }
+            };
+        }
+
         // ===== STRATÉGIE ICHIMOKU (par défaut) =====
         const analysis = signalDetector.analyze(candles, {}, timeframe);
         

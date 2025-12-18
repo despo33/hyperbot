@@ -1588,6 +1588,41 @@ async function loadTradingConfig() {
             if (mtfConfValueEl) mtfConfValueEl.textContent = config.mtfMinConfirmation || 2;
         }
         
+        // Stratégie de trading
+        const strategyEl = document.getElementById('configStrategy');
+        if (strategyEl && config.strategy) {
+            strategyEl.value = config.strategy;
+            updateStrategyUI(config.strategy);
+        }
+        
+        // Paramètres Bollinger Squeeze
+        const bbPeriodEl = document.getElementById('bbPeriod');
+        if (bbPeriodEl) bbPeriodEl.value = config.bbPeriod || 20;
+        
+        const bbStdDevEl = document.getElementById('bbStdDev');
+        if (bbStdDevEl) bbStdDevEl.value = config.bbStdDev || 2;
+        
+        const kcPeriodEl = document.getElementById('kcPeriod');
+        if (kcPeriodEl) kcPeriodEl.value = config.kcPeriod || 20;
+        
+        const kcMultiplierEl = document.getElementById('kcMultiplier');
+        if (kcMultiplierEl) kcMultiplierEl.value = config.kcMultiplier || 1.5;
+        
+        const momentumPeriodEl = document.getElementById('momentumPeriod');
+        if (momentumPeriodEl) momentumPeriodEl.value = config.momentumPeriod || 12;
+        
+        const bbRsiFilterEl = document.getElementById('bbRsiFilter');
+        if (bbRsiFilterEl) bbRsiFilterEl.checked = config.bbRsiFilter !== false;
+        
+        const bbVolumeFilterEl = document.getElementById('bbVolumeFilter');
+        if (bbVolumeFilterEl) bbVolumeFilterEl.checked = config.bbVolumeFilter !== false;
+        
+        const bbMomentumFilterEl = document.getElementById('bbMomentumFilter');
+        if (bbMomentumFilterEl) bbMomentumFilterEl.checked = config.bbMomentumFilter !== false;
+        
+        const bbSqueezeOnlyEl = document.getElementById('bbSqueezeOnly');
+        if (bbSqueezeOnlyEl) bbSqueezeOnlyEl.checked = config.bbSqueezeOnly !== false;
+        
     } catch (error) {
         console.error('Erreur chargement config trading:', error);
     }
@@ -1669,7 +1704,17 @@ async function saveTradingConfig() {
             useChikouAdvanced: document.getElementById('useChikouAdvanced')?.checked ?? true,
             useKumoTwist: document.getElementById('useKumoTwist')?.checked ?? true,
             // Stratégie de trading
-            strategy: document.getElementById('configStrategy')?.value || 'ichimoku'
+            strategy: document.getElementById('configStrategy')?.value || 'ichimoku',
+            // Paramètres Bollinger Squeeze
+            bbPeriod: parseInt(document.getElementById('bbPeriod')?.value || 20),
+            bbStdDev: parseFloat(document.getElementById('bbStdDev')?.value || 2),
+            kcPeriod: parseInt(document.getElementById('kcPeriod')?.value || 20),
+            kcMultiplier: parseFloat(document.getElementById('kcMultiplier')?.value || 1.5),
+            momentumPeriod: parseInt(document.getElementById('momentumPeriod')?.value || 12),
+            bbRsiFilter: document.getElementById('bbRsiFilter')?.checked ?? true,
+            bbVolumeFilter: document.getElementById('bbVolumeFilter')?.checked ?? true,
+            bbMomentumFilter: document.getElementById('bbMomentumFilter')?.checked ?? true,
+            bbSqueezeOnly: document.getElementById('bbSqueezeOnly')?.checked ?? true
         };
 
         await apiRequest('/config/trading', {
@@ -2720,6 +2765,9 @@ function updateStrategyUI(strategy) {
     document.querySelectorAll('.smc-section').forEach(el => {
         el.classList.toggle('hidden', strategy !== 'smc');
     });
+    document.querySelectorAll('.bollinger-section').forEach(el => {
+        el.classList.toggle('hidden', strategy !== 'bollinger');
+    });
     
     // Met à jour le label du score minimum
     const minScoreLabel = document.querySelector('label[for="minScore"]');
@@ -2728,6 +2776,11 @@ function updateStrategyUI(strategy) {
             minScoreLabel.innerHTML = `
                 Score SMC minimum
                 <span class="tooltip-icon" data-tooltip="Score basé sur Order Blocks, FVG, BOS. Plus le score est élevé, plus le signal est fort">?</span>
+            `;
+        } else if (strategy === 'bollinger') {
+            minScoreLabel.innerHTML = `
+                Score Bollinger minimum
+                <span class="tooltip-icon" data-tooltip="Score basé sur le squeeze, momentum et breakout. Plus le score est élevé, plus le signal est fort">?</span>
             `;
         } else {
             minScoreLabel.innerHTML = `
@@ -2742,6 +2795,8 @@ function updateStrategyUI(strategy) {
     if (strategyHint) {
         if (strategy === 'smc') {
             strategyHint.textContent = 'SMC: Order Blocks, Fair Value Gaps, Break of Structure, Liquidity Sweeps.';
+        } else if (strategy === 'bollinger') {
+            strategyHint.textContent = 'Bollinger Squeeze: Détecte les périodes de faible volatilité suivies de breakouts explosifs.';
         } else {
             strategyHint.textContent = 'Ichimoku: Signaux TK Cross, Kumo, Chikou. Stratégie classique et éprouvée.';
         }

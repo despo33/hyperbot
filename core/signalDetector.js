@@ -7,6 +7,7 @@ import ichimoku from './ichimoku.js';
 import indicators from './indicators.js';
 import patternDetector from './patternDetector.js';
 import multiTimeframe from './multiTimeframe.js';
+import bollingerSqueeze from './bollingerSqueeze.js';
 
 /**
  * Classe principale de détection des signaux
@@ -1031,6 +1032,129 @@ class SignalDetector {
         }
 
         return multiTimeframe.confirmSignal(signal, candles, symbol);
+    }
+
+    /**
+     * Analyse avec la stratégie Bollinger Squeeze
+     * @param {Array} candles - Données OHLCV
+     * @param {string} timeframe - Timeframe
+     * @param {Object} config - Configuration optionnelle
+     * @returns {Object} Résultat de l'analyse
+     */
+    analyzeBollingerSqueeze(candles, timeframe = '15m', config = {}) {
+        if (!candles || candles.length < 30) {
+            return {
+                success: false,
+                error: 'Pas assez de données (minimum 30 candles)',
+                signal: null
+            };
+        }
+
+        // Configure la stratégie si des paramètres sont fournis
+        if (Object.keys(config).length > 0) {
+            bollingerSqueeze.configure(config);
+        }
+
+        // Analyse Bollinger Squeeze
+        const analysis = bollingerSqueeze.analyze(candles);
+
+        if (!analysis.success) {
+            return analysis;
+        }
+
+        // Ajoute les indicateurs complémentaires
+        const closes = candles.map(c => c.close);
+        const volumes = candles.map(c => c.volume);
+        
+        // RSI pour confirmation
+        const rsi = indicators.calculateRSI(closes);
+        
+        // Volume analysis
+        const volumeAnalysis = indicators.analyzeVolume(volumes, closes);
+
+        // Confirmation du signal par RSI
+        let rsiConfirms = true;
+        if (analysis.signal === 'BUY' && rsi.value > 70) {
+            rsiConfirms = false; // RSI en surachat, pas de long
+        } else if (analysis.signal === 'SELL' && rsi.value < 30) {
+            rsiConfirms = false; // RSI en survente, pas de short
+        }
+
+        // Confirmation par volume
+        const volumeConfirms = volumeAnalysis.spike || volumeAnalysis.ratio > 1.2;
+
+        // Ajuste la force du signal
+        let adjustedStrength = analysis.strength;
+        if (rsiConfirms) adjustedStrength += 0.1;
+        if (volumeConfirms) adjustedStrength += 0.1;
+        adjustedStrength = Math.min(1, adjustedStrength);
+
+        // Calcul de la probabilité de gain
+        let winProbability = 0.5;
+        if (analysis.signal) {
+            winProbability = 0.55 + (adjustedStrength * 0.2);
+            if (rsiConfirms) winProbability += 0.05;
+            if (volumeConfirms) winProbability += 0.05;
+            winProbability = Math.min(0.85, winProbability);
+        }
+
+        return {
+            success: true,
+            strategy: 'bollinger_squeeze',
+            timestamp: analysis.timestamp,
+            timeframe,
+            currentPrice: analysis.currentPrice,
+            signal: analysis.signal ? {
+                action: analysis.signal,
+                direction: analysis.direction,
+                strength: adjustedStrength,
+                score: analysis.score,
+                description: analysis.description,
+                rsiConfirms,
+                volumeConfirms
+            } : null,
+            squeeze: analysis.squeeze,
+            momentum: analysis.momentum,
+            bollingerBands: analysis.bollingerBands,
+            levels: analysis.levels,
+            indicators: {
+                rsi,
+                volume: volumeAnalysis
+            },
+            winProbability,
+            recommendation: this.generateBollingerRecommendation(analysis, rsiConfirms, volumeConfirms)
+        };
+    }
+
+    /**
+     * Génère une recommandation pour Bollinger Squeeze
+     */
+    generateBollingerRecommendation(analysis, rsiConfirms, volumeConfirms) {
+        if (!analysis.signal) {
+            if (analysis.squeeze.isSqueezing) {
+                return {
+                    action: 'WAIT',
+                    reason: `Squeeze en cours (${analysis.squeeze.squeezeCount} bougies) - Attendre le breakout`,
+                    confidence: 'medium'
+                };
+            }
+            return {
+                action: 'NEUTRAL',
+                reason: 'Pas de signal Bollinger Squeeze',
+                confidence: 'low'
+            };
+        }
+
+        const confirmations = [];
+        if (rsiConfirms) confirmations.push('RSI');
+        if (volumeConfirms) confirmations.push('Volume');
+
+        return {
+            action: analysis.signal,
+            reason: analysis.description,
+            confidence: confirmations.length >= 2 ? 'high' : confirmations.length === 1 ? 'medium' : 'low',
+            confirmations
+        };
     }
 }
 

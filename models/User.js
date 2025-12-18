@@ -134,6 +134,49 @@ const configProfileSchema = new mongoose.Schema({
         minRiskRewardRatio: {
             type: Number,
             default: 1.5
+        },
+        // Stratégie de trading
+        strategy: {
+            type: String,
+            enum: ['ichimoku', 'smc', 'bollinger'],
+            default: 'ichimoku'
+        },
+        // Paramètres Bollinger Squeeze
+        bbPeriod: {
+            type: Number,
+            default: 20
+        },
+        bbStdDev: {
+            type: Number,
+            default: 2
+        },
+        kcPeriod: {
+            type: Number,
+            default: 20
+        },
+        kcMultiplier: {
+            type: Number,
+            default: 1.5
+        },
+        momentumPeriod: {
+            type: Number,
+            default: 12
+        },
+        bbRsiFilter: {
+            type: Boolean,
+            default: true
+        },
+        bbVolumeFilter: {
+            type: Boolean,
+            default: true
+        },
+        bbMomentumFilter: {
+            type: Boolean,
+            default: true
+        },
+        bbSqueezeOnly: {
+            type: Boolean,
+            default: true
         }
     }
 });
@@ -351,6 +394,49 @@ const userSchema = new mongoose.Schema({
         minRiskRewardRatio: {
             type: Number,
             default: 1.5
+        },
+        // Stratégie de trading
+        strategy: {
+            type: String,
+            enum: ['ichimoku', 'smc', 'bollinger'],
+            default: 'ichimoku'
+        },
+        // Paramètres Bollinger Squeeze
+        bbPeriod: {
+            type: Number,
+            default: 20
+        },
+        bbStdDev: {
+            type: Number,
+            default: 2
+        },
+        kcPeriod: {
+            type: Number,
+            default: 20
+        },
+        kcMultiplier: {
+            type: Number,
+            default: 1.5
+        },
+        momentumPeriod: {
+            type: Number,
+            default: 12
+        },
+        bbRsiFilter: {
+            type: Boolean,
+            default: true
+        },
+        bbVolumeFilter: {
+            type: Boolean,
+            default: true
+        },
+        bbMomentumFilter: {
+            type: Boolean,
+            default: true
+        },
+        bbSqueezeOnly: {
+            type: Boolean,
+            default: true
         }
     },
     

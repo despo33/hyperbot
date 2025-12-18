@@ -516,6 +516,18 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
             if (configUpdate.maxTradesPerDay !== undefined) req.user.botConfig.maxTradesPerDay = configUpdate.maxTradesPerDay;
             if (configUpdate.maxConsecutiveLosses !== undefined) req.user.botConfig.maxConsecutiveLosses = configUpdate.maxConsecutiveLosses;
             if (configUpdate.minRiskRewardRatio !== undefined) req.user.botConfig.minRiskRewardRatio = configUpdate.minRiskRewardRatio;
+            // Stratégie de trading
+            if (configUpdate.strategy) req.user.botConfig.strategy = configUpdate.strategy;
+            // Paramètres Bollinger Squeeze
+            if (configUpdate.bbPeriod !== undefined) req.user.botConfig.bbPeriod = configUpdate.bbPeriod;
+            if (configUpdate.bbStdDev !== undefined) req.user.botConfig.bbStdDev = configUpdate.bbStdDev;
+            if (configUpdate.kcPeriod !== undefined) req.user.botConfig.kcPeriod = configUpdate.kcPeriod;
+            if (configUpdate.kcMultiplier !== undefined) req.user.botConfig.kcMultiplier = configUpdate.kcMultiplier;
+            if (configUpdate.momentumPeriod !== undefined) req.user.botConfig.momentumPeriod = configUpdate.momentumPeriod;
+            if (configUpdate.bbRsiFilter !== undefined) req.user.botConfig.bbRsiFilter = configUpdate.bbRsiFilter;
+            if (configUpdate.bbVolumeFilter !== undefined) req.user.botConfig.bbVolumeFilter = configUpdate.bbVolumeFilter;
+            if (configUpdate.bbMomentumFilter !== undefined) req.user.botConfig.bbMomentumFilter = configUpdate.bbMomentumFilter;
+            if (configUpdate.bbSqueezeOnly !== undefined) req.user.botConfig.bbSqueezeOnly = configUpdate.bbSqueezeOnly;
             if (configUpdate.enabledSignals) {
                 req.user.botConfig.enabledSignals = { ...req.user.botConfig.enabledSignals, ...configUpdate.enabledSignals };
             }
