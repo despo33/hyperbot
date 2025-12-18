@@ -733,6 +733,29 @@ class UserBotInstance {
             this.applyTimeframePreset(newConfig.timeframes[0]);
         }
 
+        // Synchronise les paramètres Risk Manager avec le riskManager global
+        // Note: En mode multi-utilisateurs, chaque bot devrait avoir son propre riskManager
+        // Pour l'instant, on synchronise avec le global pour assurer la compatibilité
+        const riskParams = {};
+        if (newConfig.riskPerTrade !== undefined) riskParams.riskPerTrade = newConfig.riskPerTrade;
+        if (newConfig.maxPositionSize !== undefined) riskParams.maxPositionSize = newConfig.maxPositionSize;
+        if (newConfig.dailyLossLimit !== undefined) riskParams.dailyLossLimit = newConfig.dailyLossLimit;
+        if (newConfig.maxDrawdown !== undefined) riskParams.maxDrawdown = newConfig.maxDrawdown;
+        if (newConfig.maxTradesPerDay !== undefined) riskParams.maxTradesPerDay = newConfig.maxTradesPerDay;
+        if (newConfig.maxConsecutiveLosses !== undefined) riskParams.maxConsecutiveLosses = newConfig.maxConsecutiveLosses;
+        if (newConfig.minRiskRewardRatio !== undefined) riskParams.minRiskRewardRatio = newConfig.minRiskRewardRatio;
+        if (newConfig.defaultTP !== undefined) riskParams.defaultTPPercent = newConfig.defaultTP;
+        if (newConfig.defaultSL !== undefined) riskParams.defaultSLPercent = newConfig.defaultSL;
+
+        if (Object.keys(riskParams).length > 0) {
+            // Import dynamique pour éviter les dépendances circulaires
+            import('./riskManager.js').then(module => {
+                module.default.updateConfig(riskParams);
+            }).catch(() => {
+                // Silencieux si le module n'est pas disponible
+            });
+        }
+
         this.log('Configuration mise à jour', 'info');
     }
 

@@ -114,6 +114,26 @@ const configProfileSchema = new mongoose.Schema({
         maxPositionSize: {
             type: Number,
             default: 50
+        },
+        dailyLossLimit: {
+            type: Number,
+            default: 5
+        },
+        maxDrawdown: {
+            type: Number,
+            default: 20
+        },
+        maxTradesPerDay: {
+            type: Number,
+            default: 10
+        },
+        maxConsecutiveLosses: {
+            type: Number,
+            default: 3
+        },
+        minRiskRewardRatio: {
+            type: Number,
+            default: 1.5
         }
     }
 });
@@ -311,6 +331,26 @@ const userSchema = new mongoose.Schema({
         maxPositionSize: {
             type: Number,
             default: 50
+        },
+        dailyLossLimit: {
+            type: Number,
+            default: 5
+        },
+        maxDrawdown: {
+            type: Number,
+            default: 20
+        },
+        maxTradesPerDay: {
+            type: Number,
+            default: 10
+        },
+        maxConsecutiveLosses: {
+            type: Number,
+            default: 3
+        },
+        minRiskRewardRatio: {
+            type: Number,
+            default: 1.5
         }
     },
     

@@ -509,8 +509,13 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
             if (configUpdate.mtfTimeframes) req.user.botConfig.mtfTimeframes = configUpdate.mtfTimeframes;
             if (configUpdate.mtfMinConfirmation) req.user.botConfig.mtfMinConfirmation = configUpdate.mtfMinConfirmation;
             // Risk Management
-            if (configUpdate.riskPerTrade) req.user.botConfig.riskPerTrade = configUpdate.riskPerTrade;
-            if (configUpdate.maxPositionSize) req.user.botConfig.maxPositionSize = configUpdate.maxPositionSize;
+            if (configUpdate.riskPerTrade !== undefined) req.user.botConfig.riskPerTrade = configUpdate.riskPerTrade;
+            if (configUpdate.maxPositionSize !== undefined) req.user.botConfig.maxPositionSize = configUpdate.maxPositionSize;
+            if (configUpdate.dailyLossLimit !== undefined) req.user.botConfig.dailyLossLimit = configUpdate.dailyLossLimit;
+            if (configUpdate.maxDrawdown !== undefined) req.user.botConfig.maxDrawdown = configUpdate.maxDrawdown;
+            if (configUpdate.maxTradesPerDay !== undefined) req.user.botConfig.maxTradesPerDay = configUpdate.maxTradesPerDay;
+            if (configUpdate.maxConsecutiveLosses !== undefined) req.user.botConfig.maxConsecutiveLosses = configUpdate.maxConsecutiveLosses;
+            if (configUpdate.minRiskRewardRatio !== undefined) req.user.botConfig.minRiskRewardRatio = configUpdate.minRiskRewardRatio;
             if (configUpdate.enabledSignals) {
                 req.user.botConfig.enabledSignals = { ...req.user.botConfig.enabledSignals, ...configUpdate.enabledSignals };
             }
@@ -542,11 +547,17 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
  */
 router.get('/config/risk', requireAuth, async (req, res) => {
     if (req.user.botConfig) {
+        // Retourne les paramètres du profil utilisateur avec fallback sur riskManager
+        const globalConfig = riskManager.getConfig();
         return res.json({ 
             config: {
-                riskPerTrade: req.user.botConfig.riskPerTrade || 2,
-                maxPositionSize: req.user.botConfig.maxPositionSize || 50,
-                ...riskManager.getConfig()
+                riskPerTrade: req.user.botConfig.riskPerTrade ?? globalConfig.riskPerTrade ?? 2,
+                maxPositionSize: req.user.botConfig.maxPositionSize ?? globalConfig.maxPositionSize ?? 50,
+                dailyLossLimit: req.user.botConfig.dailyLossLimit ?? globalConfig.dailyLossLimit ?? 5,
+                maxDrawdown: req.user.botConfig.maxDrawdown ?? globalConfig.maxDrawdown ?? 20,
+                maxTradesPerDay: req.user.botConfig.maxTradesPerDay ?? globalConfig.maxTradesPerDay ?? 10,
+                maxConsecutiveLosses: req.user.botConfig.maxConsecutiveLosses ?? globalConfig.maxConsecutiveLosses ?? 3,
+                minRiskRewardRatio: req.user.botConfig.minRiskRewardRatio ?? globalConfig.minRiskRewardRatio ?? 1.5
             },
             fromUser: true 
         });
@@ -562,10 +573,16 @@ router.post('/config/risk', requireAuth, async (req, res) => {
     try {
         const configUpdate = req.body;
         
-        // Si utilisateur connecté, sauvegarde dans son compte
+        // Si utilisateur connecté, sauvegarde TOUS les paramètres dans son compte
         if (req.user) {
-            if (configUpdate.riskPerTrade) req.user.botConfig.riskPerTrade = configUpdate.riskPerTrade;
-            if (configUpdate.maxPositionSize) req.user.botConfig.maxPositionSize = configUpdate.maxPositionSize;
+            // Paramètres Risk Manager
+            if (configUpdate.riskPerTrade !== undefined) req.user.botConfig.riskPerTrade = configUpdate.riskPerTrade;
+            if (configUpdate.maxPositionSize !== undefined) req.user.botConfig.maxPositionSize = configUpdate.maxPositionSize;
+            if (configUpdate.dailyLossLimit !== undefined) req.user.botConfig.dailyLossLimit = configUpdate.dailyLossLimit;
+            if (configUpdate.maxDrawdown !== undefined) req.user.botConfig.maxDrawdown = configUpdate.maxDrawdown;
+            if (configUpdate.maxTradesPerDay !== undefined) req.user.botConfig.maxTradesPerDay = configUpdate.maxTradesPerDay;
+            if (configUpdate.maxConsecutiveLosses !== undefined) req.user.botConfig.maxConsecutiveLosses = configUpdate.maxConsecutiveLosses;
+            if (configUpdate.minRiskRewardRatio !== undefined) req.user.botConfig.minRiskRewardRatio = configUpdate.minRiskRewardRatio;
             
             await req.user.save();
             console.log(`[RISK] Config risk sauvegardée pour ${req.user.username}`);
@@ -574,11 +591,16 @@ router.post('/config/risk', requireAuth, async (req, res) => {
             const userId = req.user._id.toString();
             botManager.updateBotConfig(userId, {
                 riskPerTrade: configUpdate.riskPerTrade,
-                maxPositionSize: configUpdate.maxPositionSize
+                maxPositionSize: configUpdate.maxPositionSize,
+                dailyLossLimit: configUpdate.dailyLossLimit,
+                maxDrawdown: configUpdate.maxDrawdown,
+                maxTradesPerDay: configUpdate.maxTradesPerDay,
+                maxConsecutiveLosses: configUpdate.maxConsecutiveLosses,
+                minRiskRewardRatio: configUpdate.minRiskRewardRatio
             });
         }
         
-        // Sauvegarde aussi dans riskManager (pour les autres paramètres)
+        // Sauvegarde aussi dans riskManager global
         riskManager.updateConfig(configUpdate);
         res.json({ success: true, config: riskManager.getConfig() });
     } catch (error) {
