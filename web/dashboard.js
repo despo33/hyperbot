@@ -3979,44 +3979,62 @@ function initBacktestForm() {
     const endDateInput = document.getElementById('btEndDate');
     const startDateInput = document.getElementById('btStartDate');
     
-    // Fonction pour calculer la période minimale selon le timeframe (min 250 bougies)
-    function updateDatesForTimeframe(timeframe) {
-        const minCandles = 250;
-        const timeframeMinutes = {
-            '1m': 1,
-            '5m': 5,
-            '15m': 15,
-            '30m': 30,
-            '1h': 60,
-            '4h': 240,
-            '1d': 1440
-        };
+    const timeframeMinutes = {
+        '1m': 1, '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240, '1d': 1440
+    };
+    
+    // Fonction pour mettre à jour l'affichage de la période
+    function updatePeriodDisplay() {
+        const startDate = startDateInput?.value ? new Date(startDateInput.value) : null;
+        const endDate = endDateInput?.value ? new Date(endDateInput.value) : null;
+        const timeframe = timeframeSelect?.value || '15m';
         
-        const minutes = timeframeMinutes[timeframe] || 15;
-        const minPeriodMs = minCandles * minutes * 60 * 1000;
-        
-        const today = new Date();
-        const minStartDate = new Date(today.getTime() - minPeriodMs);
-        
-        if (endDateInput) endDateInput.value = today.toISOString().split('T')[0];
-        if (startDateInput) startDateInput.value = minStartDate.toISOString().split('T')[0];
-        
-        // Met à jour le hint avec la période recommandée
-        const hint = document.getElementById('btDateHint');
-        if (hint) {
-            const days = Math.ceil(minPeriodMs / (24 * 60 * 60 * 1000));
-            hint.textContent = `Période minimum recommandée pour ${timeframe}: ${days} jours (${minCandles} bougies)`;
+        if (startDate && endDate) {
+            const diffMs = endDate - startDate;
+            const days = Math.ceil(diffMs / (24 * 60 * 60 * 1000));
+            const minutes = timeframeMinutes[timeframe] || 15;
+            const candles = Math.floor(diffMs / (minutes * 60 * 1000));
+            
+            const periodInfo = document.getElementById('btPeriodInfo');
+            const candleEstimate = document.getElementById('btCandleEstimate');
+            
+            if (periodInfo) periodInfo.textContent = `📊 ${days} jours sélectionnés`;
+            if (candleEstimate) candleEstimate.textContent = `~${candles} bougies en ${timeframe}`;
         }
     }
     
-    // Initialise avec le timeframe par défaut
-    if (timeframeSelect && endDateInput && startDateInput) {
-        updateDatesForTimeframe(timeframeSelect.value);
+    // Fonction pour définir la période (en jours)
+    function setPeriod(days) {
+        const today = new Date();
+        const startDate = new Date(today.getTime() - (days * 24 * 60 * 60 * 1000));
         
-        // Met à jour les dates quand le timeframe change
-        timeframeSelect.addEventListener('change', () => {
-            updateDatesForTimeframe(timeframeSelect.value);
+        if (endDateInput) endDateInput.value = today.toISOString().split('T')[0];
+        if (startDateInput) startDateInput.value = startDate.toISOString().split('T')[0];
+        
+        // Met à jour les boutons actifs
+        document.querySelectorAll('.period-btn').forEach(btn => {
+            btn.classList.toggle('active', parseInt(btn.dataset.days) === days);
         });
+        
+        updatePeriodDisplay();
+    }
+    
+    // Gestion des boutons de raccourcis de période
+    document.querySelectorAll('.period-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const days = parseInt(btn.dataset.days);
+            setPeriod(days);
+        });
+    });
+    
+    // Met à jour l'affichage quand les dates changent manuellement
+    if (startDateInput) startDateInput.addEventListener('change', updatePeriodDisplay);
+    if (endDateInput) endDateInput.addEventListener('change', updatePeriodDisplay);
+    if (timeframeSelect) timeframeSelect.addEventListener('change', updatePeriodDisplay);
+    
+    // Initialise avec 14 jours par défaut
+    if (timeframeSelect && endDateInput && startDateInput) {
+        setPeriod(14);
     }
 }
 

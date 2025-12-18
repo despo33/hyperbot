@@ -462,14 +462,28 @@ body {
     width: 100%;
 }
 
-.btn-small {
+.btn-small, .btn-sm {
     padding: 0.5rem 1rem;
     font-size: 0.8rem;
 }
 
-.btn-small svg {
+.btn-small svg, .btn-sm svg {
     width: 14px;
     height: 14px;
+}
+
+.period-btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.75rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.period-btn.active {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: white;
+    box-shadow: 0 0 15px rgba(124, 58, 237, 0.4);
 }
 
 .btn-large {

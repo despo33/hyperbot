@@ -1627,19 +1627,26 @@
                                     </div>
                                 </div>
                                 
-                                <h4 style="margin-top: 1rem; margin-bottom: 0.5rem;">Période d'analyse</h4>
+                                <h4 style="margin-top: 1rem; margin-bottom: 0.5rem;">📅 Période d'analyse</h4>
+                                <div class="period-shortcuts" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+                                    <button type="button" class="btn btn-sm btn-outline period-btn" data-days="3">3 jours</button>
+                                    <button type="button" class="btn btn-sm btn-outline period-btn" data-days="7">7 jours</button>
+                                    <button type="button" class="btn btn-sm btn-outline period-btn active" data-days="14">14 jours</button>
+                                    <button type="button" class="btn btn-sm btn-outline period-btn" data-days="30">30 jours</button>
+                                    <button type="button" class="btn btn-sm btn-outline period-btn" data-days="90">3 mois</button>
+                                </div>
                                 <div class="form-row">
                                     <div class="form-group">
-                                        <label for="btStartDate">Date de début</label>
+                                        <label for="btStartDate">Du</label>
                                         <input type="date" id="btStartDate" class="form-control">
                                     </div>
                                     <div class="form-group">
-                                        <label for="btEndDate">Date de fin</label>
+                                        <label for="btEndDate">Au</label>
                                         <input type="date" id="btEndDate" class="form-control">
                                     </div>
                                 </div>
-                                <p class="form-hint" id="btDateHint" style="color: var(--warning); font-size: 0.8rem; margin-top: -0.5rem;">
-                                    Période minimum recommandée pour 15m: 3 jours (250 bougies)
+                                <p class="form-hint" id="btDateHint" style="color: var(--text-secondary); font-size: 0.8rem; margin-top: -0.5rem;">
+                                    <span id="btPeriodInfo">📊 14 jours sélectionnés</span> • <span id="btCandleEstimate">~1344 bougies en 15m</span>
                                 </p>
                                 <div class="form-row">
                                     <div class="form-group">
