@@ -55,6 +55,7 @@ export function createWebServer(port = 3000) {
                 fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", "data:"],
                 imgSrc: ["'self'", "data:", "https:", "blob:"],
                 connectSrc: ["'self'", "wss:", "ws:", "https:", "http:"],
+                frameSrc: ["'self'", "https://s.tradingview.com", "https://s3.tradingview.com", "https://*.tradingview.com"],
                 frameAncestors: ["'none'"],
                 upgradeInsecureRequests: null
             }
