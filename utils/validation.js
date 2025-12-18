@@ -149,11 +149,30 @@ export const tradingConfigSchema = Joi.object({
     }),
     // Stratégie de trading
     strategy: Joi.string()
-        .valid('ichimoku', 'smc'),
+        .valid('ichimoku', 'smc', 'bollinger'),
     // Indicateurs avancés
     useSupertrend: Joi.boolean(),
     useFibonacci: Joi.boolean(),
-    useKumoTwist: Joi.boolean()
+    useKumoTwist: Joi.boolean(),
+    useChikouAdvanced: Joi.boolean(),
+    // Multi-Timeframe
+    useMTF: Joi.boolean(),
+    mtfPrimary: Joi.string().valid('1m', '5m', '15m', '30m', '1h', '4h', '1d'),
+    mtfHigher: Joi.string().valid('1m', '5m', '15m', '30m', '1h', '4h', '1d'),
+    mtfConfirmations: Joi.number().integer().min(1).max(5),
+    // Mode
+    mode: Joi.string().valid('auto', 'manual', 'paper'),
+    multiCryptoMode: Joi.boolean(),
+    // Paramètres Bollinger Squeeze
+    bbPeriod: Joi.number().integer().min(5).max(100),
+    bbStdDev: Joi.number().min(0.5).max(5),
+    kcPeriod: Joi.number().integer().min(5).max(100),
+    kcMultiplier: Joi.number().min(0.5).max(5),
+    momentumPeriod: Joi.number().integer().min(3).max(50),
+    bbRsiFilter: Joi.boolean(),
+    bbVolumeFilter: Joi.boolean(),
+    bbMomentumFilter: Joi.boolean(),
+    bbSqueezeOnly: Joi.boolean()
 }).unknown(false);
 
 // ===== PROFILS =====
