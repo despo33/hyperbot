@@ -6,7 +6,7 @@
 // ==================== CONFIGURATION ====================
 
 const API_BASE = window.location.origin + '/api';
-let WS_URL = `ws://${window.location.host}`;
+let WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
 let ws = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
