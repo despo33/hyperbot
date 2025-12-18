@@ -2643,6 +2643,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Config Trading
     document.getElementById('saveTradingConfig')?.addEventListener('click', saveTradingConfig);
     
+    // Changement de stratégie (Ichimoku / SMC)
+    document.getElementById('configStrategy')?.addEventListener('change', (e) => {
+        const strategy = e.target.value;
+        updateStrategyUI(strategy);
+    });
+    
     // Profiles
     document.getElementById('createProfileBtn')?.addEventListener('click', createProfile);
     
@@ -2702,6 +2708,52 @@ const CRYPTO_PRESETS = {
     altcoins: 'SOL, AVAX, LINK, DOT, MATIC, UNI, ATOM, APT, ARB, OP, INJ, SUI, SEI, NEAR, FTM, AAVE',
     defi: 'UNI, AAVE, LINK, MKR, SNX, CRV, COMP, SUSHI, YFI, LDO'
 };
+
+/**
+ * Met à jour l'interface selon la stratégie sélectionnée (Ichimoku ou SMC)
+ */
+function updateStrategyUI(strategy) {
+    // Masque toutes les sections de stratégie
+    document.querySelectorAll('.ichimoku-section').forEach(el => {
+        el.classList.toggle('hidden', strategy !== 'ichimoku');
+    });
+    document.querySelectorAll('.smc-section').forEach(el => {
+        el.classList.toggle('hidden', strategy !== 'smc');
+    });
+    
+    // Met à jour le label du score minimum
+    const minScoreLabel = document.querySelector('label[for="minScore"]');
+    if (minScoreLabel) {
+        if (strategy === 'smc') {
+            minScoreLabel.innerHTML = `
+                Score SMC minimum
+                <span class="tooltip-icon" data-tooltip="Score basé sur Order Blocks, FVG, BOS. Plus le score est élevé, plus le signal est fort">?</span>
+            `;
+        } else {
+            minScoreLabel.innerHTML = `
+                Score Ichimoku minimum
+                <span class="tooltip-icon" data-tooltip="Score de -7 à +7 basé sur les indicateurs Ichimoku. Plus le score est élevé, plus le signal est fort">?</span>
+            `;
+        }
+    }
+    
+    // Met à jour le hint de la stratégie
+    const strategyHint = document.getElementById('configStrategyHint');
+    if (strategyHint) {
+        if (strategy === 'smc') {
+            strategyHint.textContent = 'SMC: Order Blocks, Fair Value Gaps, Break of Structure, Liquidity Sweeps.';
+        } else {
+            strategyHint.textContent = 'Ichimoku: Signaux TK Cross, Kumo, Chikou. Stratégie classique et éprouvée.';
+        }
+    }
+    
+    // Réinitialise les icônes Lucide pour les nouvelles sections
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+    
+    console.log(`[UI] Stratégie changée: ${strategy}`);
+}
 
 /**
  * Initialise les contrôles de configuration trading
