@@ -49,25 +49,50 @@ export function createWebServer(port = 3000) {
         contentSecurityPolicy: {
             directives: {
                 defaultSrc: ["'self'"],
-                scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net", "https://unpkg.com", "https://s3.tradingview.com"],
-                scriptSrcAttr: ["'unsafe-inline'"],
-                styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+                // Scripts: sources externes de confiance uniquement + unsafe-inline pour compatibilité dashboard
+                // Note: unsafe-inline requis pour les event handlers HTML (onclick, etc.)
+                scriptSrc: [
+                    "'self'", 
+                    "'unsafe-inline'",  // Requis pour les scripts inline du dashboard
+                    "https://cdn.jsdelivr.net", 
+                    "https://unpkg.com", 
+                    "https://s3.tradingview.com"
+                ],
+                scriptSrcAttr: ["'unsafe-inline'"],  // Pour les onclick, onload, etc.
+                // Styles: unsafe-inline requis pour les styles dynamiques
+                styleSrc: [
+                    "'self'", 
+                    "'unsafe-inline'", 
+                    "https://fonts.googleapis.com", 
+                    "https://cdn.jsdelivr.net", 
+                    "https://cdnjs.cloudflare.com"
+                ],
                 fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", "data:"],
                 imgSrc: ["'self'", "data:", "https:", "blob:"],
-                connectSrc: ["'self'", "wss:", "ws:", "https:", "http:"],
+                connectSrc: ["'self'", "wss:", "ws:", "https:"],
                 frameSrc: ["'self'", "https://s.tradingview.com", "https://s3.tradingview.com", "https://*.tradingview.com"],
-                frameAncestors: ["'none'"],
-                upgradeInsecureRequests: null
+                // SÉCURITÉ RENFORCÉE
+                objectSrc: ["'none'"],           // Bloque Flash, Java, etc.
+                baseUri: ["'self'"],             // Empêche les attaques base-uri
+                formAction: ["'self'"],          // Limite les destinations de formulaires
+                frameAncestors: ["'none'"],      // Empêche l'embedding (anti-clickjacking)
+                upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null
             }
         },
         crossOriginEmbedderPolicy: false,
         crossOriginResourcePolicy: { policy: "cross-origin" },
-        // HSTS activé si ENABLE_HSTS=true dans .env
+        // HSTS activé si ENABLE_HSTS=true dans .env (force HTTPS pendant 1 an)
         hsts: process.env.ENABLE_HSTS === 'true' ? {
             maxAge: 31536000,
             includeSubDomains: true,
             preload: true
-        } : false
+        } : false,
+        // Headers de sécurité additionnels via Helmet
+        xssFilter: true,
+        noSniff: true,
+        ieNoOpen: true,
+        dnsPrefetchControl: { allow: false },
+        permittedCrossDomainPolicies: { permittedPolicies: 'none' }
     }));
 
     // ===== SÉCURITÉ: Headers additionnels =====
