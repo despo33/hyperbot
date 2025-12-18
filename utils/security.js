@@ -251,9 +251,15 @@ export function secureCors(req, res, next) {
 // ==================== HTTPS REDIRECT ====================
 
 /**
- * Force HTTPS en production
+ * Force HTTPS en production (seulement si ENABLE_HTTPS_REDIRECT=true)
+ * Par défaut désactivé pour permettre HTTP sans certificat SSL
  */
 export function forceHTTPS(req, res, next) {
+    // Désactivé par défaut - activer avec ENABLE_HTTPS_REDIRECT=true
+    if (process.env.ENABLE_HTTPS_REDIRECT !== 'true') {
+        return next();
+    }
+
     if (process.env.NODE_ENV !== 'production') {
         return next();
     }
