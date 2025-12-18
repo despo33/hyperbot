@@ -9,6 +9,7 @@ import { WebSocketServer } from 'ws';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import routes from './routes.js';
 import authRoutes from './routes/authRoutes.js';
 import walletRoutes from './routes/walletRoutes.js';
@@ -16,45 +17,19 @@ import adminRoutes from './routes/adminRoutes.js';
 import tradeEngine from './core/tradeEngine.js';
 import botManager from './core/BotManager.js';
 import logger from './services/logger.js';
+import { verifyJWT } from './utils/auth.js';
+import { 
+    rateLimiter, 
+    secureCors, 
+    forceHTTPS, 
+    securityHeaders, 
+    securityLogger 
+} from './utils/security.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Rate limiting simple (en mémoire)
-const rateLimitMap = new Map();
-const RATE_LIMIT_WINDOW = 60000; // 1 minute
-const RATE_LIMIT_MAX = 100; // 100 requêtes par minute
-
-function rateLimit(req, res, next) {
-    const ip = req.ip || req.connection.remoteAddress;
-    const now = Date.now();
-    
-    if (!rateLimitMap.has(ip)) {
-        rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
-    } else {
-        const data = rateLimitMap.get(ip);
-        if (now > data.resetTime) {
-            data.count = 1;
-            data.resetTime = now + RATE_LIMIT_WINDOW;
-        } else {
-            data.count++;
-            if (data.count > RATE_LIMIT_MAX) {
-                return res.status(429).json({ error: 'Trop de requêtes. Réessayez plus tard.' });
-            }
-        }
-    }
-    next();
-}
-
-// Nettoyage périodique du rate limit map
-setInterval(() => {
-    const now = Date.now();
-    for (const [ip, data] of rateLimitMap.entries()) {
-        if (now > data.resetTime) {
-            rateLimitMap.delete(ip);
-        }
-    }
-}, 60000);
+// Rate limiting géré par utils/security.js
 
 /**
  * Crée et configure le serveur web
@@ -65,6 +40,9 @@ export function createWebServer(port = 3000) {
     const app = express();
     const server = createServer(app);
     const wss = new WebSocketServer({ server });
+
+    // ===== SÉCURITÉ: Force HTTPS en production =====
+    app.use(forceHTTPS);
 
     // ===== SÉCURITÉ: Headers HTTP avec Helmet =====
     app.use(helmet({
@@ -81,40 +59,33 @@ export function createWebServer(port = 3000) {
                 upgradeInsecureRequests: null
             }
         },
-        crossOriginEmbedderPolicy: false, // Nécessaire pour les CDN
-        crossOriginResourcePolicy: { policy: "cross-origin" }
+        crossOriginEmbedderPolicy: false,
+        crossOriginResourcePolicy: { policy: "cross-origin" },
+        // HSTS activé si ENABLE_HSTS=true dans .env
+        hsts: process.env.ENABLE_HSTS === 'true' ? {
+            maxAge: 31536000,
+            includeSubDomains: true,
+            preload: true
+        } : false
     }));
-    
-    // HSTS désactivé car pas de HTTPS configuré
-    // if (process.env.NODE_ENV === 'production') {
-    //     app.use(helmet.hsts({
-    //         maxAge: 31536000,
-    //         includeSubDomains: true
-    //     }));
-    // }
 
-    // Rate limiting
-    app.use(rateLimit);
+    // ===== SÉCURITÉ: Headers additionnels =====
+    app.use(securityHeaders);
+
+    // ===== SÉCURITÉ: Logging des requêtes suspectes =====
+    app.use(securityLogger);
+
+    // ===== SÉCURITÉ: Rate limiting renforcé =====
+    app.use(rateLimiter('default'));
 
     // Middleware
-    app.use(express.json({ limit: '1mb' })); // Limite la taille des requêtes
+    app.use(express.json({ limit: '1mb' }));
     app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+    app.use(cookieParser());
 
-    // CORS configuré selon l'environnement
-    // En production, restreindre aux origines autorisées
-    const corsOrigin = process.env.NODE_ENV === 'production' 
-        ? (process.env.CORS_ORIGIN || 'http://72.62.25.146')
-        : '*';
-    app.use((req, res, next) => {
-        res.header('Access-Control-Allow-Origin', corsOrigin);
-        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-        res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-        res.header('Access-Control-Allow-Credentials', 'true');
-        if (req.method === 'OPTIONS') {
-            return res.sendStatus(200);
-        }
-        next();
-    });
+    // ===== SÉCURITÉ: CORS sécurisé =====
+    // En production, définir CORS_ORIGINS dans .env
+    app.use(secureCors);
 
     // Choix du frontend: 'vue' pour le nouveau, 'legacy' pour l'ancien
     const frontendMode = process.env.FRONTEND_MODE || 'legacy';
@@ -173,9 +144,10 @@ export function createWebServer(port = 3000) {
         res.status(500).json({ error: 'Erreur serveur interne' });
     });
 
-    // WebSocket - Connexions en temps réel
-    const clients = new Set();
-    const MAX_WS_CLIENTS = 50; // Limite de connexions simultanées
+    // ===== WebSocket SÉCURISÉ avec authentification JWT =====
+    const clients = new Map(); // Map<ws, { userId, authenticated, subscriptions }>
+    const MAX_WS_CLIENTS = 50;
+    const WS_AUTH_TIMEOUT = 10000; // 10s pour s'authentifier
 
     wss.on('connection', (ws, req) => {
         // Limite le nombre de connexions
@@ -185,22 +157,58 @@ export function createWebServer(port = 3000) {
             return;
         }
 
-        console.log('[WS] Nouvelle connexion');
-        clients.add(ws);
-        console.log(`[WS] Client connecté (total: ${clients.size})`);
+        // Extrait le token du query string ou des headers
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const token = url.searchParams.get('token');
+        
+        // Initialise le client comme non authentifié
+        const clientData = {
+            authenticated: false,
+            userId: null,
+            subscriptions: new Set(),
+            ip: req.socket.remoteAddress
+        };
+        clients.set(ws, clientData);
+
+        console.log(`[WS] Nouvelle connexion depuis ${clientData.ip} (total: ${clients.size})`);
+
+        // Si token fourni dans l'URL, authentifie immédiatement
+        if (token) {
+            const decoded = verifyJWT(token);
+            if (decoded) {
+                clientData.authenticated = true;
+                clientData.userId = decoded.userId;
+                console.log(`[WS] Client authentifié: ${decoded.userId}`);
+            }
+        }
+
+        // Timeout d'authentification - déconnecte si pas authentifié après 10s
+        // (Désactivé en développement pour faciliter les tests)
+        let authTimeout = null;
+        if (process.env.NODE_ENV === 'production' && process.env.WS_REQUIRE_AUTH === 'true') {
+            authTimeout = setTimeout(() => {
+                if (!clientData.authenticated) {
+                    console.log(`[WS] Client non authentifié déconnecté: ${clientData.ip}`);
+                    ws.close(4001, 'Authentification requise');
+                }
+            }, WS_AUTH_TIMEOUT);
+        }
 
         // Envoie l'état initial
         ws.send(JSON.stringify({
             type: 'connected',
             timestamp: Date.now(),
-            message: 'Connecté au serveur de trading'
+            authenticated: clientData.authenticated,
+            message: clientData.authenticated 
+                ? 'Connecté et authentifié' 
+                : 'Connecté - Authentification requise pour les données sensibles'
         }));
 
         // Gestion des messages entrants
         ws.on('message', (message) => {
             try {
                 const data = JSON.parse(message);
-                handleWebSocketMessage(ws, data);
+                handleWebSocketMessage(ws, data, clientData);
             } catch (e) {
                 console.error('[WS] Erreur parsing message:', e.message);
             }
@@ -208,12 +216,14 @@ export function createWebServer(port = 3000) {
 
         // Déconnexion
         ws.on('close', () => {
+            if (authTimeout) clearTimeout(authTimeout);
             clients.delete(ws);
             console.log(`[WS] Client déconnecté (restant: ${clients.size})`);
         });
 
         ws.on('error', (error) => {
             console.error('[WS] Erreur:', error.message);
+            if (authTimeout) clearTimeout(authTimeout);
             clients.delete(ws);
         });
     });
@@ -222,17 +232,52 @@ export function createWebServer(port = 3000) {
      * Gère les messages WebSocket entrants
      * @param {WebSocket} ws 
      * @param {Object} data 
+     * @param {Object} clientData - Données du client (auth, userId, etc.)
      */
-    function handleWebSocketMessage(ws, data) {
+    function handleWebSocketMessage(ws, data, clientData) {
         switch (data.type) {
             case 'ping':
                 ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
                 break;
 
+            case 'auth':
+                // Authentification via JWT
+                if (data.token) {
+                    const decoded = verifyJWT(data.token);
+                    if (decoded) {
+                        clientData.authenticated = true;
+                        clientData.userId = decoded.userId;
+                        ws.send(JSON.stringify({ 
+                            type: 'authenticated', 
+                            success: true,
+                            userId: decoded.userId 
+                        }));
+                        console.log(`[WS] Client authentifié via message: ${decoded.userId}`);
+                    } else {
+                        ws.send(JSON.stringify({ 
+                            type: 'authenticated', 
+                            success: false,
+                            error: 'Token invalide' 
+                        }));
+                    }
+                }
+                break;
+
             case 'subscribe':
-                // Abonnement à un type d'événement spécifique
-                ws.subscriptions = ws.subscriptions || new Set();
-                ws.subscriptions.add(data.channel);
+                // Vérifie l'authentification pour les channels sensibles
+                const sensitiveChannels = ['trades', 'signals', 'logs', 'analysis', 'status'];
+                const requiresAuth = sensitiveChannels.includes(data.channel);
+                
+                if (requiresAuth && !clientData.authenticated && process.env.NODE_ENV === 'production') {
+                    ws.send(JSON.stringify({ 
+                        type: 'error', 
+                        error: 'Authentification requise pour ce channel',
+                        channel: data.channel
+                    }));
+                    return;
+                }
+                
+                clientData.subscriptions.add(data.channel);
                 ws.send(JSON.stringify({ 
                     type: 'subscribed', 
                     channel: data.channel 
@@ -240,9 +285,11 @@ export function createWebServer(port = 3000) {
                 break;
 
             case 'unsubscribe':
-                if (ws.subscriptions) {
-                    ws.subscriptions.delete(data.channel);
-                }
+                clientData.subscriptions.delete(data.channel);
+                ws.send(JSON.stringify({ 
+                    type: 'unsubscribed', 
+                    channel: data.channel 
+                }));
                 break;
 
             default:
@@ -251,26 +298,38 @@ export function createWebServer(port = 3000) {
     }
 
     /**
-     * Broadcast un message à tous les clients connectés
+     * Broadcast un message à tous les clients connectés et authentifiés
      * @param {string} type 
      * @param {Object} data 
      * @param {string} channel - Optionnel, pour filtrer par abonnement
+     * @param {boolean} requireAuth - Si true, n'envoie qu'aux clients authentifiés
      */
-    function broadcast(type, data, channel = null) {
+    function broadcast(type, data, channel = null, requireAuth = true) {
         const message = JSON.stringify({
             type,
             timestamp: Date.now(),
             data
         });
 
-        clients.forEach(client => {
-            if (client.readyState === 1) { // WebSocket.OPEN
-                // Si un channel est spécifié, vérifie l'abonnement
-                if (channel && client.subscriptions && !client.subscriptions.has(channel)) {
-                    return;
-                }
-                client.send(message);
+        // En production, les données sensibles ne sont envoyées qu'aux clients authentifiés
+        const isProduction = process.env.NODE_ENV === 'production';
+        const sensitiveChannels = ['trades', 'signals', 'logs', 'analysis', 'status'];
+        const isSensitive = sensitiveChannels.includes(channel);
+
+        clients.forEach((clientData, ws) => {
+            if (ws.readyState !== 1) return; // WebSocket.OPEN
+            
+            // Vérifie l'authentification pour les données sensibles en production
+            if (isProduction && isSensitive && requireAuth && !clientData.authenticated) {
+                return;
             }
+            
+            // Vérifie l'abonnement au channel
+            if (channel && !clientData.subscriptions.has(channel)) {
+                return;
+            }
+            
+            ws.send(message);
         });
     }
 
@@ -314,9 +373,13 @@ export function createWebServer(port = 3000) {
 
     // Ping périodique pour maintenir les connexions
     setInterval(() => {
-        clients.forEach(client => {
-            if (client.readyState === 1) {
-                client.send(JSON.stringify({ type: 'heartbeat', timestamp: Date.now() }));
+        clients.forEach((clientData, ws) => {
+            if (ws.readyState === 1) {
+                ws.send(JSON.stringify({ 
+                    type: 'heartbeat', 
+                    timestamp: Date.now(),
+                    authenticated: clientData.authenticated
+                }));
             }
         });
     }, 30000);

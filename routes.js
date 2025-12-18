@@ -40,10 +40,10 @@ const router = Router();
 
 /**
  * GET /api/status
- * Retourne le statut complet du bot
- * Utilise le wallet de l'utilisateur connecté si disponible
+ * Retourne le statut complet du bot (PROTÉGÉ)
+ * Utilise le wallet de l'utilisateur connecté
  */
-router.get('/status', optionalAuth, async (req, res) => {
+router.get('/status', requireAuth, async (req, res) => {
     try {
         // Si utilisateur connecté, récupère le statut de SON bot
         let botStatus = null;
@@ -170,21 +170,13 @@ router.post('/bot/stop', requireAuth, (req, res) => {
 
 /**
  * GET /api/logs
- * Retourne les logs du bot de l'utilisateur
+ * Retourne les logs du bot de l'utilisateur (PROTÉGÉ)
  */
-router.get('/logs', optionalAuth, (req, res) => {
+router.get('/logs', requireAuth, (req, res) => {
     const limit = parseInt(req.query.limit) || 100;
-    
-    // Si utilisateur connecté, retourne ses logs
-    if (req.user) {
-        const userId = req.user._id.toString();
-        const logs = botManager.getBotLogs(userId, limit);
-        return res.json({ logs, userId: userId.substring(0, 8) + '...' });
-    }
-    
-    // Sinon logs globaux (ancien système)
-    const logs = tradeEngine.getLogs(limit);
-    res.json({ logs });
+    const userId = req.user._id.toString();
+    const logs = botManager.getBotLogs(userId, limit);
+    res.json({ logs, userId: userId.substring(0, 8) + '...' });
 });
 
 // ==================== TRADING ROUTES ====================
@@ -223,9 +215,9 @@ router.get('/candles/:symbol', async (req, res) => {
 
 /**
  * GET /api/analysis
- * Effectue une analyse sans trader
+ * Effectue une analyse sans trader (PROTÉGÉ)
  */
-router.get('/analysis', async (req, res) => {
+router.get('/analysis', requireAuth, async (req, res) => {
     try {
         const analysis = await tradeEngine.analyzeOnly();
         res.json(analysis);
@@ -236,9 +228,9 @@ router.get('/analysis', async (req, res) => {
 
 /**
  * GET /api/positions
- * Retourne les positions ouvertes de l'utilisateur avec leurs analyses
+ * Retourne les positions ouvertes de l'utilisateur avec leurs analyses (PROTÉGÉ)
  */
-router.get('/positions', optionalAuth, async (req, res) => {
+router.get('/positions', requireAuth, async (req, res) => {
     try {
         let address;
         if (req.user) {
@@ -275,9 +267,9 @@ router.get('/positions', optionalAuth, async (req, res) => {
 
 /**
  * GET /api/position-details/:symbol
- * Retourne les détails complets d'une position (analyse, calculs, raisons)
+ * Retourne les détails complets d'une position (analyse, calculs, raisons) (PROTÉGÉ)
  */
-router.get('/position-details/:symbol', optionalAuth, async (req, res) => {
+router.get('/position-details/:symbol', requireAuth, async (req, res) => {
     try {
         const { symbol } = req.params;
         
@@ -373,9 +365,9 @@ router.get('/position-details/:symbol', optionalAuth, async (req, res) => {
 
 /**
  * GET /api/orders
- * Retourne les ordres ouverts de l'utilisateur
+ * Retourne les ordres ouverts de l'utilisateur (PROTÉGÉ)
  */
-router.get('/orders', optionalAuth, async (req, res) => {
+router.get('/orders', requireAuth, async (req, res) => {
     try {
         let address;
         if (req.user) {
@@ -476,14 +468,13 @@ router.post('/cancel-orders', requireAuth, async (req, res) => {
 
 /**
  * GET /api/config/trading
- * Retourne la config trading de l'utilisateur
+ * Retourne la config trading de l'utilisateur (PROTÉGÉ)
  */
-router.get('/config/trading', optionalAuth, async (req, res) => {
-    // Si utilisateur connecté, retourne sa config
-    if (req.user && req.user.botConfig) {
+router.get('/config/trading', requireAuth, async (req, res) => {
+    if (req.user.botConfig) {
         return res.json({ config: req.user.botConfig, fromUser: true });
     }
-    // Sinon config globale
+    // Fallback config par défaut
     res.json({ config: tradeEngine.config, fromUser: false });
 });
 
@@ -547,11 +538,10 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
 
 /**
  * GET /api/config/risk
- * Retourne la config risk management
+ * Retourne la config risk management (PROTÉGÉ)
  */
-router.get('/config/risk', optionalAuth, async (req, res) => {
-    // Si utilisateur connecté, retourne sa config risk depuis botConfig
-    if (req.user && req.user.botConfig) {
+router.get('/config/risk', requireAuth, async (req, res) => {
+    if (req.user.botConfig) {
         return res.json({ 
             config: {
                 riskPerTrade: req.user.botConfig.riskPerTrade || 2,
@@ -979,69 +969,48 @@ router.post('/keys/save', requireAuth, async (req, res) => {
 
 /**
  * GET /api/keys/trading-address
- * Retourne l'adresse de trading de l'utilisateur connecté
+ * Retourne l'adresse de trading de l'utilisateur connecté (PROTÉGÉ)
  */
-router.get('/keys/trading-address', optionalAuth, async (req, res) => {
-    // Si utilisateur connecté, retourne UNIQUEMENT son wallet (pas de fallback)
-    if (req.user) {
-        const activeWallet = req.user.getActiveWallet();
-        if (activeWallet) {
-            return res.json({
-                tradingAddress: activeWallet.tradingAddress || activeWallet.address,
-                address: activeWallet.address,
-                walletName: activeWallet.name,
-                isUserWallet: true
-            });
-        }
-        // Utilisateur connecté mais pas de wallet
+router.get('/keys/trading-address', requireAuth, async (req, res) => {
+    const activeWallet = req.user.getActiveWallet();
+    if (activeWallet) {
         return res.json({
-            tradingAddress: null,
-            address: null,
-            walletName: null,
+            tradingAddress: activeWallet.tradingAddress || activeWallet.address,
+            address: activeWallet.address,
+            walletName: activeWallet.name,
             isUserWallet: true
         });
     }
-    
-    // Seulement si PAS connecté: wallet global
+    // Utilisateur connecté mais pas de wallet
     res.json({
-        tradingAddress: auth.tradingAddress || auth.getAddress(),
-        address: auth.getAddress(),
-        isUserWallet: false
+        tradingAddress: null,
+        address: null,
+        walletName: null,
+        isUserWallet: true
     });
 });
 
 /**
  * GET /api/keys/status
- * Retourne le statut de l'authentification de l'utilisateur
+ * Retourne le statut de l'authentification de l'utilisateur (PROTÉGÉ)
  */
-router.get('/keys/status', optionalAuth, async (req, res) => {
-    // Si utilisateur connecté, retourne UNIQUEMENT ses wallets (pas de fallback global)
-    if (req.user) {
-        const activeWallet = req.user.getActiveWallet();
-        return res.json({
-            authenticated: !!activeWallet,
-            address: activeWallet?.address || null,
-            tradingAddress: activeWallet?.tradingAddress || activeWallet?.address || null,
-            walletName: activeWallet?.name || null,
-            walletsCount: req.user.wallets.length,
-            isUserWallet: true
-        });
-    }
-    
-    // Seulement si PAS connecté: utilise wallet global
+router.get('/keys/status', requireAuth, async (req, res) => {
+    const activeWallet = req.user.getActiveWallet();
     res.json({
-        authenticated: auth.isReady(),
-        address: auth.getAddress(),
-        tradingAddress: auth.tradingAddress,
-        isUserWallet: false
+        authenticated: !!activeWallet,
+        address: activeWallet?.address || null,
+        tradingAddress: activeWallet?.tradingAddress || activeWallet?.address || null,
+        walletName: activeWallet?.name || null,
+        walletsCount: req.user.wallets.length,
+        isUserWallet: true
     });
 });
 
 /**
  * GET /api/account/check/:address
- * Vérifie le solde d'une adresse spécifique (pour debug)
+ * Vérifie le solde d'une adresse spécifique (PROTÉGÉ - admin/debug)
  */
-router.get('/account/check/:address', async (req, res) => {
+router.get('/account/check/:address', requireAuth, async (req, res) => {
     try {
         const { address } = req.params;
         
@@ -1123,9 +1092,9 @@ router.post('/keys/load', requireAuth, async (req, res) => {
 
 /**
  * GET /api/signals/history
- * Retourne l'historique des signaux
+ * Retourne l'historique des signaux (PROTÉGÉ)
  */
-router.get('/signals/history', (req, res) => {
+router.get('/signals/history', requireAuth, (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const history = signalDetector.getSignalHistory(limit);
     res.json({ signals: history });
@@ -1133,9 +1102,9 @@ router.get('/signals/history', (req, res) => {
 
 /**
  * GET /api/signals/last
- * Retourne le dernier signal
+ * Retourne le dernier signal (PROTÉGÉ)
  */
-router.get('/signals/last', (req, res) => {
+router.get('/signals/last', requireAuth, (req, res) => {
     const signal = signalDetector.getLastSignal();
     res.json({ signal });
 });
@@ -1144,28 +1113,22 @@ router.get('/signals/last', (req, res) => {
 
 /**
  * GET /api/account/balance
- * Retourne le solde du compte de l'utilisateur connecté
+ * Retourne le solde du compte de l'utilisateur connecté (PROTÉGÉ)
  */
-router.get('/account/balance', optionalAuth, async (req, res) => {
+router.get('/account/balance', requireAuth, async (req, res) => {
     try {
-        let addressToUse;
+        const activeWallet = req.user.getActiveWallet();
+        const addressToUse = activeWallet?.tradingAddress || activeWallet?.address;
         
-        // Utilise le wallet de l'utilisateur si connecté
-        if (req.user) {
-            const activeWallet = req.user.getActiveWallet();
-            addressToUse = activeWallet?.tradingAddress || activeWallet?.address;
-        }
-        
-        // Fallback sur l'adresse globale si pas d'utilisateur
         if (!addressToUse) {
-            addressToUse = auth.getBalanceAddress();
+            return res.json({ balance: 0, equity: 0, message: 'Aucun wallet configuré' });
         }
         
         const balance = await api.getAccountBalance(addressToUse);
         res.json({
             ...balance,
             addressUsed: addressToUse,
-            isUserWallet: !!req.user
+            isUserWallet: true
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -1174,25 +1137,19 @@ router.get('/account/balance', optionalAuth, async (req, res) => {
 
 /**
  * GET /api/account/fills
- * Retourne l'historique des trades de l'utilisateur connecté
+ * Retourne l'historique des trades de l'utilisateur connecté (PROTÉGÉ)
  */
-router.get('/account/fills', optionalAuth, async (req, res) => {
+router.get('/account/fills', requireAuth, async (req, res) => {
     try {
-        let tradingAddress;
+        const activeWallet = req.user.getActiveWallet();
+        const tradingAddress = activeWallet?.tradingAddress || activeWallet?.address;
         
-        // Utilise le wallet de l'utilisateur si connecté
-        if (req.user) {
-            const activeWallet = req.user.getActiveWallet();
-            tradingAddress = activeWallet?.tradingAddress || activeWallet?.address;
-        }
-        
-        // Fallback sur l'adresse globale si pas d'utilisateur
         if (!tradingAddress) {
-            tradingAddress = auth.getBalanceAddress();
+            return res.json({ fills: [], message: 'Aucun wallet configuré' });
         }
         
         const fills = await api.getUserFills(tradingAddress);
-        res.json({ fills, isUserWallet: !!req.user });
+        res.json({ fills, isUserWallet: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -1200,18 +1157,19 @@ router.get('/account/fills', optionalAuth, async (req, res) => {
 
 /**
  * GET /api/account/stats
- * Retourne les statistiques calculées à partir de l'historique
+ * Retourne les statistiques calculées à partir de l'historique (PROTÉGÉ)
  */
-router.get('/account/stats', optionalAuth, async (req, res) => {
+router.get('/account/stats', requireAuth, async (req, res) => {
     try {
-        // Utilise le wallet de l'utilisateur si connecté
-        let tradingAddress;
-        if (req.user) {
-            const activeWallet = req.user.getActiveWallet();
-            tradingAddress = activeWallet?.tradingAddress || activeWallet?.address;
-        }
+        const activeWallet = req.user.getActiveWallet();
+        const tradingAddress = activeWallet?.tradingAddress || activeWallet?.address;
+        
         if (!tradingAddress) {
-            tradingAddress = auth.getBalanceAddress();
+            return res.json({
+                totalTrades: 0, wins: 0, losses: 0, winRate: 0,
+                totalPnL: 0, avgWin: 0, avgLoss: 0, profitFactor: 0,
+                message: 'Aucun wallet configuré'
+            });
         }
         
         const fills = await api.getUserFills(tradingAddress);
@@ -1345,19 +1303,15 @@ router.get('/account/stats', optionalAuth, async (req, res) => {
 
 /**
  * GET /api/account/history
- * Retourne l'historique des trades avec filtres
- * Utilise le wallet de l'utilisateur connecté
+ * Retourne l'historique des trades avec filtres (PROTÉGÉ)
  */
-router.get('/account/history', optionalAuth, async (req, res) => {
+router.get('/account/history', requireAuth, async (req, res) => {
     try {
-        // Utilise le wallet de l'utilisateur si connecté
-        let tradingAddress;
-        if (req.user) {
-            const activeWallet = req.user.getActiveWallet();
-            tradingAddress = activeWallet?.tradingAddress || activeWallet?.address;
-        }
+        const activeWallet = req.user.getActiveWallet();
+        const tradingAddress = activeWallet?.tradingAddress || activeWallet?.address;
+        
         if (!tradingAddress) {
-            tradingAddress = auth.getBalanceAddress();
+            return res.json({ trades: [], stats: { total: 0 }, message: 'Aucun wallet configuré' });
         }
         
         const fills = await api.getUserFills(tradingAddress);
@@ -1505,9 +1459,9 @@ router.get('/account/history', optionalAuth, async (req, res) => {
 
 /**
  * GET /api/scanner/scan
- * Lance un scan de toutes les cryptos
+ * Lance un scan de toutes les cryptos (PROTÉGÉ)
  */
-router.get('/scanner/scan', async (req, res) => {
+router.get('/scanner/scan', requireAuth, async (req, res) => {
     try {
         const timeframe = req.query.timeframe || '1h';
         const symbols = req.query.symbols ? req.query.symbols.split(',') : TOP_CRYPTOS;
@@ -1527,9 +1481,9 @@ router.get('/scanner/scan', async (req, res) => {
 
 /**
  * GET /api/scanner/results
- * Retourne les résultats du dernier scan
+ * Retourne les résultats du dernier scan (PROTÉGÉ)
  */
-router.get('/scanner/results', (req, res) => {
+router.get('/scanner/results', requireAuth, (req, res) => {
     const sortBy = req.query.sortBy || 'score';
     const order = req.query.order || 'desc';
     
@@ -1544,9 +1498,9 @@ router.get('/scanner/results', (req, res) => {
 
 /**
  * GET /api/scanner/opportunities
- * Retourne les meilleures opportunités de trading
+ * Retourne les meilleures opportunités de trading (PROTÉGÉ)
  */
-router.get('/scanner/opportunities', (req, res) => {
+router.get('/scanner/opportunities', requireAuth, (req, res) => {
     const limit = parseInt(req.query.limit) || 5;
     
     const opportunities = scanner.getBestOpportunities(limit);
@@ -1562,9 +1516,9 @@ router.get('/scanner/opportunities', (req, res) => {
 
 /**
  * GET /api/scanner/symbol/:symbol
- * Retourne l'analyse d'un symbole spécifique
+ * Retourne l'analyse d'un symbole spécifique (PROTÉGÉ)
  */
-router.get('/scanner/symbol/:symbol', async (req, res) => {
+router.get('/scanner/symbol/:symbol', requireAuth, async (req, res) => {
     try {
         const { symbol } = req.params;
         const timeframe = req.query.timeframe || '1h';
@@ -1578,9 +1532,9 @@ router.get('/scanner/symbol/:symbol', async (req, res) => {
 
 /**
  * GET /api/trade-details/:symbol
- * Retourne les détails complets d'un trade potentiel (SL, TP, probabilités)
+ * Retourne les détails complets d'un trade potentiel (SL, TP, probabilités) (PROTÉGÉ)
  */
-router.get('/trade-details/:symbol', async (req, res) => {
+router.get('/trade-details/:symbol', requireAuth, async (req, res) => {
     try {
         const { symbol } = req.params;
         const details = await tradeEngine.getTradeDetails(symbol.toUpperCase());
@@ -1618,9 +1572,9 @@ router.post('/scanner/stop', requireAuth, (req, res) => {
 
 /**
  * GET /api/scanner/cryptos
- * Retourne la liste des cryptos supportées
+ * Retourne la liste des cryptos supportées (PROTÉGÉ)
  */
-router.get('/scanner/cryptos', (req, res) => {
+router.get('/scanner/cryptos', requireAuth, (req, res) => {
     res.json({ cryptos: TOP_CRYPTOS });
 });
 
@@ -1688,9 +1642,9 @@ router.post('/backtest/run', requireAuth, async (req, res) => {
 
 /**
  * GET /api/backtest/status
- * Retourne le statut du backtest en cours
+ * Retourne le statut du backtest en cours (PROTÉGÉ)
  */
-router.get('/backtest/status', (req, res) => {
+router.get('/backtest/status', requireAuth, (req, res) => {
     res.json(backtester.getStatus());
 });
 
