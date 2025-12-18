@@ -68,9 +68,8 @@ bot/
 │   └── validation.js         # Schémas Joi pour validation API
 │
 ├── storage/                  # 💾 DONNÉES PERSISTANTES
-│   ├── config.json           # Config trading
-│   ├── risk.json             # Config risk management
-│   ├── profiles.json         # Profils de configuration
+│   ├── risk.json             # Config risk management (fallback)
+│   ├── profiles.json         # Profils de configuration (legacy)
 │   ├── keys.json.enc         # Clés API chiffrées AES-256
 │   └── state.json            # État du bot
 │

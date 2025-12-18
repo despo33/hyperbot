@@ -130,39 +130,26 @@ class TradeEngine {
             onAnalysis: []
         };
 
-        this.configPath = path.join(__dirname, '..', 'storage', 'config.json');
-        this.loadConfig();
+        // Note: La config est maintenant gérée via MongoDB (user.botConfig)
+        // Plus de stockage local - tout passe par l'authentification utilisateur
     }
 
     /**
-     * Charge la configuration depuis le fichier
+     * Charge la configuration (no-op, config vient de MongoDB via user.botConfig)
+     * @deprecated Utiliser updateConfig() avec les données de l'utilisateur
      */
     loadConfig() {
-        try {
-            if (fs.existsSync(this.configPath)) {
-                const data = JSON.parse(fs.readFileSync(this.configPath, 'utf8'));
-                this.config = { ...this.config, ...data };
-                this.log('Configuration chargée', 'info');
-            }
-        } catch (error) {
-            this.log(`Erreur chargement config: ${error.message}`, 'error');
-        }
+        // No-op - la config est chargée depuis MongoDB via les routes API
+        this.log('Configuration initialisée (valeurs par défaut)', 'info');
     }
 
     /**
-     * Sauvegarde la configuration
+     * Sauvegarde la configuration (no-op, config sauvée dans MongoDB)
+     * @deprecated La sauvegarde se fait via POST /api/config/trading
      */
     saveConfig() {
-        try {
-            const dir = path.dirname(this.configPath);
-            if (!fs.existsSync(dir)) {
-                fs.mkdirSync(dir, { recursive: true });
-            }
-            fs.writeFileSync(this.configPath, JSON.stringify(this.config, null, 2));
-            this.log('Configuration sauvegardée', 'info');
-        } catch (error) {
-            this.log(`Erreur sauvegarde config: ${error.message}`, 'error');
-        }
+        // No-op - la config est sauvegardée dans MongoDB via les routes API
+        // Cette méthode est gardée pour compatibilité mais ne fait plus rien
     }
 
     /**

@@ -265,8 +265,7 @@ Double-cliquez sur `start.bat` pour lancer le bot!
 │   └── hyperliquidAuth.js   # Authentification Hyperliquid
 │
 ├── /storage                 # Données persistantes (JSON)
-│   ├── config.json          # Configuration trading
-│   ├── risk.json            # Configuration risk management
+│   ├── risk.json            # Configuration risk management (fallback)
 │   ├── state.json           # État du bot
 │   ├── keys.json.enc        # Clés API chiffrées
 │   └── logs.log             # Fichier de logs
