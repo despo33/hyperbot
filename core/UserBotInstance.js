@@ -109,18 +109,54 @@ class UserBotInstance {
         }
 
         this.state.isRunning = true;
-        this.log(`🚀 Bot démarré pour l'utilisateur ${this.userId}`, 'success');
-        this.log(`Mode: ${this.config.mode.toUpperCase()}`, 'info');
-        this.log(`Symboles: ${this.config.symbols.join(', ')}`, 'info');
         
-        // Affiche les timeframes selon le mode
+        // ===== LOG DÉTAILLÉ DES RÉGLAGES =====
+        this.log(`═══════════════════════════════════════`, 'info');
+        this.log(`🚀 DÉMARRAGE DU BOT DE TRADING`, 'success');
+        this.log(`═══════════════════════════════════════`, 'info');
+        this.log(`Mode: ${this.config.mode.toUpperCase()}`, 'info');
+        
+        // Symboles
+        this.log(`🪙 Symboles: ${this.config.symbols?.length || 0} paires`, 'info');
+        this.log(`   ${this.config.symbols?.join(', ') || 'Aucun'}`, 'info');
+        
+        // Timeframes
         if (this.config.multiTimeframeMode && this.config.mtfTimeframes?.length > 0) {
-            this.log(`Mode Multi-Timeframe: ${this.config.mtfTimeframes.join(', ')}`, 'info');
+            this.log(`⏱️ Mode Multi-Timeframe ACTIF`, 'info');
+            this.log(`   Timeframes: ${this.config.mtfTimeframes.join(', ')}`, 'info');
+            this.log(`   Confirmation min: ${this.config.mtfMinConfirmation || 2} TF`, 'info');
         } else {
-            this.log(`Timeframe: ${this.config.timeframes.join(', ')}`, 'info');
-            // Applique le preset seulement en mode non-MTF
-            this.applyTimeframePreset(this.config.timeframes[0]);
+            this.log(`⏱️ Timeframe: ${this.config.timeframes?.join(', ') || '15m'}`, 'info');
+            this.applyTimeframePreset(this.config.timeframes?.[0] || '15m');
         }
+        
+        // Preset actif
+        const activePreset = this.TIMEFRAME_PRESETS[this.config.timeframes?.[0] || '15m'] || {};
+        this.log(`📋 Preset: ${activePreset.name || 'Par défaut'}`, 'info');
+        
+        // Filtres et seuils
+        this.log(`🎯 Filtres actifs:`, 'info');
+        this.log(`   Score min: ${this.config.minScore || 3}`, 'info');
+        this.log(`   Win Prob min: ${((this.config.minWinProbability || 0.65) * 100).toFixed(0)}%`, 'info');
+        
+        // TP/SL
+        const tpsl = this.TIMEFRAME_TPSL[this.config.timeframes?.[0] || '15m'] || { tp: 2, sl: 1 };
+        this.log(`💰 TP/SL:`, 'info');
+        this.log(`   Mode: ${this.config.tpslMode || 'auto'}`, 'info');
+        this.log(`   TP: ${this.config.defaultTP || tpsl.tp}% | SL: ${this.config.defaultSL || tpsl.sl}%`, 'info');
+        
+        // Autres paramètres
+        this.log(`⚙️ Paramètres:`, 'info');
+        this.log(`   Intervalle: ${(this.config.analysisInterval || 60000) / 1000}s`, 'info');
+        this.log(`   Levier: ${this.config.leverage || 5}x`, 'info');
+        this.log(`   Max positions: ${this.config.maxConcurrentTrades || 3}`, 'info');
+        
+        // Risk Management
+        this.log(`🛡️ Risk Management:`, 'info');
+        this.log(`   Risk/trade: ${this.config.riskPerTrade || 2}%`, 'info');
+        this.log(`   Daily loss limit: ${this.config.dailyLossLimit || 5}%`, 'info');
+        this.log(`   Max drawdown: ${this.config.maxDrawdown || 20}%`, 'info');
+        this.log(`═══════════════════════════════════════`, 'info');
 
         // Démarre la boucle d'analyse
         this.startAnalysisLoop();
