@@ -370,12 +370,58 @@ class UserBotInstance {
      * Traite les opportunités en mode auto
      */
     async processOpportunities(opportunities) {
+        // ÉTAPE 1: Récupère les positions RÉELLES sur l'exchange (source de vérité)
+        const tradingAddress = this.auth.tradingAddress || this.auth.getAddress();
+        let realPositions = [];
+        try {
+            realPositions = await api.getPositions(tradingAddress);
+        } catch (e) {
+            this.log(`Erreur récupération positions: ${e.message}`, 'error');
+            return;
+        }
+        
+        // Filtre les positions actives (taille > 0)
+        const activeRealPositions = realPositions.filter(p => {
+            const size = parseFloat(p.szi || p.size || 0);
+            return Math.abs(size) > 0;
+        });
+        
+        const activeCount = activeRealPositions.length;
+        const symbolsWithPosition = new Set(activeRealPositions.map(p => p.coin || p.symbol));
+        
+        // Synchronise l'état interne avec les positions réelles
+        this.state.activePositions.clear();
+        for (const pos of activeRealPositions) {
+            const symbol = pos.coin || pos.symbol;
+            const size = parseFloat(pos.szi || pos.size || 0);
+            this.state.activePositions.set(symbol, {
+                symbol,
+                direction: size > 0 ? 'long' : 'short',
+                entryPrice: parseFloat(pos.entryPx || 0),
+                size: Math.abs(size)
+            });
+        }
+        
+        // ÉTAPE 2: Vérifie la limite AVANT de traiter les opportunités
+        if (activeCount >= this.config.maxConcurrentTrades) {
+            this.log(`⚠️ Max trades atteint (${activeCount}/${this.config.maxConcurrentTrades}) - Aucun nouveau trade`, 'info');
+            return;
+        }
+        
         // Trie par score décroissant
         const sorted = opportunities.sort((a, b) => b.signal.score - a.signal.score);
 
+        // ÉTAPE 3: Traite UNE SEULE opportunité à la fois pour éviter les dépassements
         for (const opp of sorted) {
+            // Re-vérifie la limite (positions réelles + état interne)
             if (this.state.activePositions.size >= this.config.maxConcurrentTrades) {
+                this.log(`Max trades atteint après trade, arrêt`, 'info');
                 break;
+            }
+            
+            // Skip si position existe déjà sur ce symbole
+            if (symbolsWithPosition.has(opp.symbol)) {
+                continue;
             }
 
             // Vérifie le cooldown
@@ -386,6 +432,8 @@ class UserBotInstance {
 
             try {
                 await this.executeTrade(opp);
+                // IMPORTANT: Après un trade, on s'arrête pour laisser le temps à l'exchange de se mettre à jour
+                break;
             } catch (error) {
                 this.log(`Erreur exécution trade ${opp.symbol}: ${error.message}`, 'error');
             }

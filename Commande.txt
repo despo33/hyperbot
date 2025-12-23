@@ -1,0 +1,151 @@
+================================================================================
+                    COMMANDES UTILES - ROBOT TRADING HYPERBOT
+================================================================================
+
+==================== SERVEUR VPS (SSH) ====================
+
+# Connexion SSH au serveur
+ssh root@72.62.25.146
+
+# Aller dans le dossier du projet
+cd /var/www/hyperbot
+
+# Pull les dernières modifications
+git pull origin main
+
+# Voir les logs en temps réel
+pm2 logs trading-bot
+
+# Redémarrer le bot
+pm2 restart trading-bot
+
+# Arrêter le bot
+pm2 stop trading-bot
+
+# Démarrer le bot
+pm2 start trading-bot
+
+# Voir le statut des processus
+pm2 list
+
+# Voir les détails du bot
+pm2 show trading-bot
+
+# Sauvegarder la config PM2
+pm2 save
+
+# Voir les logs d'erreur uniquement
+pm2 logs trading-bot --err
+
+# Voir les 100 dernières lignes de logs
+pm2 logs trading-bot --lines 100
+
+
+==================== GIT (Local & Serveur) ====================
+
+# Voir le statut des fichiers modifiés
+git status
+
+# Ajouter tous les fichiers modifiés
+git add .
+
+# Ajouter des fichiers spécifiques
+git add bot/routes.js bot/web/dashboard.js
+
+# Commit avec message
+git commit -m "Description des modifications"
+
+# Push vers GitHub
+git push origin main
+
+# Pull depuis GitHub
+git pull origin main
+
+# Voir l'historique des commits
+git log --oneline -10
+
+# Annuler les modifications locales (ATTENTION: perd les changements)
+git checkout -- .
+
+# Reset complet vers la version GitHub (ATTENTION: perd tout)
+git reset --hard origin/main
+
+
+==================== POWERSHELL (Windows Local) ====================
+
+# Aller dans le dossier du projet
+cd c:\Users\33666\Desktop\robot\analyse
+
+# Copier fichiers vers serveur (SCP)
+scp bot\routes.js root@72.62.25.146:/var/www/hyperbot/bot/
+scp bot\web\dashboard.js root@72.62.25.146:/var/www/hyperbot/bot/web/
+
+# Exécuter commande SSH directement
+ssh root@72.62.25.146 "pm2 restart trading-bot"
+
+# Voir contenu d'un fichier
+cat bot\routes.js
+
+# Rechercher dans les fichiers
+Select-String -Path "bot\*.js" -Pattern "multiTimeframeMode"
+
+
+==================== MONGODB ====================
+
+# Connexion MongoDB (sur serveur)
+mongosh
+
+# Voir les bases de données
+show dbs
+
+# Utiliser la base hyperbot
+use hyperbot
+
+# Voir les collections
+show collections
+
+# Voir les utilisateurs
+db.users.find().pretty()
+
+# Voir un utilisateur spécifique
+db.users.findOne({username: "admin"})
+
+
+==================== NGINX (Serveur Web) ====================
+
+# Tester la config Nginx
+nginx -t
+
+# Redémarrer Nginx
+systemctl restart nginx
+
+# Voir le statut Nginx
+systemctl status nginx
+
+# Voir les logs Nginx
+tail -f /var/log/nginx/error.log
+
+
+==================== SYSTÈME (Linux Serveur) ====================
+
+# Voir l'espace disque
+df -h
+
+# Voir la mémoire
+free -h
+
+# Voir les processus
+htop
+
+# Redémarrer le serveur (ATTENTION!)
+reboot
+
+
+==================== URLS UTILES ====================
+
+Dashboard:     https://robot-indicator.com
+GitHub:        https://github.com/despo33/hyperbot
+IP Serveur:    72.62.25.146
+
+
+================================================================================

@@ -962,6 +962,47 @@ class HyperliquidApi {
     }
 
     /**
+     * Ferme une position pour un utilisateur spécifique
+     * @param {string} symbol 
+     * @param {string} userAddress - Adresse de l'utilisateur
+     * @returns {Promise<Object>}
+     */
+    async closePositionForUser(symbol, userAddress) {
+        console.log(`[API] closePositionForUser: symbol=${symbol}, userAddress=${userAddress}`);
+        
+        // Récupère les positions de l'utilisateur spécifique
+        const positions = await this.getOpenPositions(userAddress);
+        console.log(`[API] Positions trouvées pour ${userAddress?.slice(0,10)}...:`, positions.map(p => `${p.symbol}:${p.size}`));
+        
+        // Cherche la position - essaie plusieurs formats de symbole
+        let position = positions.find(p => p.symbol === symbol);
+        if (!position) {
+            // Essaie sans le suffixe -PERP
+            position = positions.find(p => p.symbol === symbol.replace('-PERP', ''));
+        }
+        if (!position) {
+            // Essaie avec le coin
+            position = positions.find(p => p.coin === symbol || p.coin === symbol.replace('-PERP', ''));
+        }
+
+        if (!position) {
+            console.log(`[API] Position ${symbol} non trouvée parmi:`, positions.map(p => p.symbol || p.coin));
+            throw new Error(`Aucune position ouverte pour ${symbol}`);
+        }
+
+        console.log(`[API] Fermeture position ${symbol}: size=${position.size}, isBuy=${position.size < 0}`);
+
+        // Ferme avec un ordre market inverse
+        return await this.placeOrder({
+            symbol,
+            isBuy: position.size < 0, // Inverse de la position
+            size: Math.abs(position.size),
+            orderType: 'market',
+            reduceOnly: true
+        });
+    }
+
+    /**
      * Modifie le levier pour un symbole
      * @param {string} symbol 
      * @param {number} leverage 

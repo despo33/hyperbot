@@ -434,9 +434,17 @@ router.post('/position/close', requireAuth, async (req, res) => {
             return res.status(400).json({ success: false, error: 'Symbol requis' });
         }
         
-        console.log(`[MANUAL CLOSE] Fermeture manuelle de la position ${symbol} (size: ${size})`);
+        // Récupère l'adresse de trading de l'utilisateur
+        const activeWallet = req.user.getActiveWallet();
+        if (!activeWallet) {
+            return res.status(400).json({ success: false, error: 'Aucun wallet actif' });
+        }
         
-        const result = await api.closePosition(symbol);
+        const userAddress = activeWallet.tradingAddress || activeWallet.address;
+        console.log(`[MANUAL CLOSE] Fermeture manuelle de la position ${symbol} pour ${userAddress?.slice(0,10)}... (size: ${size})`);
+        
+        // Utilise l'adresse utilisateur pour récupérer et fermer la position
+        const result = await api.closePositionForUser(symbol, userAddress);
         
         if (result) {
             console.log(`[MANUAL CLOSE] Position ${symbol} fermée avec succès`);
@@ -532,6 +540,52 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
                 req.user.botConfig.enabledSignals = { ...req.user.botConfig.enabledSignals, ...configUpdate.enabledSignals };
             }
             
+            // Sauvegarde aussi dans le profil actif (si existe)
+            // Note: On met à jour uniquement les champs envoyés, pas de spread global
+            if (req.user.configProfiles && req.user.configProfiles.length > 0) {
+                const activeProfileIndex = req.user.activeProfileIndex || 0;
+                const activeProfile = req.user.configProfiles[activeProfileIndex];
+                if (activeProfile && activeProfile.config) {
+                    // Met à jour uniquement les champs définis (pas de spread)
+                    if (configUpdate.symbols) activeProfile.config.symbols = configUpdate.symbols;
+                    if (configUpdate.timeframes) activeProfile.config.timeframes = configUpdate.timeframes;
+                    if (configUpdate.leverage !== undefined) activeProfile.config.leverage = configUpdate.leverage;
+                    if (configUpdate.maxConcurrentTrades !== undefined) activeProfile.config.maxConcurrentTrades = configUpdate.maxConcurrentTrades;
+                    if (configUpdate.minWinProbability !== undefined) activeProfile.config.minWinProbability = configUpdate.minWinProbability;
+                    if (configUpdate.minScore !== undefined) activeProfile.config.minScore = configUpdate.minScore;
+                    if (configUpdate.tpslMode) activeProfile.config.tpslMode = configUpdate.tpslMode;
+                    if (configUpdate.defaultTP !== undefined) activeProfile.config.defaultTP = configUpdate.defaultTP;
+                    if (configUpdate.defaultSL !== undefined) activeProfile.config.defaultSL = configUpdate.defaultSL;
+                    if (configUpdate.analysisInterval !== undefined) activeProfile.config.analysisInterval = configUpdate.analysisInterval;
+                    if (configUpdate.atrMultiplierSL !== undefined) activeProfile.config.atrMultiplierSL = configUpdate.atrMultiplierSL;
+                    if (configUpdate.atrMultiplierTP !== undefined) activeProfile.config.atrMultiplierTP = configUpdate.atrMultiplierTP;
+                    if (configUpdate.useRSIFilter !== undefined) activeProfile.config.useRSIFilter = configUpdate.useRSIFilter;
+                    if (configUpdate.rsiOverbought !== undefined) activeProfile.config.rsiOverbought = configUpdate.rsiOverbought;
+                    if (configUpdate.rsiOversold !== undefined) activeProfile.config.rsiOversold = configUpdate.rsiOversold;
+                    if (configUpdate.multiTimeframeMode !== undefined) activeProfile.config.multiTimeframeMode = configUpdate.multiTimeframeMode;
+                    if (configUpdate.mtfTimeframes) activeProfile.config.mtfTimeframes = configUpdate.mtfTimeframes;
+                    if (configUpdate.mtfMinConfirmation !== undefined) activeProfile.config.mtfMinConfirmation = configUpdate.mtfMinConfirmation;
+                    if (configUpdate.strategy) activeProfile.config.strategy = configUpdate.strategy;
+                    if (configUpdate.enabledSignals) {
+                        activeProfile.config.enabledSignals = { ...activeProfile.config.enabledSignals, ...configUpdate.enabledSignals };
+                    }
+                    // Bollinger params
+                    if (configUpdate.bbPeriod !== undefined) activeProfile.config.bbPeriod = configUpdate.bbPeriod;
+                    if (configUpdate.bbStdDev !== undefined) activeProfile.config.bbStdDev = configUpdate.bbStdDev;
+                    if (configUpdate.kcPeriod !== undefined) activeProfile.config.kcPeriod = configUpdate.kcPeriod;
+                    if (configUpdate.kcMultiplier !== undefined) activeProfile.config.kcMultiplier = configUpdate.kcMultiplier;
+                    if (configUpdate.momentumPeriod !== undefined) activeProfile.config.momentumPeriod = configUpdate.momentumPeriod;
+                    if (configUpdate.bbRsiFilter !== undefined) activeProfile.config.bbRsiFilter = configUpdate.bbRsiFilter;
+                    if (configUpdate.bbVolumeFilter !== undefined) activeProfile.config.bbVolumeFilter = configUpdate.bbVolumeFilter;
+                    if (configUpdate.bbMomentumFilter !== undefined) activeProfile.config.bbMomentumFilter = configUpdate.bbMomentumFilter;
+                    if (configUpdate.bbSqueezeOnly !== undefined) activeProfile.config.bbSqueezeOnly = configUpdate.bbSqueezeOnly;
+                    
+                    // Marque le sous-document comme modifié pour Mongoose
+                    req.user.markModified('configProfiles');
+                    console.log(`[CONFIG] Profil actif "${activeProfile.name}" mis à jour`);
+                }
+            }
+            
             await req.user.save();
             console.log(`[CONFIG] Config sauvegardée pour ${req.user.username}`);
             
@@ -595,6 +649,27 @@ router.post('/config/risk', requireAuth, async (req, res) => {
             if (configUpdate.maxTradesPerDay !== undefined) req.user.botConfig.maxTradesPerDay = configUpdate.maxTradesPerDay;
             if (configUpdate.maxConsecutiveLosses !== undefined) req.user.botConfig.maxConsecutiveLosses = configUpdate.maxConsecutiveLosses;
             if (configUpdate.minRiskRewardRatio !== undefined) req.user.botConfig.minRiskRewardRatio = configUpdate.minRiskRewardRatio;
+            
+            // Sauvegarde aussi dans le profil actif (si existe)
+            // Note: On met à jour uniquement les champs risk, pas tout le config
+            if (req.user.configProfiles && req.user.configProfiles.length > 0) {
+                const activeProfileIndex = req.user.activeProfileIndex || 0;
+                const activeProfile = req.user.configProfiles[activeProfileIndex];
+                if (activeProfile && activeProfile.config) {
+                    // Met à jour uniquement les champs risk (pas de spread global)
+                    if (configUpdate.riskPerTrade !== undefined) activeProfile.config.riskPerTrade = configUpdate.riskPerTrade;
+                    if (configUpdate.maxPositionSize !== undefined) activeProfile.config.maxPositionSize = configUpdate.maxPositionSize;
+                    if (configUpdate.dailyLossLimit !== undefined) activeProfile.config.dailyLossLimit = configUpdate.dailyLossLimit;
+                    if (configUpdate.maxDrawdown !== undefined) activeProfile.config.maxDrawdown = configUpdate.maxDrawdown;
+                    if (configUpdate.maxTradesPerDay !== undefined) activeProfile.config.maxTradesPerDay = configUpdate.maxTradesPerDay;
+                    if (configUpdate.maxConsecutiveLosses !== undefined) activeProfile.config.maxConsecutiveLosses = configUpdate.maxConsecutiveLosses;
+                    if (configUpdate.minRiskRewardRatio !== undefined) activeProfile.config.minRiskRewardRatio = configUpdate.minRiskRewardRatio;
+                    
+                    // Marque le sous-document comme modifié pour Mongoose
+                    req.user.markModified('configProfiles');
+                    console.log(`[RISK] Profil actif "${activeProfile.name}" mis à jour`);
+                }
+            }
             
             await req.user.save();
             console.log(`[RISK] Config risk sauvegardée pour ${req.user.username}`);
