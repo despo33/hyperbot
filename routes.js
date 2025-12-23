@@ -538,6 +538,19 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
             if (configUpdate.multiTimeframeMode !== undefined) req.user.botConfig.multiTimeframeMode = configUpdate.multiTimeframeMode;
             if (configUpdate.mtfTimeframes) req.user.botConfig.mtfTimeframes = configUpdate.mtfTimeframes;
             if (configUpdate.mtfMinConfirmation) req.user.botConfig.mtfMinConfirmation = configUpdate.mtfMinConfirmation;
+            // Multi-Timeframe (nouveaux champs du dashboard)
+            if (configUpdate.useMTF !== undefined) req.user.botConfig.useMTF = configUpdate.useMTF;
+            if (configUpdate.mtfPrimary) req.user.botConfig.mtfPrimary = configUpdate.mtfPrimary;
+            if (configUpdate.mtfHigher) req.user.botConfig.mtfHigher = configUpdate.mtfHigher;
+            if (configUpdate.mtfConfirmations) req.user.botConfig.mtfConfirmations = configUpdate.mtfConfirmations;
+            // Mode et Multi-Crypto
+            if (configUpdate.mode) req.user.botConfig.mode = configUpdate.mode;
+            if (configUpdate.multiCryptoMode !== undefined) req.user.botConfig.multiCryptoMode = configUpdate.multiCryptoMode;
+            // Indicateurs avancés
+            if (configUpdate.useSupertrend !== undefined) req.user.botConfig.useSupertrend = configUpdate.useSupertrend;
+            if (configUpdate.useFibonacci !== undefined) req.user.botConfig.useFibonacci = configUpdate.useFibonacci;
+            if (configUpdate.useChikouAdvanced !== undefined) req.user.botConfig.useChikouAdvanced = configUpdate.useChikouAdvanced;
+            if (configUpdate.useKumoTwist !== undefined) req.user.botConfig.useKumoTwist = configUpdate.useKumoTwist;
             // Risk Management
             if (configUpdate.riskPerTrade !== undefined) req.user.botConfig.riskPerTrade = configUpdate.riskPerTrade;
             if (configUpdate.maxPositionSize !== undefined) req.user.botConfig.maxPositionSize = configUpdate.maxPositionSize;
@@ -591,6 +604,19 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
                     if (configUpdate.enabledSignals) {
                         activeProfile.config.enabledSignals = { ...activeProfile.config.enabledSignals, ...configUpdate.enabledSignals };
                     }
+                    // Mode et Multi-Crypto
+                    if (configUpdate.mode) activeProfile.config.mode = configUpdate.mode;
+                    if (configUpdate.multiCryptoMode !== undefined) activeProfile.config.multiCryptoMode = configUpdate.multiCryptoMode;
+                    // Multi-Timeframe (nouveaux champs)
+                    if (configUpdate.useMTF !== undefined) activeProfile.config.useMTF = configUpdate.useMTF;
+                    if (configUpdate.mtfPrimary) activeProfile.config.mtfPrimary = configUpdate.mtfPrimary;
+                    if (configUpdate.mtfHigher) activeProfile.config.mtfHigher = configUpdate.mtfHigher;
+                    if (configUpdate.mtfConfirmations !== undefined) activeProfile.config.mtfConfirmations = configUpdate.mtfConfirmations;
+                    // Indicateurs avancés
+                    if (configUpdate.useSupertrend !== undefined) activeProfile.config.useSupertrend = configUpdate.useSupertrend;
+                    if (configUpdate.useFibonacci !== undefined) activeProfile.config.useFibonacci = configUpdate.useFibonacci;
+                    if (configUpdate.useChikouAdvanced !== undefined) activeProfile.config.useChikouAdvanced = configUpdate.useChikouAdvanced;
+                    if (configUpdate.useKumoTwist !== undefined) activeProfile.config.useKumoTwist = configUpdate.useKumoTwist;
                     // Bollinger params
                     if (configUpdate.bbPeriod !== undefined) activeProfile.config.bbPeriod = configUpdate.bbPeriod;
                     if (configUpdate.bbStdDev !== undefined) activeProfile.config.bbStdDev = configUpdate.bbStdDev;
