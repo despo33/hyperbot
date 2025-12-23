@@ -163,6 +163,12 @@ export const tradingConfigSchema = Joi.object({
     // Mode
     mode: Joi.string().valid('auto', 'manual', 'paper'),
     multiCryptoMode: Joi.boolean(),
+    // Risk Management (aussi acceptés ici pour compatibilité)
+    dailyLossLimit: Joi.number().min(1).max(100),
+    maxDrawdown: Joi.number().min(1).max(100),
+    maxTradesPerDay: Joi.number().integer().min(1).max(100),
+    maxConsecutiveLosses: Joi.number().integer().min(1).max(20),
+    minRiskRewardRatio: Joi.number().min(0.1).max(10),
     // Paramètres Bollinger Squeeze
     bbPeriod: Joi.number().integer().min(5).max(100),
     bbStdDev: Joi.number().min(0.5).max(5),
@@ -173,7 +179,7 @@ export const tradingConfigSchema = Joi.object({
     bbVolumeFilter: Joi.boolean(),
     bbMomentumFilter: Joi.boolean(),
     bbSqueezeOnly: Joi.boolean()
-}).unknown(false);
+}).unknown(true);  // Permet les champs non définis pour éviter les erreurs de validation
 
 // ===== PROFILS =====
 
