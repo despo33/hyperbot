@@ -811,10 +811,29 @@ class UserBotInstance {
      * Met à jour la configuration
      */
     updateConfig(newConfig) {
+        // Log des paramètres reçus pour debug
+        const changedParams = Object.keys(newConfig).filter(k => newConfig[k] !== undefined);
+        this.log(`📝 Mise à jour config: ${changedParams.join(', ')}`, 'info');
+        
         this.config = { ...this.config, ...newConfig };
         
         if (newConfig.timeframes && newConfig.timeframes.length > 0) {
             this.applyTimeframePreset(newConfig.timeframes[0]);
+            this.log(`⏱️ Timeframe appliqué: ${newConfig.timeframes[0]}`, 'info');
+        }
+
+        // Log des paramètres trading importants
+        if (newConfig.leverage !== undefined) {
+            this.log(`⚡ Levier: ${newConfig.leverage}x`, 'info');
+        }
+        if (newConfig.defaultTP !== undefined || newConfig.defaultSL !== undefined) {
+            this.log(`💰 TP/SL: TP=${this.config.defaultTP}% | SL=${this.config.defaultSL}%`, 'info');
+        }
+        if (newConfig.minScore !== undefined) {
+            this.log(`🎯 Score min: ${newConfig.minScore}`, 'info');
+        }
+        if (newConfig.minWinProbability !== undefined) {
+            this.log(`📊 Win Prob min: ${(newConfig.minWinProbability * 100).toFixed(0)}%`, 'info');
         }
 
         // Synchronise les paramètres Risk Manager avec le riskManager global
@@ -832,15 +851,17 @@ class UserBotInstance {
         if (newConfig.defaultSL !== undefined) riskParams.defaultSLPercent = newConfig.defaultSL;
 
         if (Object.keys(riskParams).length > 0) {
+            this.log(`🛡️ Risk params: ${Object.keys(riskParams).join(', ')}`, 'info');
             // Import dynamique pour éviter les dépendances circulaires
             import('./riskManager.js').then(module => {
                 module.default.updateConfig(riskParams);
+                this.log(`✅ RiskManager synchronisé`, 'info');
             }).catch(() => {
                 // Silencieux si le module n'est pas disponible
             });
         }
 
-        this.log('Configuration mise à jour', 'info');
+        this.log('✅ Configuration appliquée en temps réel', 'success');
     }
 
     /**
