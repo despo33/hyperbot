@@ -657,10 +657,11 @@ class TradeEngine {
         if (analysis.indicators?.vwap?.signal) confluence++;
         if (analysis.indicators?.cvd?.signal) confluence++;
         
-        // ===== FILTRE TENDANCE EMA200 (CRITIQUE) =====
-        // Ne pas trader contre la tendance de fond
+        // ===== FILTRE TENDANCE EMA200 (ASSOUPLI) =====
+        // Filtre informatif mais ne bloque plus les trades
+        // Les corrections en bull market sont normales et tradables
         const ema200 = analysis.indicators?.ema200;
-        let trendOK = true;
+        let trendOK = true; // Toujours true - ne bloque plus
         let trendDirection = 'neutral';
         
         if (ema200 && ema200.value) {
@@ -668,55 +669,59 @@ class TradeEngine {
             const priceBelowEMA = currentPrice < ema200.value;
             const emaDistance = Math.abs((currentPrice - ema200.value) / ema200.value * 100);
             
-            // Détermine la tendance
+            // Détermine la tendance (informatif seulement)
             if (priceAboveEMA && emaDistance > 0.5) {
                 trendDirection = 'bullish';
             } else if (priceBelowEMA && emaDistance > 0.5) {
                 trendDirection = 'bearish';
             }
             
-            // RÈGLE STRICTE: Ne pas LONG sous EMA200, ne pas SHORT au-dessus
-            if (signalDirection === 'long' && priceBelowEMA && emaDistance > 1.0) {
-                trendOK = false; // Interdit LONG si prix significativement sous EMA200
-            } else if (signalDirection === 'short' && priceAboveEMA && emaDistance > 1.0) {
-                trendOK = false; // Interdit SHORT si prix significativement au-dessus EMA200
-            }
+            // NOTE: On ne bloque plus les trades basés sur EMA200
+            // Les corrections en tendance haussière sont normales
+            // Le score Ichimoku et les autres filtres suffisent
+            // ANCIEN CODE BLOQUANT RETIRÉ:
+            // if (signalDirection === 'long' && priceBelowEMA && emaDistance > 1.0) trendOK = false;
+            // if (signalDirection === 'short' && priceAboveEMA && emaDistance > 1.0) trendOK = false;
         }
         
-        // ===== FILTRE MACD TENDANCE =====
+        // ===== FILTRE MACD TENDANCE (ASSOUPLI) =====
+        // Le MACD est utilisé comme indicateur de confirmation, pas comme bloqueur strict
         let macdTrendOK = true;
         if (macd && macd.histogram !== undefined) {
-            // MACD doit confirmer la direction
-            if (signalDirection === 'long' && macd.histogram < -0.5) {
+            // MACD doit confirmer la direction - seuils assouplis pour crypto volatile
+            // Seuil augmenté de 0.5 à 2.0 pour éviter de bloquer les corrections normales
+            if (signalDirection === 'long' && macd.histogram < -2.0) {
                 macdTrendOK = false; // MACD très négatif = pas de LONG
-            } else if (signalDirection === 'short' && macd.histogram > 0.5) {
+            } else if (signalDirection === 'short' && macd.histogram > 2.0) {
                 macdTrendOK = false; // MACD très positif = pas de SHORT
             }
         }
         
-        // ===== FILTRE SUPERTREND (NOUVEAU) =====
-        let supertrendOK = true;
+        // ===== FILTRE SUPERTREND (ASSOUPLI) =====
+        // Le Supertrend a un biais haussier, on l'utilise comme bonus, pas comme bloqueur
+        let supertrendOK = true; // Toujours true - ne bloque plus
         const supertrend = analysis.indicators?.supertrend;
-        if (this.config.useSupertrend && supertrend && supertrend.direction !== 'neutral') {
-            // Ne trade que dans le sens du Supertrend
-            if (signalDirection === 'long' && supertrend.direction !== 'bullish') {
-                supertrendOK = false;
-            } else if (signalDirection === 'short' && supertrend.direction !== 'bearish') {
-                supertrendOK = false;
-            }
-        }
+        // NOTE: Le Supertrend est maintenant utilisé comme bonus de confluence
+        // et non comme filtre bloquant car il a un biais haussier
+        // qui empêche les SHORT même lors de corrections légitimes
+        // ANCIEN CODE BLOQUANT RETIRÉ:
+        // if (this.config.useSupertrend && supertrend && supertrend.direction !== 'neutral') {
+        //     if (signalDirection === 'long' && supertrend.direction !== 'bullish') supertrendOK = false;
+        //     if (signalDirection === 'short' && supertrend.direction !== 'bearish') supertrendOK = false;
+        // }
         
-        // ===== FILTRE CHIKOU AVANCÉ (NOUVEAU) =====
-        let chikouOK = true;
+        // ===== FILTRE CHIKOU AVANCÉ (ASSOUPLI) =====
+        // Le Chikou est utilisé comme bonus de confirmation, pas comme bloqueur
+        // Car il a aussi un biais vers la tendance dominante
+        let chikouOK = true; // Toujours true - ne bloque plus
         const chikouAdvanced = analysis.indicators?.chikouAdvanced;
-        if (this.config.useChikouAdvanced && chikouAdvanced && chikouAdvanced.confirmed) {
-            // Chikou doit confirmer la direction
-            if (signalDirection === 'long' && chikouAdvanced.direction !== 'bullish') {
-                chikouOK = false;
-            } else if (signalDirection === 'short' && chikouAdvanced.direction !== 'bearish') {
-                chikouOK = false;
-            }
-        }
+        // NOTE: Le Chikou est maintenant utilisé comme indicateur informatif
+        // et non comme filtre bloquant car il suit la tendance dominante
+        // ANCIEN CODE BLOQUANT RETIRÉ:
+        // if (this.config.useChikouAdvanced && chikouAdvanced && chikouAdvanced.confirmed) {
+        //     if (signalDirection === 'long' && chikouAdvanced.direction !== 'bullish') chikouOK = false;
+        //     if (signalDirection === 'short' && chikouAdvanced.direction !== 'bearish') chikouOK = false;
+        // }
         
         // Vérifie les filtres avec les presets du timeframe
         const hasStrongScore = absIchimokuScore >= preset.minScore;

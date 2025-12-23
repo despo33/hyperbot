@@ -945,17 +945,39 @@ class HyperliquidApi {
      */
     async closePosition(symbol) {
         const positions = await this.getOpenPositions();
-        const position = positions.find(p => p.symbol === symbol);
+        
+        // Normalise le symbole
+        const normalizedSymbol = symbol.replace('-PERP', '');
+        
+        let position = positions.find(p => p.symbol === symbol);
+        if (!position) {
+            position = positions.find(p => p.symbol === normalizedSymbol);
+        }
+        if (!position) {
+            position = positions.find(p => p.coin === symbol || p.coin === normalizedSymbol);
+        }
 
         if (!position) {
             throw new Error(`Aucune position ouverte pour ${symbol}`);
         }
 
-        // Ferme avec un ordre market inverse
+        // Récupère le prix actuel pour l'ordre market
+        // Hyperliquid nécessite un prix valide même pour les ordres IOC (market)
+        const currentPrice = await this.getPrice(normalizedSymbol);
+        
+        // Pour fermer: inverse de la position avec slippage
+        const isBuy = position.size < 0;
+        const slippage = 0.01;
+        const orderPrice = isBuy 
+            ? currentPrice * (1 + slippage)
+            : currentPrice * (1 - slippage);
+
+        // Ferme avec un ordre IOC (market) avec prix
         return await this.placeOrder({
-            symbol,
-            isBuy: position.size < 0, // Inverse de la position
+            symbol: normalizedSymbol,
+            isBuy: isBuy,
             size: Math.abs(position.size),
+            price: orderPrice,
             orderType: 'market',
             reduceOnly: true
         });
@@ -974,15 +996,18 @@ class HyperliquidApi {
         const positions = await this.getOpenPositions(userAddress);
         console.log(`[API] Positions trouvées pour ${userAddress?.slice(0,10)}...:`, positions.map(p => `${p.symbol}:${p.size}`));
         
+        // Normalise le symbole (enlève -PERP si présent)
+        const normalizedSymbol = symbol.replace('-PERP', '');
+        
         // Cherche la position - essaie plusieurs formats de symbole
         let position = positions.find(p => p.symbol === symbol);
         if (!position) {
             // Essaie sans le suffixe -PERP
-            position = positions.find(p => p.symbol === symbol.replace('-PERP', ''));
+            position = positions.find(p => p.symbol === normalizedSymbol);
         }
         if (!position) {
             // Essaie avec le coin
-            position = positions.find(p => p.coin === symbol || p.coin === symbol.replace('-PERP', ''));
+            position = positions.find(p => p.coin === symbol || p.coin === normalizedSymbol);
         }
 
         if (!position) {
@@ -990,13 +1015,28 @@ class HyperliquidApi {
             throw new Error(`Aucune position ouverte pour ${symbol}`);
         }
 
-        console.log(`[API] Fermeture position ${symbol}: size=${position.size}, isBuy=${position.size < 0}`);
+        // Récupère le prix actuel pour l'ordre market
+        // Hyperliquid nécessite un prix valide même pour les ordres IOC (market)
+        const currentPrice = await this.getPrice(normalizedSymbol);
+        
+        // Pour fermer une position:
+        // - Si position LONG (size > 0), on VEND (isBuy = false) avec un prix légèrement inférieur
+        // - Si position SHORT (size < 0), on ACHÈTE (isBuy = true) avec un prix légèrement supérieur
+        const isBuy = position.size < 0;
+        // Ajoute une marge de 1% pour s'assurer que l'ordre IOC passe
+        const slippage = 0.01;
+        const orderPrice = isBuy 
+            ? currentPrice * (1 + slippage)  // Achat: prix plus haut
+            : currentPrice * (1 - slippage); // Vente: prix plus bas
 
-        // Ferme avec un ordre market inverse
+        console.log(`[API] Fermeture position ${normalizedSymbol}: size=${position.size}, isBuy=${isBuy}, price=${orderPrice.toFixed(2)}`);
+
+        // Ferme avec un ordre IOC (market) avec prix
         return await this.placeOrder({
-            symbol,
-            isBuy: position.size < 0, // Inverse de la position
+            symbol: normalizedSymbol,
+            isBuy: isBuy,
             size: Math.abs(position.size),
+            price: orderPrice,
             orderType: 'market',
             reduceOnly: true
         });

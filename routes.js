@@ -446,14 +446,36 @@ router.post('/position/close', requireAuth, async (req, res) => {
         // Utilise l'adresse utilisateur pour récupérer et fermer la position
         const result = await api.closePositionForUser(symbol, userAddress);
         
-        if (result) {
-            console.log(`[MANUAL CLOSE] Position ${symbol} fermée avec succès`);
-            res.json({ success: true, result, message: `Position ${symbol} fermée` });
+        console.log(`[MANUAL CLOSE] Résultat API:`, JSON.stringify(result, null, 2));
+        
+        // Vérifie si l'ordre a été accepté par Hyperliquid
+        if (result && result.status === 'ok') {
+            // Vérifie si l'ordre a été rempli (filled)
+            const response = result.response;
+            if (response && response.data && response.data.statuses) {
+                const status = response.data.statuses[0];
+                if (status && status.filled) {
+                    console.log(`[MANUAL CLOSE] ✅ Position ${symbol} fermée avec succès - filled: ${JSON.stringify(status.filled)}`);
+                    res.json({ success: true, result, message: `Position ${symbol} fermée` });
+                } else if (status && status.error) {
+                    console.log(`[MANUAL CLOSE] ❌ Erreur ordre: ${status.error}`);
+                    res.json({ success: false, error: status.error });
+                } else {
+                    console.log(`[MANUAL CLOSE] ⚠️ Ordre envoyé mais statut incertain:`, status);
+                    res.json({ success: true, result, message: `Ordre de fermeture envoyé pour ${symbol}` });
+                }
+            } else {
+                console.log(`[MANUAL CLOSE] ✅ Position ${symbol} - ordre accepté`);
+                res.json({ success: true, result, message: `Position ${symbol} fermée` });
+            }
+        } else if (result) {
+            console.log(`[MANUAL CLOSE] ⚠️ Résultat inattendu:`, result);
+            res.json({ success: true, result, message: `Ordre envoyé pour ${symbol}` });
         } else {
-            res.json({ success: false, error: 'Échec de la fermeture' });
+            res.json({ success: false, error: 'Échec de la fermeture - pas de réponse' });
         }
     } catch (error) {
-        console.error(`[MANUAL CLOSE] Erreur:`, error.message);
+        console.error(`[MANUAL CLOSE] ❌ Erreur:`, error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
