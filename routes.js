@@ -1859,4 +1859,210 @@ router.get('/backtest/:filename', requireAuth, (req, res) => {
     }
 });
 
+// ==================== ADMIN ROUTES ====================
+
+/**
+ * Middleware pour vérifier le rôle admin
+ */
+function requireAdmin(req, res, next) {
+    if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Accès refusé. Droits administrateur requis.' });
+    }
+    next();
+}
+
+/**
+ * GET /api/admin/users
+ * Liste tous les utilisateurs (ADMIN ONLY)
+ */
+router.get('/admin/users', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const search = req.query.search || '';
+        const status = req.query.status || 'all';
+        
+        let query = {};
+        
+        // Filtre par recherche
+        if (search) {
+            query.$or = [
+                { email: { $regex: search, $options: 'i' } },
+                { username: { $regex: search, $options: 'i' } }
+            ];
+        }
+        
+        // Filtre par statut
+        if (status === 'active') {
+            query.isActive = true;
+        } else if (status === 'inactive') {
+            query.isActive = false;
+        }
+        
+        const total = await User.countDocuments(query);
+        const users = await User.find(query)
+            .select('-password -wallets.secretPhrase')
+            .sort({ createdAt: -1 })
+            .skip((page - 1) * limit)
+            .limit(limit);
+        
+        res.json({
+            success: true,
+            users: users.map(u => ({
+                id: u._id,
+                email: u.email,
+                username: u.username,
+                role: u.role,
+                isActive: u.isActive,
+                isEmailVerified: u.isEmailVerified,
+                walletsCount: u.wallets?.length || 0,
+                lastLogin: u.lastLogin,
+                createdAt: u.createdAt
+            })),
+            pagination: {
+                page,
+                limit,
+                total,
+                pages: Math.ceil(total / limit)
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * GET /api/admin/stats
+ * Statistiques globales (ADMIN ONLY)
+ */
+router.get('/admin/stats', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const totalUsers = await User.countDocuments();
+        const activeUsers = await User.countDocuments({ isActive: true });
+        const verifiedUsers = await User.countDocuments({ isEmailVerified: true });
+        
+        // Nouveaux utilisateurs cette semaine
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        const newUsersWeek = await User.countDocuments({ createdAt: { $gte: oneWeekAgo } });
+        
+        // Utilisateurs avec wallets
+        const usersWithWallets = await User.countDocuments({ 'wallets.0': { $exists: true } });
+        
+        // Admins
+        const adminCount = await User.countDocuments({ role: 'admin' });
+        
+        res.json({
+            success: true,
+            stats: {
+                totalUsers,
+                activeUsers,
+                verifiedUsers,
+                newUsersWeek,
+                usersWithWallets,
+                adminCount
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * GET /api/admin/users/:id
+ * Détails d'un utilisateur (ADMIN ONLY)
+ */
+router.get('/admin/users/:id', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id).select('-password -wallets.secretPhrase');
+        
+        if (!user) {
+            return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+        }
+        
+        res.json({ success: true, user: user.toSafeObject() });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * PUT /api/admin/users/:id
+ * Modifier un utilisateur (ADMIN ONLY)
+ */
+router.put('/admin/users/:id', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { role, isActive, isEmailVerified } = req.body;
+        
+        const user = await User.findById(req.params.id);
+        if (!user) {
+            return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+        }
+        
+        // Empêche de modifier son propre rôle
+        if (req.params.id === req.user._id.toString() && role && role !== req.user.role) {
+            return res.status(400).json({ success: false, error: 'Vous ne pouvez pas modifier votre propre rôle' });
+        }
+        
+        if (role !== undefined) user.role = role;
+        if (isActive !== undefined) user.isActive = isActive;
+        if (isEmailVerified !== undefined) user.isEmailVerified = isEmailVerified;
+        
+        await user.save();
+        
+        res.json({ success: true, message: 'Utilisateur modifié', user: user.toSafeObject() });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * DELETE /api/admin/users/:id
+ * Supprimer un utilisateur (ADMIN ONLY)
+ */
+router.delete('/admin/users/:id', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        // Empêche de se supprimer soi-même
+        if (req.params.id === req.user._id.toString()) {
+            return res.status(400).json({ success: false, error: 'Vous ne pouvez pas supprimer votre propre compte' });
+        }
+        
+        const user = await User.findByIdAndDelete(req.params.id);
+        
+        if (!user) {
+            return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+        }
+        
+        res.json({ success: true, message: `Utilisateur ${user.email} supprimé` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /api/admin/users/:id/reset-password
+ * Réinitialiser le mot de passe d'un utilisateur (ADMIN ONLY)
+ */
+router.post('/admin/users/:id/reset-password', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { newPassword } = req.body;
+        
+        if (!newPassword || newPassword.length < 6) {
+            return res.status(400).json({ success: false, error: 'Mot de passe trop court (min 6 caractères)' });
+        }
+        
+        const user = await User.findById(req.params.id);
+        if (!user) {
+            return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+        }
+        
+        user.password = newPassword; // Le hook pre-save hashera le mot de passe
+        await user.save();
+        
+        res.json({ success: true, message: `Mot de passe de ${user.email} réinitialisé` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 export default router;
