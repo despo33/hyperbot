@@ -1488,9 +1488,9 @@ async function loadTradingConfig() {
         // Si le bot tourne, utilise la config active, sinon la config sauvegardée
         const config = (isBotRunning && activeBotConfig) ? activeBotConfig : data.config;
 
-        // Mode (toujours auto)
+        // Mode (charge la valeur sauvegardée)
         const modeEl = document.getElementById('configMode');
-        if (modeEl) modeEl.value = 'auto';
+        if (modeEl) modeEl.value = config.mode || 'auto';
         
         // Timeframe (radio buttons)
         const tf = config.timeframes?.[0] || '15m';
@@ -1543,7 +1543,26 @@ async function loadTradingConfig() {
         const kijunBounceEl = document.getElementById('signalKijunBounce');
         if (kijunBounceEl) kijunBounceEl.checked = signals.kijunBounce !== false;
         
-        // TP/SL personnalisés
+        // ===== MODE TP/SL (radio buttons) =====
+        const tpslMode = config.tpslMode || 'auto';
+        const tpslModeRadio = document.querySelector(`input[name="tpslMode"][value="${tpslMode}"]`);
+        if (tpslModeRadio) {
+            tpslModeRadio.checked = true;
+        }
+        
+        // TP/SL en mode pourcentage
+        const percentTPEl = document.getElementById('percentTP');
+        const percentSLEl = document.getElementById('percentSL');
+        if (percentTPEl && config.defaultTP) percentTPEl.value = config.defaultTP;
+        if (percentSLEl && config.defaultSL) percentSLEl.value = config.defaultSL;
+        
+        // Multiplicateurs ATR
+        const atrMultiplierSLEl = document.getElementById('atrMultiplierSL');
+        const atrMultiplierTPEl = document.getElementById('atrMultiplierTP');
+        if (atrMultiplierSLEl) atrMultiplierSLEl.value = config.atrMultiplierSL || 1.5;
+        if (atrMultiplierTPEl) atrMultiplierTPEl.value = config.atrMultiplierTP || 2.5;
+        
+        // TP/SL personnalisés (ancien format)
         if (config.defaultTP && config.defaultSL) {
             const customTPEl = document.getElementById('customTP');
             const customSLEl = document.getElementById('customSL');
@@ -1561,11 +1580,25 @@ async function loadTradingConfig() {
         const rsiOversoldEl = document.getElementById('rsiOversold');
         if (rsiOversoldEl) rsiOversoldEl.value = config.rsiOversold || 30;
         
-        // Multi-Timeframe (version moderne)
+        // ===== INDICATEURS AVANCÉS =====
+        const useSupertrendEl = document.getElementById('useSupertrend');
+        if (useSupertrendEl) useSupertrendEl.checked = config.useSupertrend !== false;
+        
+        const useFibonacciEl = document.getElementById('useFibonacci');
+        if (useFibonacciEl) useFibonacciEl.checked = config.useFibonacci !== false;
+        
+        const useChikouAdvancedEl = document.getElementById('useChikouAdvanced');
+        if (useChikouAdvancedEl) useChikouAdvancedEl.checked = config.useChikouAdvanced !== false;
+        
+        const useKumoTwistEl = document.getElementById('useKumoTwist');
+        if (useKumoTwistEl) useKumoTwistEl.checked = config.useKumoTwist !== false;
+        
+        // ===== MULTI-TIMEFRAME =====
         const mtfEl = document.getElementById('useMTF');
         const mtfSettingsEl = document.getElementById('mtfSettings');
         if (mtfEl) {
-            const isMultiTF = config.multiTimeframeMode || false;
+            // Charge depuis useMTF ou multiTimeframeMode (compatibilité)
+            const isMultiTF = config.useMTF !== undefined ? config.useMTF : (config.multiTimeframeMode || false);
             mtfEl.checked = isMultiTF;
             if (mtfSettingsEl) mtfSettingsEl.style.opacity = isMultiTF ? '1' : '0.5';
         }
@@ -1573,26 +1606,27 @@ async function loadTradingConfig() {
         // MTF Primary/Higher Timeframes
         const mtfPrimaryEl = document.getElementById('mtfPrimary');
         const mtfHigherEl = document.getElementById('mtfHigher');
-        if (mtfPrimaryEl && config.mtfTimeframes && config.mtfTimeframes[0]) {
-            mtfPrimaryEl.value = config.mtfTimeframes[0];
+        if (mtfPrimaryEl) {
+            mtfPrimaryEl.value = config.mtfPrimary || (config.mtfTimeframes && config.mtfTimeframes[0]) || '15m';
         }
-        if (mtfHigherEl && config.mtfTimeframes && config.mtfTimeframes[1]) {
-            mtfHigherEl.value = config.mtfTimeframes[1];
+        if (mtfHigherEl) {
+            mtfHigherEl.value = config.mtfHigher || (config.mtfTimeframes && config.mtfTimeframes[1]) || '4h';
         }
         
         // MTF Confirmations (slider)
         const mtfConfEl = document.getElementById('mtfConfirmations');
         const mtfConfValueEl = document.getElementById('mtfConfirmationsValue');
         if (mtfConfEl) {
-            mtfConfEl.value = config.mtfMinConfirmation || 2;
-            if (mtfConfValueEl) mtfConfValueEl.textContent = config.mtfMinConfirmation || 2;
+            const mtfConfValue = config.mtfConfirmations || config.mtfMinConfirmation || 2;
+            mtfConfEl.value = mtfConfValue;
+            if (mtfConfValueEl) mtfConfValueEl.textContent = mtfConfValue;
         }
         
         // Stratégie de trading
         const strategyEl = document.getElementById('configStrategy');
-        if (strategyEl && config.strategy) {
-            strategyEl.value = config.strategy;
-            updateStrategyUI(config.strategy);
+        if (strategyEl) {
+            strategyEl.value = config.strategy || 'ichimoku';
+            updateStrategyUI(config.strategy || 'ichimoku');
         }
         
         // Paramètres Bollinger Squeeze
@@ -1622,6 +1656,8 @@ async function loadTradingConfig() {
         
         const bbSqueezeOnlyEl = document.getElementById('bbSqueezeOnly');
         if (bbSqueezeOnlyEl) bbSqueezeOnlyEl.checked = config.bbSqueezeOnly !== false;
+        
+        console.log('[CONFIG] Configuration chargée:', config.strategy, 'TF:', tf, 'TP/SL mode:', tpslMode);
         
     } catch (error) {
         console.error('Erreur chargement config trading:', error);
