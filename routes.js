@@ -621,6 +621,13 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
             if (configUpdate.enabledSignals) {
                 req.user.botConfig.enabledSignals = { ...req.user.botConfig.enabledSignals, ...configUpdate.enabledSignals };
             }
+            // Signaux et filtres SMC
+            if (configUpdate.smcSignals) {
+                req.user.botConfig.smcSignals = { ...req.user.botConfig.smcSignals, ...configUpdate.smcSignals };
+            }
+            if (configUpdate.smcFilters) {
+                req.user.botConfig.smcFilters = { ...req.user.botConfig.smcFilters, ...configUpdate.smcFilters };
+            }
             
             // Sauvegarde aussi dans le profil actif (si existe)
             // Note: On met à jour uniquement les champs envoyés, pas de spread global
@@ -668,6 +675,13 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
                     if (configUpdate.momentumPeriod !== undefined) activeProfile.config.momentumPeriod = configUpdate.momentumPeriod;
                     if (configUpdate.bbRsiFilter !== undefined) activeProfile.config.bbRsiFilter = configUpdate.bbRsiFilter;
                     if (configUpdate.bbVolumeFilter !== undefined) activeProfile.config.bbVolumeFilter = configUpdate.bbVolumeFilter;
+                    // Signaux et filtres SMC
+                    if (configUpdate.smcSignals) {
+                        activeProfile.config.smcSignals = { ...activeProfile.config.smcSignals, ...configUpdate.smcSignals };
+                    }
+                    if (configUpdate.smcFilters) {
+                        activeProfile.config.smcFilters = { ...activeProfile.config.smcFilters, ...configUpdate.smcFilters };
+                    }
                     
                     // Marque le sous-document comme modifié pour Mongoose
                     req.user.markModified('configProfiles');

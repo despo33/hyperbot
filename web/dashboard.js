@@ -1600,6 +1600,37 @@ async function loadTradingConfig() {
         const kijunBounceEl = document.getElementById('signalKijunBounce');
         if (kijunBounceEl) kijunBounceEl.checked = signals.kijunBounce !== false;
         
+        // Signaux SMC
+        const smcSignals = config.smcSignals || {};
+        const smcOrderBlocksEl = document.getElementById('smcOrderBlocks');
+        if (smcOrderBlocksEl) smcOrderBlocksEl.checked = smcSignals.orderBlocks !== false;
+        
+        const smcFVGEl = document.getElementById('smcFVG');
+        if (smcFVGEl) smcFVGEl.checked = smcSignals.fvg !== false;
+        
+        const smcBOSEl = document.getElementById('smcBOS');
+        if (smcBOSEl) smcBOSEl.checked = smcSignals.bos !== false;
+        
+        const smcCHoCHEl = document.getElementById('smcCHoCH');
+        if (smcCHoCHEl) smcCHoCHEl.checked = smcSignals.choch !== false;
+        
+        const smcLiquidityEl = document.getElementById('smcLiquidity');
+        if (smcLiquidityEl) smcLiquidityEl.checked = smcSignals.liquidity !== false;
+        
+        // Filtres SMC
+        const smcFilters = config.smcFilters || {};
+        const smcSessionFilterEl = document.getElementById('smcSessionFilter');
+        if (smcSessionFilterEl) smcSessionFilterEl.checked = smcFilters.sessionFilter !== false;
+        
+        const smcVolumeFilterEl = document.getElementById('smcVolumeFilter');
+        if (smcVolumeFilterEl) smcVolumeFilterEl.checked = smcFilters.volumeFilter !== false;
+        
+        const smcPremiumDiscountEl = document.getElementById('smcPremiumDiscount');
+        if (smcPremiumDiscountEl) smcPremiumDiscountEl.checked = smcFilters.premiumDiscount !== false;
+        
+        const smcInducementFilterEl = document.getElementById('smcInducementFilter');
+        if (smcInducementFilterEl) smcInducementFilterEl.checked = smcFilters.inducementFilter !== false;
+        
         // ===== MODE TP/SL (radio buttons) =====
         const tpslMode = config.tpslMode || 'auto';
         console.log('[CONFIG] Chargement TP/SL:', {
@@ -1826,15 +1857,37 @@ async function saveTradingConfig() {
             kcMultiplier: parseFloat(document.getElementById('kcMultiplier')?.value || 1.5),
             momentumPeriod: parseInt(document.getElementById('momentumPeriod')?.value || 12),
             bbRsiFilter: document.getElementById('bbRsiFilter')?.checked ?? true,
-            bbVolumeFilter: document.getElementById('bbVolumeFilter')?.checked ?? true
+            bbVolumeFilter: document.getElementById('bbVolumeFilter')?.checked ?? true,
+            // Signaux SMC
+            smcSignals: {
+                orderBlocks: document.getElementById('smcOrderBlocks')?.checked ?? true,
+                fvg: document.getElementById('smcFVG')?.checked ?? true,
+                bos: document.getElementById('smcBOS')?.checked ?? true,
+                choch: document.getElementById('smcCHoCH')?.checked ?? true,
+                liquidity: document.getElementById('smcLiquidity')?.checked ?? true
+            },
+            // Filtres SMC
+            smcFilters: {
+                sessionFilter: document.getElementById('smcSessionFilter')?.checked ?? true,
+                volumeFilter: document.getElementById('smcVolumeFilter')?.checked ?? true,
+                premiumDiscount: document.getElementById('smcPremiumDiscount')?.checked ?? true,
+                inducementFilter: document.getElementById('smcInducementFilter')?.checked ?? true
+            }
         };
 
         console.log('[CONFIG] Sauvegarde config trading:', {
+            symbols: config.symbols?.length + ' cryptos',
+            timeframes: config.timeframes,
+            multiTFTrading: config.multiTFTrading,
+            strategy: config.strategy,
+            leverage: config.leverage,
             tpslMode: config.tpslMode,
             defaultTP: config.defaultTP,
             defaultSL: config.defaultSL,
-            atrMultiplierSL: config.atrMultiplierSL,
-            atrMultiplierTP: config.atrMultiplierTP
+            enabledSignals: config.enabledSignals,
+            useMTF: config.useMTF,
+            mtfPrimary: config.mtfPrimary,
+            mtfHigher: config.mtfHigher
         });
 
         const result = await apiRequest('/config/trading', {
