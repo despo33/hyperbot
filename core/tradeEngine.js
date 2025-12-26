@@ -61,7 +61,8 @@ class TradeEngine {
             rsiOverbought: 70,            // Seuil de surachat (pas de LONG au-dessus)
             rsiOversold: 30,              // Seuil de survente (pas de SHORT en-dessous)
             // ===== MODE MULTI-TIMEFRAME =====
-            useMTF: true,                 // Activer l'analyse multi-timeframe
+            multiTFTrading: false,        // Trading sur plusieurs TF en parallèle
+            useMTF: true,                 // Activer l'analyse multi-timeframe (confirmation)
             mtfPrimary: '15m',            // Timeframe principal
             mtfHigher: '4h',              // Timeframe supérieur pour confirmer la tendance
             mtfConfirmations: 2,          // Minimum de confirmations requises
@@ -521,10 +522,10 @@ class TradeEngine {
                 : [this.config.symbol];
             
             // Détermine les timeframes à analyser
-            // En mode MTF, on analyse tous les TF sélectionnés indépendamment
-            const timeframesToAnalyze = this.config.multiTimeframeMode && this.config.mtfTimeframes?.length > 0
-                ? this.config.mtfTimeframes
-                : this.config.timeframes;
+            // En mode Multi-TF Trading, on analyse tous les TF sélectionnés indépendamment
+            const timeframesToAnalyze = this.config.multiTFTrading && this.config.timeframes?.length > 1
+                ? this.config.timeframes
+                : [this.config.timeframes?.[0] || '15m'];
             
             const opportunities = [];
             

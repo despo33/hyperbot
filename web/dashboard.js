@@ -1526,13 +1526,36 @@ async function loadTradingConfig() {
         const modeEl = document.getElementById('configMode');
         if (modeEl) modeEl.value = config.mode || 'auto';
         
-        // Timeframe (radio buttons)
-        const tf = config.timeframes?.[0] || '15m';
-        const tfRadio = document.querySelector(`input[name="configTimeframe"][value="${tf}"]`);
-        if (tfRadio) {
-            tfRadio.checked = true;
-            updateTimeframeInfo(tf);
-            updateTPSLPreview(tf);
+        // Multi-TF Trading mode
+        const multiTFTradingEl = document.getElementById('multiTFTrading');
+        const singleTFSelector = document.getElementById('singleTFSelector');
+        const multiTFSelector = document.getElementById('multiTFSelector');
+        const isMultiTFTrading = config.multiTFTrading || false;
+        
+        if (multiTFTradingEl) {
+            multiTFTradingEl.checked = isMultiTFTrading;
+            if (singleTFSelector) singleTFSelector.style.display = isMultiTFTrading ? 'none' : 'flex';
+            if (multiTFSelector) multiTFSelector.style.display = isMultiTFTrading ? 'flex' : 'none';
+        }
+        
+        // Timeframes
+        const timeframes = config.timeframes || ['15m'];
+        
+        if (isMultiTFTrading && timeframes.length > 0) {
+            // Mode multi: coche les checkboxes
+            document.querySelectorAll('input[name="configTimeframeMulti"]').forEach(cb => {
+                cb.checked = timeframes.includes(cb.value);
+            });
+            updateTimeframeInfo(timeframes.join(', '));
+        } else {
+            // Mode single: sélectionne le radio
+            const tf = timeframes[0] || '15m';
+            const tfRadio = document.querySelector(`input[name="configTimeframe"][value="${tf}"]`);
+            if (tfRadio) {
+                tfRadio.checked = true;
+                updateTimeframeInfo(tf);
+                updateTPSLPreview(tf);
+            }
         }
         
         // Intervalle et Levier
@@ -1715,8 +1738,25 @@ async function saveTradingConfig() {
         const cryptosText = document.getElementById('cryptosList').value;
         const symbols = cryptosText.split(',').map(s => s.trim().toUpperCase()).filter(s => s.length > 0);
         
-        // Récupère le timeframe sélectionné (radio buttons)
-        const selectedTF = document.querySelector('input[name="configTimeframe"]:checked')?.value || '15m';
+        // Multi-TF Trading mode
+        const multiTFTrading = document.getElementById('multiTFTrading')?.checked || false;
+        
+        // Récupère les timeframes selon le mode
+        let timeframes;
+        let selectedTF;
+        
+        if (multiTFTrading) {
+            // Mode multi: récupère tous les TF cochés
+            const checkedTFs = document.querySelectorAll('input[name="configTimeframeMulti"]:checked');
+            timeframes = Array.from(checkedTFs).map(cb => cb.value);
+            if (timeframes.length === 0) timeframes = ['15m']; // Fallback
+            selectedTF = timeframes[0]; // Pour le calcul TP/SL
+        } else {
+            // Mode single: récupère le radio sélectionné
+            selectedTF = document.querySelector('input[name="configTimeframe"]:checked')?.value || '15m';
+            timeframes = [selectedTF];
+        }
+        
         const tpslInfo = TIMEFRAME_TPSL[selectedTF] || { tp: 2, sl: 1 };
         
         // Mode TP/SL (3 modes: auto, atr, percent)
@@ -1744,7 +1784,8 @@ async function saveTradingConfig() {
         
         const config = {
             symbols: symbols,
-            timeframes: [selectedTF],
+            timeframes: timeframes,
+            multiTFTrading: multiTFTrading,
             analysisInterval: parseInt(document.getElementById('configInterval').value) * 1000,
             leverage: parseInt(document.getElementById('configLeverage').value),
             mode: document.getElementById('configMode').value,
@@ -2809,6 +2850,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Config Trading
     document.getElementById('saveTradingConfig')?.addEventListener('click', saveTradingConfig);
+    
+    // Toggle Multi-TF Trading
+    document.getElementById('multiTFTrading')?.addEventListener('change', (e) => {
+        const isMulti = e.target.checked;
+        const singleTFSelector = document.getElementById('singleTFSelector');
+        const multiTFSelector = document.getElementById('multiTFSelector');
+        const timeframeInfoText = document.getElementById('timeframeInfoText');
+        
+        if (singleTFSelector) singleTFSelector.style.display = isMulti ? 'none' : 'flex';
+        if (multiTFSelector) multiTFSelector.style.display = isMulti ? 'flex' : 'none';
+        
+        if (timeframeInfoText) {
+            if (isMulti) {
+                timeframeInfoText.innerHTML = `
+                    <strong>Mode Multi-Timeframe</strong> - Le bot analyse et trade sur plusieurs TF en parallèle<br>
+                    <span class="text-muted">⚠️ Attention: peut ouvrir plusieurs positions sur le même symbole (TF différents)</span>
+                `;
+            } else {
+                const tf = document.querySelector('input[name="configTimeframe"]:checked')?.value || '15m';
+                updateTimeframeInfo(tf);
+            }
+        }
+    });
     
     // Changement de stratégie (Ichimoku / SMC)
     document.getElementById('configStrategy')?.addEventListener('change', (e) => {

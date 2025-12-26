@@ -599,6 +599,7 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
             // Mode et Multi-Crypto
             if (configUpdate.mode !== undefined) req.user.botConfig.mode = configUpdate.mode;
             if (configUpdate.multiCryptoMode !== undefined) req.user.botConfig.multiCryptoMode = configUpdate.multiCryptoMode;
+            if (configUpdate.multiTFTrading !== undefined) req.user.botConfig.multiTFTrading = configUpdate.multiTFTrading;
             // Risk Management
             if (configUpdate.riskPerTrade !== undefined) req.user.botConfig.riskPerTrade = configUpdate.riskPerTrade;
             if (configUpdate.maxPositionSize !== undefined) req.user.botConfig.maxPositionSize = configUpdate.maxPositionSize;
@@ -653,6 +654,7 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
                     // Mode et Multi-Crypto
                     if (configUpdate.mode !== undefined) activeProfile.config.mode = configUpdate.mode;
                     if (configUpdate.multiCryptoMode !== undefined) activeProfile.config.multiCryptoMode = configUpdate.multiCryptoMode;
+                    if (configUpdate.multiTFTrading !== undefined) activeProfile.config.multiTFTrading = configUpdate.multiTFTrading;
                     // Multi-Timeframe (nouveaux champs)
                     if (configUpdate.useMTF !== undefined) activeProfile.config.useMTF = configUpdate.useMTF;
                     if (configUpdate.mtfPrimary !== undefined) activeProfile.config.mtfPrimary = configUpdate.mtfPrimary;

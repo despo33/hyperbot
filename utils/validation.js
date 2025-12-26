@@ -158,6 +158,7 @@ export const tradingConfigSchema = Joi.object({
     // Mode
     mode: Joi.string().valid('auto', 'manual', 'paper'),
     multiCryptoMode: Joi.boolean(),
+    multiTFTrading: Joi.boolean(),
     // Risk Management (aussi acceptés ici pour compatibilité)
     dailyLossLimit: Joi.number().min(1).max(100),
     maxDrawdown: Joi.number().min(1).max(100),
