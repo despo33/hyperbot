@@ -2514,57 +2514,84 @@ async function showTradeDetails(symbol) {
  * Exécute un trade sur Hyperliquid
  */
 async function executeTrade(symbol, signal, stopLoss, takeProfit, suggestedSize = null) {
-    // Récupère le prix actuel pour afficher les infos
     const direction = signal === 'BUY' ? 'long' : 'short';
     
-    // Demande confirmation avec détails
-    const confirmMsg = `Confirmer le trade ${signal} sur ${symbol}?\n\n` +
-        `Direction: ${direction.toUpperCase()}\n` +
+    // Récupère la config pour les valeurs par défaut
+    let defaultLeverage = 5;
+    let defaultAmount = 50;
+    try {
+        const configData = await apiRequest('/config/trading');
+        defaultLeverage = configData?.config?.leverage || 5;
+    } catch (e) {}
+    
+    // Récupère le solde pour afficher
+    let balanceInfo = '';
+    try {
+        const balance = await apiRequest('/account/balance');
+        if (balance?.totalEquity) {
+            balanceInfo = `\nSolde disponible: $${formatNumber(balance.totalEquity)}`;
+        }
+    } catch (e) {}
+    
+    // Demande le montant à l'utilisateur
+    const amountStr = prompt(
+        `💰 TRADE MANUEL - ${symbol} ${direction.toUpperCase()}\n\n` +
+        `Stop Loss: $${formatNumber(stopLoss)}\n` +
+        `Take Profit: $${formatNumber(takeProfit)}${balanceInfo}\n\n` +
+        `Entrez le MONTANT en USD à investir:`,
+        defaultAmount.toString()
+    );
+    
+    if (!amountStr) return;
+    const amount = parseFloat(amountStr);
+    if (isNaN(amount) || amount <= 0) {
+        showToast('❌ Montant invalide', 'error');
+        return;
+    }
+    
+    // Demande le levier
+    const leverageStr = prompt(
+        `⚡ LEVIER pour ${symbol} ${direction.toUpperCase()}\n\n` +
+        `Montant: $${amount}\n` +
+        `Entrez le LEVIER (1-50):`,
+        defaultLeverage.toString()
+    );
+    
+    if (!leverageStr) return;
+    const leverage = parseInt(leverageStr);
+    if (isNaN(leverage) || leverage < 1 || leverage > 50) {
+        showToast('❌ Levier invalide (1-50)', 'error');
+        return;
+    }
+    
+    // Confirmation finale
+    const confirmMsg = `⚠️ CONFIRMER LE TRADE\n\n` +
+        `${symbol} ${direction.toUpperCase()}\n` +
+        `Montant: $${amount}\n` +
+        `Levier: ${leverage}x\n` +
         `Stop Loss: $${formatNumber(stopLoss)}\n` +
         `Take Profit: $${formatNumber(takeProfit)}\n\n` +
-        `⚠️ Ce trade sera exécuté sur Hyperliquid avec votre capital réel.`;
+        `Ce trade sera exécuté sur Hyperliquid avec votre capital réel.`;
     
     if (!confirm(confirmMsg)) return;
     
     try {
         showToast(`Exécution du trade ${signal} ${symbol}...`, 'info');
         
-        // Récupère la config pour calculer la taille
-        const configData = await apiRequest('/config/trading');
-        const balance = await apiRequest('/balance');
-        
-        // Calcule la taille de position basée sur le risk management
-        let size = suggestedSize;
-        if (!size && balance?.balance) {
-            const riskPercent = configData?.riskPerTrade || 2;
-            const leverage = configData?.leverage || 5;
-            const accountBalance = balance.balance;
-            const currentPrice = (stopLoss + takeProfit) / 2; // Approximation
-            const slDistance = Math.abs(currentPrice - stopLoss);
-            const riskAmount = accountBalance * (riskPercent / 100);
-            size = (riskAmount / slDistance) * leverage;
-            // Arrondi à 4 décimales
-            size = Math.floor(size * 10000) / 10000;
-        }
-        
-        // Taille minimum de sécurité
-        if (!size || size < 0.0001) {
-            size = 0.001;
-        }
-        
         const result = await apiRequest('/trade', {
             method: 'POST',
             body: JSON.stringify({
                 symbol,
                 direction,
-                size,
+                amount,
+                leverage,
                 stopLoss,
                 takeProfit
             })
         });
         
         if (result.success) {
-            showToast(`✅ Trade ${signal} ${symbol} exécuté! Taille: ${size}`, 'success');
+            showToast(`✅ Trade ${signal} ${symbol} exécuté! Montant: $${amount} x${leverage}`, 'success');
             document.querySelector('.trade-modal-overlay')?.remove();
             // Rafraîchit les positions
             setTimeout(() => loadPositions(), 1000);

@@ -384,26 +384,49 @@ router.get('/orders', requireAuth, async (req, res) => {
 /**
  * POST /api/trade
  * Place un trade manuel (protégé)
+ * Accepte soit 'size' directement, soit 'amount' + 'leverage' pour calculer la taille
  */
-router.post('/trade', requireAuth, validate(tradeSchema), async (req, res) => {
+router.post('/trade', requireAuth, async (req, res) => {
     try {
-        const { symbol, direction, size, price, stopLoss, takeProfit } = req.body;
+        const { symbol, direction, size, amount, leverage, price, stopLoss, takeProfit } = req.body;
 
-        if (!symbol || !direction || !size) {
-            return res.status(400).json({ error: 'Paramètres manquants' });
+        if (!symbol || !direction) {
+            return res.status(400).json({ error: 'Paramètres manquants (symbol, direction)' });
+        }
+
+        // Calcule la taille de position
+        let finalSize = size;
+        
+        if (!finalSize && amount && leverage) {
+            // Récupère le prix actuel pour calculer la taille
+            const currentPrice = await priceFetcher.getPrice(symbol);
+            if (!currentPrice) {
+                return res.status(400).json({ error: 'Impossible de récupérer le prix actuel' });
+            }
+            // Taille = (montant * levier) / prix
+            finalSize = (parseFloat(amount) * parseFloat(leverage)) / currentPrice;
+            // Arrondi à 4 décimales
+            finalSize = Math.floor(finalSize * 10000) / 10000;
+            console.log(`[TRADE] Calcul taille: $${amount} x${leverage} / $${currentPrice} = ${finalSize}`);
+        }
+
+        if (!finalSize || finalSize <= 0) {
+            return res.status(400).json({ error: 'Taille de position invalide' });
         }
 
         const result = await tradeEngine.manualTrade({
             symbol,
             direction,
-            size: parseFloat(size),
+            size: parseFloat(finalSize),
             price: price ? parseFloat(price) : null,
             stopLoss: stopLoss ? parseFloat(stopLoss) : null,
-            takeProfit: takeProfit ? parseFloat(takeProfit) : null
+            takeProfit: takeProfit ? parseFloat(takeProfit) : null,
+            leverage: leverage ? parseInt(leverage) : null
         });
 
         res.json(result);
     } catch (error) {
+        console.error('[TRADE] Erreur:', error);
         res.status(500).json({ error: error.message });
     }
 });
