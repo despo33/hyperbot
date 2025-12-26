@@ -94,17 +94,17 @@ class SMCSignalDetector {
             }
         }
 
-        // Filtre MACD
+        // Filtre MACD - ASSOUPLI POUR SHORT
+        // En bull market, le MACD est souvent positif, on ne bloque pas les SHORT pour autant
         if (tradeable && config.useMACDFilter && technicalAnalysis?.macd) {
             const macd = technicalAnalysis.macd;
             
-            if (smcSignal.direction === 'long' && macd.histogram < -0.5) {
+            if (smcSignal.direction === 'long' && macd.histogram < -2.0) {
                 tradeable = false;
                 rejectReason = 'MACD très négatif';
-            } else if (smcSignal.direction === 'short' && macd.histogram > 0.5) {
-                tradeable = false;
-                rejectReason = 'MACD très positif';
             }
+            // NOTE: On ne bloque plus les SHORT basé sur MACD positif
+            // car en bull market le MACD est souvent positif même lors de corrections légitimes
         }
 
         // Filtre Volume

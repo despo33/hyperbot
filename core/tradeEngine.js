@@ -630,6 +630,11 @@ class TradeEngine {
             return this.analyzeWithSMC(symbol, timeframe, candles, currentPrice, preset, tpsl);
         }
         
+        // ===== STRATÉGIE BOLLINGER SQUEEZE =====
+        if (strategy === 'bollinger') {
+            return this.analyzeWithBollinger(symbol, timeframe, candles, currentPrice, preset, tpsl);
+        }
+        
         // ===== STRATÉGIE ICHIMOKU (par défaut) =====
         // Analyse avec signalDetector
         const analysis = signalDetector.analyze(candles, {}, timeframe);
@@ -902,6 +907,104 @@ class TradeEngine {
             // Raisons
             reasons: signal.reasons,
             rejectReason: !tradeable ? smcAnalysis.rejectReason : null
+        };
+    }
+
+    /**
+     * Analyse avec la stratégie Bollinger Squeeze
+     * @param {string} symbol 
+     * @param {string} timeframe 
+     * @param {Array} candles 
+     * @param {number} currentPrice 
+     * @param {Object} preset 
+     * @param {Object} tpsl 
+     * @returns {Object}
+     */
+    async analyzeWithBollinger(symbol, timeframe, candles, currentPrice, preset, tpsl) {
+        // Analyse Bollinger Squeeze
+        const bbAnalysis = signalDetector.analyzeBollingerSqueeze(candles, timeframe, {
+            bbPeriod: this.config.bbPeriod || 20,
+            bbStdDev: this.config.bbStdDev || 2,
+            kcPeriod: this.config.kcPeriod || 20,
+            kcMultiplier: this.config.kcMultiplier || 1.5,
+            momentumPeriod: this.config.momentumPeriod || 12
+        });
+
+        if (!bbAnalysis || !bbAnalysis.success || !bbAnalysis.signal) {
+            return {
+                success: true,
+                symbol,
+                timeframe,
+                strategy: 'bollinger',
+                currentPrice,
+                tradeable: false,
+                rejectReason: 'Pas de signal Bollinger Squeeze'
+            };
+        }
+
+        const signal = bbAnalysis.signal;
+        const direction = signal.direction === 'bullish' ? 'long' : 
+                         signal.direction === 'bearish' ? 'short' : null;
+
+        if (!direction) {
+            return {
+                success: true,
+                symbol,
+                timeframe,
+                strategy: 'bollinger',
+                currentPrice,
+                tradeable: false,
+                rejectReason: 'Direction non déterminée'
+            };
+        }
+
+        // Calcul des niveaux TP/SL
+        let stopLoss, takeProfit, slPercent, tpPercent;
+        
+        if (direction === 'long') {
+            slPercent = tpsl.sl;
+            tpPercent = tpsl.tp;
+            stopLoss = currentPrice * (1 - slPercent / 100);
+            takeProfit = currentPrice * (1 + tpPercent / 100);
+        } else {
+            slPercent = tpsl.sl;
+            tpPercent = tpsl.tp;
+            stopLoss = currentPrice * (1 + slPercent / 100);
+            takeProfit = currentPrice * (1 - tpPercent / 100);
+        }
+
+        const rrr = tpPercent / slPercent;
+
+        // Vérification de tradabilité - ASSOUPLI pour permettre les SHORT
+        // On ne bloque plus basé sur RSI ou autres filtres stricts
+        const tradeable = signal.strength >= 0.3 && bbAnalysis.winProbability >= (this.config.minWinProbability || 0.55);
+
+        return {
+            success: true,
+            symbol,
+            timeframe,
+            strategy: 'bollinger',
+            currentPrice,
+            tradeable,
+            direction,
+            score: Math.abs(signal.score || 5),
+            confluence: (signal.rsiConfirms ? 1 : 0) + (signal.volumeConfirms ? 1 : 0) + 1,
+            winProbability: bbAnalysis.winProbability,
+            // Niveaux TP/SL
+            stopLoss,
+            takeProfit,
+            slPercent,
+            tpPercent,
+            rrr,
+            // Données Bollinger
+            squeeze: bbAnalysis.squeeze,
+            momentum: bbAnalysis.momentum,
+            bollingerBands: bbAnalysis.bollingerBands,
+            // Indicateurs
+            indicators: bbAnalysis.indicators,
+            // Raisons
+            reasons: [signal.description],
+            rejectReason: !tradeable ? 'Signal trop faible ou probabilité insuffisante' : null
         };
     }
 
