@@ -1843,6 +1843,12 @@ async function loadRiskConfig() {
     try {
         const data = await apiRequest('/config/risk');
         const config = data.config;
+        
+        console.log('[RISK] Chargement config risk:', {
+            ...config,
+            fromProfile: data.fromProfile,
+            profileName: data.profileName
+        });
 
         // Risk per trade (slider)
         const riskEl = document.getElementById('riskPerTrade');
@@ -1919,10 +1925,14 @@ async function saveRiskConfig() {
             minRiskRewardRatio: parseFloat(document.getElementById('minRiskRewardRatio').value)
         };
 
-        await apiRequest('/config/risk', {
+        console.log('[RISK] Sauvegarde config risk:', config);
+
+        const result = await apiRequest('/config/risk', {
             method: 'POST',
             body: JSON.stringify(config)
         });
+        
+        console.log('[RISK] Réponse serveur:', result);
 
         showToast('Configuration risk sauvegardée', 'success');
     } catch (error) {

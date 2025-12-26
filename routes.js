@@ -571,33 +571,33 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
         if (req.user) {
             const configUpdate = req.body;
             
-            // Met à jour la config utilisateur
+            // Met à jour la config utilisateur (utilise !== undefined pour permettre les valeurs falsy)
             if (configUpdate.symbols) req.user.botConfig.symbols = configUpdate.symbols;
             if (configUpdate.timeframes) req.user.botConfig.timeframes = configUpdate.timeframes;
-            if (configUpdate.leverage) req.user.botConfig.leverage = configUpdate.leverage;
-            if (configUpdate.maxConcurrentTrades) req.user.botConfig.maxConcurrentTrades = configUpdate.maxConcurrentTrades;
-            if (configUpdate.minWinProbability) req.user.botConfig.minWinProbability = configUpdate.minWinProbability;
-            if (configUpdate.minScore) req.user.botConfig.minScore = configUpdate.minScore;
-            if (configUpdate.tpslMode) req.user.botConfig.tpslMode = configUpdate.tpslMode;
-            if (configUpdate.defaultTP) req.user.botConfig.defaultTP = configUpdate.defaultTP;
-            if (configUpdate.defaultSL) req.user.botConfig.defaultSL = configUpdate.defaultSL;
-            if (configUpdate.analysisInterval) req.user.botConfig.analysisInterval = configUpdate.analysisInterval;
-            if (configUpdate.atrMultiplierSL) req.user.botConfig.atrMultiplierSL = configUpdate.atrMultiplierSL;
-            if (configUpdate.atrMultiplierTP) req.user.botConfig.atrMultiplierTP = configUpdate.atrMultiplierTP;
+            if (configUpdate.leverage !== undefined) req.user.botConfig.leverage = configUpdate.leverage;
+            if (configUpdate.maxConcurrentTrades !== undefined) req.user.botConfig.maxConcurrentTrades = configUpdate.maxConcurrentTrades;
+            if (configUpdate.minWinProbability !== undefined) req.user.botConfig.minWinProbability = configUpdate.minWinProbability;
+            if (configUpdate.minScore !== undefined) req.user.botConfig.minScore = configUpdate.minScore;
+            if (configUpdate.tpslMode !== undefined) req.user.botConfig.tpslMode = configUpdate.tpslMode;
+            if (configUpdate.defaultTP !== undefined) req.user.botConfig.defaultTP = configUpdate.defaultTP;
+            if (configUpdate.defaultSL !== undefined) req.user.botConfig.defaultSL = configUpdate.defaultSL;
+            if (configUpdate.analysisInterval !== undefined) req.user.botConfig.analysisInterval = configUpdate.analysisInterval;
+            if (configUpdate.atrMultiplierSL !== undefined) req.user.botConfig.atrMultiplierSL = configUpdate.atrMultiplierSL;
+            if (configUpdate.atrMultiplierTP !== undefined) req.user.botConfig.atrMultiplierTP = configUpdate.atrMultiplierTP;
             if (configUpdate.useRSIFilter !== undefined) req.user.botConfig.useRSIFilter = configUpdate.useRSIFilter;
-            if (configUpdate.rsiOverbought) req.user.botConfig.rsiOverbought = configUpdate.rsiOverbought;
-            if (configUpdate.rsiOversold) req.user.botConfig.rsiOversold = configUpdate.rsiOversold;
+            if (configUpdate.rsiOverbought !== undefined) req.user.botConfig.rsiOverbought = configUpdate.rsiOverbought;
+            if (configUpdate.rsiOversold !== undefined) req.user.botConfig.rsiOversold = configUpdate.rsiOversold;
             // Multi-Timeframe
             if (configUpdate.multiTimeframeMode !== undefined) req.user.botConfig.multiTimeframeMode = configUpdate.multiTimeframeMode;
             if (configUpdate.mtfTimeframes) req.user.botConfig.mtfTimeframes = configUpdate.mtfTimeframes;
-            if (configUpdate.mtfMinConfirmation) req.user.botConfig.mtfMinConfirmation = configUpdate.mtfMinConfirmation;
+            if (configUpdate.mtfMinConfirmation !== undefined) req.user.botConfig.mtfMinConfirmation = configUpdate.mtfMinConfirmation;
             // Multi-Timeframe (nouveaux champs du dashboard)
             if (configUpdate.useMTF !== undefined) req.user.botConfig.useMTF = configUpdate.useMTF;
-            if (configUpdate.mtfPrimary) req.user.botConfig.mtfPrimary = configUpdate.mtfPrimary;
-            if (configUpdate.mtfHigher) req.user.botConfig.mtfHigher = configUpdate.mtfHigher;
-            if (configUpdate.mtfConfirmations) req.user.botConfig.mtfConfirmations = configUpdate.mtfConfirmations;
+            if (configUpdate.mtfPrimary !== undefined) req.user.botConfig.mtfPrimary = configUpdate.mtfPrimary;
+            if (configUpdate.mtfHigher !== undefined) req.user.botConfig.mtfHigher = configUpdate.mtfHigher;
+            if (configUpdate.mtfConfirmations !== undefined) req.user.botConfig.mtfConfirmations = configUpdate.mtfConfirmations;
             // Mode et Multi-Crypto
-            if (configUpdate.mode) req.user.botConfig.mode = configUpdate.mode;
+            if (configUpdate.mode !== undefined) req.user.botConfig.mode = configUpdate.mode;
             if (configUpdate.multiCryptoMode !== undefined) req.user.botConfig.multiCryptoMode = configUpdate.multiCryptoMode;
             // Indicateurs avancés
             if (configUpdate.useSupertrend !== undefined) req.user.botConfig.useSupertrend = configUpdate.useSupertrend;
@@ -613,7 +613,7 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
             if (configUpdate.maxConsecutiveLosses !== undefined) req.user.botConfig.maxConsecutiveLosses = configUpdate.maxConsecutiveLosses;
             if (configUpdate.minRiskRewardRatio !== undefined) req.user.botConfig.minRiskRewardRatio = configUpdate.minRiskRewardRatio;
             // Stratégie de trading
-            if (configUpdate.strategy) req.user.botConfig.strategy = configUpdate.strategy;
+            if (configUpdate.strategy !== undefined) req.user.botConfig.strategy = configUpdate.strategy;
             // Paramètres Bollinger Squeeze
             if (configUpdate.bbPeriod !== undefined) req.user.botConfig.bbPeriod = configUpdate.bbPeriod;
             if (configUpdate.bbStdDev !== undefined) req.user.botConfig.bbStdDev = configUpdate.bbStdDev;
@@ -641,7 +641,7 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
                     if (configUpdate.maxConcurrentTrades !== undefined) activeProfile.config.maxConcurrentTrades = configUpdate.maxConcurrentTrades;
                     if (configUpdate.minWinProbability !== undefined) activeProfile.config.minWinProbability = configUpdate.minWinProbability;
                     if (configUpdate.minScore !== undefined) activeProfile.config.minScore = configUpdate.minScore;
-                    if (configUpdate.tpslMode) activeProfile.config.tpslMode = configUpdate.tpslMode;
+                    if (configUpdate.tpslMode !== undefined) activeProfile.config.tpslMode = configUpdate.tpslMode;
                     if (configUpdate.defaultTP !== undefined) activeProfile.config.defaultTP = configUpdate.defaultTP;
                     if (configUpdate.defaultSL !== undefined) activeProfile.config.defaultSL = configUpdate.defaultSL;
                     if (configUpdate.analysisInterval !== undefined) activeProfile.config.analysisInterval = configUpdate.analysisInterval;
@@ -653,17 +653,17 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
                     if (configUpdate.multiTimeframeMode !== undefined) activeProfile.config.multiTimeframeMode = configUpdate.multiTimeframeMode;
                     if (configUpdate.mtfTimeframes) activeProfile.config.mtfTimeframes = configUpdate.mtfTimeframes;
                     if (configUpdate.mtfMinConfirmation !== undefined) activeProfile.config.mtfMinConfirmation = configUpdate.mtfMinConfirmation;
-                    if (configUpdate.strategy) activeProfile.config.strategy = configUpdate.strategy;
+                    if (configUpdate.strategy !== undefined) activeProfile.config.strategy = configUpdate.strategy;
                     if (configUpdate.enabledSignals) {
                         activeProfile.config.enabledSignals = { ...activeProfile.config.enabledSignals, ...configUpdate.enabledSignals };
                     }
                     // Mode et Multi-Crypto
-                    if (configUpdate.mode) activeProfile.config.mode = configUpdate.mode;
+                    if (configUpdate.mode !== undefined) activeProfile.config.mode = configUpdate.mode;
                     if (configUpdate.multiCryptoMode !== undefined) activeProfile.config.multiCryptoMode = configUpdate.multiCryptoMode;
                     // Multi-Timeframe (nouveaux champs)
                     if (configUpdate.useMTF !== undefined) activeProfile.config.useMTF = configUpdate.useMTF;
-                    if (configUpdate.mtfPrimary) activeProfile.config.mtfPrimary = configUpdate.mtfPrimary;
-                    if (configUpdate.mtfHigher) activeProfile.config.mtfHigher = configUpdate.mtfHigher;
+                    if (configUpdate.mtfPrimary !== undefined) activeProfile.config.mtfPrimary = configUpdate.mtfPrimary;
+                    if (configUpdate.mtfHigher !== undefined) activeProfile.config.mtfHigher = configUpdate.mtfHigher;
                     if (configUpdate.mtfConfirmations !== undefined) activeProfile.config.mtfConfirmations = configUpdate.mtfConfirmations;
                     // Indicateurs avancés
                     if (configUpdate.useSupertrend !== undefined) activeProfile.config.useSupertrend = configUpdate.useSupertrend;
