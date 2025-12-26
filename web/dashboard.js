@@ -389,11 +389,22 @@ function connectWebSocket() {
         reconnectAttempts = 0;
         updateConnectionStatus(true);
         
-        // S'abonne aux événements
-        ws.send(JSON.stringify({ type: 'subscribe', channel: 'logs' }));
-        ws.send(JSON.stringify({ type: 'subscribe', channel: 'signals' }));
-        ws.send(JSON.stringify({ type: 'subscribe', channel: 'trades' }));
-        ws.send(JSON.stringify({ type: 'subscribe', channel: 'analysis' }));
+        // Authentifie le WebSocket avec le token JWT
+        const token = localStorage.getItem('authToken');
+        if (token) {
+            ws.send(JSON.stringify({ type: 'auth', token: token }));
+            console.log('[WS] Token envoyé pour authentification');
+        }
+        
+        // S'abonne aux événements (après un court délai pour laisser l'auth se faire)
+        setTimeout(() => {
+            ws.send(JSON.stringify({ type: 'subscribe', channel: 'logs' }));
+            ws.send(JSON.stringify({ type: 'subscribe', channel: 'signals' }));
+            ws.send(JSON.stringify({ type: 'subscribe', channel: 'trades' }));
+            ws.send(JSON.stringify({ type: 'subscribe', channel: 'analysis' }));
+            ws.send(JSON.stringify({ type: 'subscribe', channel: 'status' }));
+            console.log('[WS] Abonnements envoyés');
+        }, 100);
     };
 
     ws.onmessage = (event) => {
