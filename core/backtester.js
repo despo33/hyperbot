@@ -498,38 +498,38 @@ class Backtester {
             tradeable = false;
         }
 
-        // Filtre EMA200
+        // Filtre EMA200 - ASSOUPLI pour SHORT
+        // En bull market, le prix est souvent au-dessus de l'EMA200, on ne bloque plus les SHORT
         if (useEMA200Filter && ema200 && ema200.value) {
-            const priceAboveEMA = currentPrice > ema200.value;
             const priceBelowEMA = currentPrice < ema200.value;
             const emaDistance = Math.abs((currentPrice - ema200.value) / ema200.value * 100);
 
+            // Bloque seulement les LONG si prix très en-dessous de l'EMA200
             if (direction === 'long' && priceBelowEMA && emaDistance > 1.0) {
                 tradeable = false;
-            } else if (direction === 'short' && priceAboveEMA && emaDistance > 1.0) {
-                tradeable = false;
             }
+            // NOTE: On ne bloque plus les SHORT basé sur EMA200
         }
 
-        // Filtre MACD
+        // Filtre MACD - ASSOUPLI pour SHORT
+        // En bull market, le MACD est souvent positif même lors de corrections légitimes
         if (useMACDFilter && macd && macd.histogram !== undefined) {
-            if (direction === 'long' && macd.histogram < -0.5) {
-                tradeable = false;
-            } else if (direction === 'short' && macd.histogram > 0.5) {
+            if (direction === 'long' && macd.histogram < -2.0) {
                 tradeable = false;
             }
+            // NOTE: On ne bloque plus les SHORT basé sur MACD positif
         }
 
-        // Filtre RSI - AMÉLIORÉ: cherche les zones de retournement
+        // Filtre RSI - ASSOUPLI pour SHORT
         if (useRSIFilter) {
             if (direction === 'long') {
-                // LONG: RSI doit être entre 35-65 (pas en surachat, pas en survente extrême)
-                if (rsi > 65 || rsi < 30) {
+                // LONG: RSI doit être entre 30-70 (pas en surachat extrême)
+                if (rsi > 70 || rsi < 25) {
                     tradeable = false;
                 }
             } else if (direction === 'short') {
-                // SHORT: RSI doit être entre 35-65
-                if (rsi < 35 || rsi > 70) {
+                // SHORT: RSI entre 20-85 (on peut shorter en surachat = idéal!)
+                if (rsi < 20 || rsi > 85) {
                     tradeable = false;
                 }
             }
@@ -573,17 +573,18 @@ class Backtester {
         }
         
         // 4. Confirmation Chikou (Ichimoku) - Signal plus fiable (si activé)
+        // NOTE: Désactivé pour SHORT car Chikou a un biais haussier en bull market
         const chikouConfirmed = analysis.chikouConfirmation?.confirmed || false;
         const chikouDirection = analysis.chikouConfirmation?.direction;
-        if (useChikouFilter && chikouConfirmed && chikouDirection) {
-            // Chikou doit confirmer la direction
-            if ((direction === 'long' && chikouDirection !== 'bullish') ||
-                (direction === 'short' && chikouDirection !== 'bearish')) {
+        if (useChikouFilter && chikouConfirmed && chikouDirection && direction === 'long') {
+            // Chikou doit confirmer la direction (seulement pour LONG)
+            if (chikouDirection !== 'bullish') {
                 tradeable = false;
             }
         }
         
-        // 5. Filtre de momentum - MACD doit être dans la bonne direction ET en accélération
+        // 5. Filtre de momentum - MACD (ASSOUPLI pour SHORT)
+        // En bull market, le MACD est souvent positif, on ne bloque pas les SHORT
         if (useMACDFilter && macd) {
             const macdLine = macd.macd || 0;
             const signalLine = macd.signal || 0;
@@ -593,25 +594,19 @@ class Backtester {
                 if (macdLine < signalLine - 0.1) {
                     tradeable = false;
                 }
-            } else {
-                // Pour SHORT: MACD doit être en-dessous du signal
-                if (macdLine > signalLine + 0.1) {
-                    tradeable = false;
-                }
             }
+            // NOTE: On ne bloque plus les SHORT basé sur MACD
         }
 
-        // ===== 6. FILTRE SUPERTREND - Ne trade que dans le sens de la tendance =====
+        // ===== 6. FILTRE SUPERTREND - ASSOUPLI pour SHORT =====
+        // Le Supertrend a un biais haussier en bull market, on ne bloque plus les SHORT
         const supertrend = analysis.indicators?.supertrend;
         if (useSupertrendFilter && supertrend && supertrend.direction !== 'neutral') {
             // LONG uniquement si Supertrend est bullish
             if (direction === 'long' && supertrend.direction !== 'bullish') {
                 tradeable = false;
             }
-            // SHORT uniquement si Supertrend est bearish
-            if (direction === 'short' && supertrend.direction !== 'bearish') {
-                tradeable = false;
-            }
+            // NOTE: On ne bloque plus les SHORT basé sur Supertrend
         }
 
         // ===== 7. Calcul Fibonacci pour TP/SL dynamiques =====
