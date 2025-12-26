@@ -62,7 +62,7 @@ async function createAdmin() {
         console.log('═'.repeat(50));
         console.log('');
         console.log('⚠️ IMPORTANT: Changez le mot de passe après la première connexion!');
-        console.log('📍 Accès admin: /admin.html');
+        console.log('📍 Accès admin: /ctrl-panel-x7k.html');
 
         await mongoose.disconnect();
         console.log('✅ Déconnecté de MongoDB');
