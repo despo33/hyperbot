@@ -72,11 +72,6 @@ class TradeEngine {
                 '1h': 0.20,
                 '4h': 0.10
             },
-            // ===== INDICATEURS AVANCÉS =====
-            useSupertrend: true,          // Filtre Supertrend (ne trade que dans le sens de la tendance)
-            useFibonacci: true,           // Utilise Fibonacci pour TP/SL dynamiques
-            useChikouAdvanced: true,      // Confirmation Chikou Span avancée
-            useKumoTwist: true,           // Détection Kumo Twist
             // ===== STRATÉGIE =====
             strategy: 'ichimoku'          // 'ichimoku' ou 'smc' (Smart Money Concepts)
         };
@@ -701,32 +696,6 @@ class TradeEngine {
                 macdTrendOK = false; // MACD très positif = pas de SHORT
             }
         }
-        
-        // ===== FILTRE SUPERTREND (ASSOUPLI) =====
-        // Le Supertrend a un biais haussier, on l'utilise comme bonus, pas comme bloqueur
-        let supertrendOK = true; // Toujours true - ne bloque plus
-        const supertrend = analysis.indicators?.supertrend;
-        // NOTE: Le Supertrend est maintenant utilisé comme bonus de confluence
-        // et non comme filtre bloquant car il a un biais haussier
-        // qui empêche les SHORT même lors de corrections légitimes
-        // ANCIEN CODE BLOQUANT RETIRÉ:
-        // if (this.config.useSupertrend && supertrend && supertrend.direction !== 'neutral') {
-        //     if (signalDirection === 'long' && supertrend.direction !== 'bullish') supertrendOK = false;
-        //     if (signalDirection === 'short' && supertrend.direction !== 'bearish') supertrendOK = false;
-        // }
-        
-        // ===== FILTRE CHIKOU AVANCÉ (ASSOUPLI) =====
-        // Le Chikou est utilisé comme bonus de confirmation, pas comme bloqueur
-        // Car il a aussi un biais vers la tendance dominante
-        let chikouOK = true; // Toujours true - ne bloque plus
-        const chikouAdvanced = analysis.indicators?.chikouAdvanced;
-        // NOTE: Le Chikou est maintenant utilisé comme indicateur informatif
-        // et non comme filtre bloquant car il suit la tendance dominante
-        // ANCIEN CODE BLOQUANT RETIRÉ:
-        // if (this.config.useChikouAdvanced && chikouAdvanced && chikouAdvanced.confirmed) {
-        //     if (signalDirection === 'long' && chikouAdvanced.direction !== 'bullish') chikouOK = false;
-        //     if (signalDirection === 'short' && chikouAdvanced.direction !== 'bearish') chikouOK = false;
-        // }
         
         // Vérifie les filtres avec les presets du timeframe
         const hasStrongScore = absIchimokuScore >= preset.minScore;

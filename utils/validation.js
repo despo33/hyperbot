@@ -150,11 +150,6 @@ export const tradingConfigSchema = Joi.object({
     // Stratégie de trading
     strategy: Joi.string()
         .valid('ichimoku', 'smc', 'bollinger'),
-    // Indicateurs avancés
-    useSupertrend: Joi.boolean(),
-    useFibonacci: Joi.boolean(),
-    useKumoTwist: Joi.boolean(),
-    useChikouAdvanced: Joi.boolean(),
     // Multi-Timeframe
     useMTF: Joi.boolean(),
     mtfPrimary: Joi.string().valid('1m', '5m', '15m', '30m', '1h', '4h', '1d'),
@@ -176,9 +171,7 @@ export const tradingConfigSchema = Joi.object({
     kcMultiplier: Joi.number().min(0.5).max(5),
     momentumPeriod: Joi.number().integer().min(3).max(50),
     bbRsiFilter: Joi.boolean(),
-    bbVolumeFilter: Joi.boolean(),
-    bbMomentumFilter: Joi.boolean(),
-    bbSqueezeOnly: Joi.boolean()
+    bbVolumeFilter: Joi.boolean()
 }).unknown(true);  // Permet les champs non définis pour éviter les erreurs de validation
 
 // ===== PROFILS =====

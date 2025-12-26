@@ -154,9 +154,6 @@ this.config = {
     mode: 'auto' | 'manual',
     leverage: 5,
     strategy: 'ichimoku' | 'smc',
-    // Filtres...
-    useSupertrend: true,
-    useChikouAdvanced: true,
     // MTF...
     useMTF: true,
     mtfPrimary: '15m',

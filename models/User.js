@@ -169,14 +169,6 @@ const configProfileSchema = new mongoose.Schema({
         bbVolumeFilter: {
             type: Boolean,
             default: true
-        },
-        bbMomentumFilter: {
-            type: Boolean,
-            default: true
-        },
-        bbSqueezeOnly: {
-            type: Boolean,
-            default: true
         }
     }
 });
@@ -437,14 +429,6 @@ const userSchema = new mongoose.Schema({
             default: true
         },
         bbVolumeFilter: {
-            type: Boolean,
-            default: true
-        },
-        bbMomentumFilter: {
-            type: Boolean,
-            default: true
-        },
-        bbSqueezeOnly: {
             type: Boolean,
             default: true
         }

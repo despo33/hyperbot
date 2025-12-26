@@ -599,11 +599,6 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
             // Mode et Multi-Crypto
             if (configUpdate.mode !== undefined) req.user.botConfig.mode = configUpdate.mode;
             if (configUpdate.multiCryptoMode !== undefined) req.user.botConfig.multiCryptoMode = configUpdate.multiCryptoMode;
-            // Indicateurs avancés
-            if (configUpdate.useSupertrend !== undefined) req.user.botConfig.useSupertrend = configUpdate.useSupertrend;
-            if (configUpdate.useFibonacci !== undefined) req.user.botConfig.useFibonacci = configUpdate.useFibonacci;
-            if (configUpdate.useChikouAdvanced !== undefined) req.user.botConfig.useChikouAdvanced = configUpdate.useChikouAdvanced;
-            if (configUpdate.useKumoTwist !== undefined) req.user.botConfig.useKumoTwist = configUpdate.useKumoTwist;
             // Risk Management
             if (configUpdate.riskPerTrade !== undefined) req.user.botConfig.riskPerTrade = configUpdate.riskPerTrade;
             if (configUpdate.maxPositionSize !== undefined) req.user.botConfig.maxPositionSize = configUpdate.maxPositionSize;
@@ -622,8 +617,6 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
             if (configUpdate.momentumPeriod !== undefined) req.user.botConfig.momentumPeriod = configUpdate.momentumPeriod;
             if (configUpdate.bbRsiFilter !== undefined) req.user.botConfig.bbRsiFilter = configUpdate.bbRsiFilter;
             if (configUpdate.bbVolumeFilter !== undefined) req.user.botConfig.bbVolumeFilter = configUpdate.bbVolumeFilter;
-            if (configUpdate.bbMomentumFilter !== undefined) req.user.botConfig.bbMomentumFilter = configUpdate.bbMomentumFilter;
-            if (configUpdate.bbSqueezeOnly !== undefined) req.user.botConfig.bbSqueezeOnly = configUpdate.bbSqueezeOnly;
             if (configUpdate.enabledSignals) {
                 req.user.botConfig.enabledSignals = { ...req.user.botConfig.enabledSignals, ...configUpdate.enabledSignals };
             }
@@ -665,11 +658,6 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
                     if (configUpdate.mtfPrimary !== undefined) activeProfile.config.mtfPrimary = configUpdate.mtfPrimary;
                     if (configUpdate.mtfHigher !== undefined) activeProfile.config.mtfHigher = configUpdate.mtfHigher;
                     if (configUpdate.mtfConfirmations !== undefined) activeProfile.config.mtfConfirmations = configUpdate.mtfConfirmations;
-                    // Indicateurs avancés
-                    if (configUpdate.useSupertrend !== undefined) activeProfile.config.useSupertrend = configUpdate.useSupertrend;
-                    if (configUpdate.useFibonacci !== undefined) activeProfile.config.useFibonacci = configUpdate.useFibonacci;
-                    if (configUpdate.useChikouAdvanced !== undefined) activeProfile.config.useChikouAdvanced = configUpdate.useChikouAdvanced;
-                    if (configUpdate.useKumoTwist !== undefined) activeProfile.config.useKumoTwist = configUpdate.useKumoTwist;
                     // Bollinger params
                     if (configUpdate.bbPeriod !== undefined) activeProfile.config.bbPeriod = configUpdate.bbPeriod;
                     if (configUpdate.bbStdDev !== undefined) activeProfile.config.bbStdDev = configUpdate.bbStdDev;
@@ -678,8 +666,6 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
                     if (configUpdate.momentumPeriod !== undefined) activeProfile.config.momentumPeriod = configUpdate.momentumPeriod;
                     if (configUpdate.bbRsiFilter !== undefined) activeProfile.config.bbRsiFilter = configUpdate.bbRsiFilter;
                     if (configUpdate.bbVolumeFilter !== undefined) activeProfile.config.bbVolumeFilter = configUpdate.bbVolumeFilter;
-                    if (configUpdate.bbMomentumFilter !== undefined) activeProfile.config.bbMomentumFilter = configUpdate.bbMomentumFilter;
-                    if (configUpdate.bbSqueezeOnly !== undefined) activeProfile.config.bbSqueezeOnly = configUpdate.bbSqueezeOnly;
                     
                     // Marque le sous-document comme modifié pour Mongoose
                     req.user.markModified('configProfiles');
