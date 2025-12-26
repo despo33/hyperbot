@@ -727,12 +727,14 @@ class TradeEngine {
         const hasStrongScore = absIchimokuScore >= preset.minScore;
         const hasMinConfluence = confluence >= preset.minConfluence;
         
-        // Filtre RSI selon le preset - RENFORCÉ
+        // Filtre RSI selon le preset - ASSOUPLI POUR SHORT
         let rsiOK = true;
         if (signalDirection === 'long') {
             rsiOK = rsi <= preset.rsiLongMax && rsi > 25; // Pas de LONG si RSI trop bas (survente extrême)
         } else if (signalDirection === 'short') {
-            rsiOK = rsi >= preset.rsiShortMin && rsi < 75; // Pas de SHORT si RSI trop haut
+            // SHORT: RSI entre 20 et 85 accepté
+            // On peut shorter en surachat (RSI élevé) = c'est même idéal!
+            rsiOK = rsi >= 20 && rsi <= 85;
         }
         
         // Filtre ADX - RENFORCÉ
@@ -1096,18 +1098,19 @@ class TradeEngine {
                              (absIchimokuScore >= 7 && macdOK);
             
         } else if (signalDirection === 'short') {
-            // Zone RSI pour SHORT basée sur le preset du timeframe
-            // En tendance forte, on étend encore de 10 points
-            const rsiMin = strongTrend ? Math.max(10, presetRsiShortMin - 10) : presetRsiShortMin;
-            const rsiOK = rsi >= rsiMin && rsi <= 80;
-            // MACD doit être négatif OU en train de descendre
-            const macdOK = macdHistogram < 0.3 || (advancedAnalysis?.macd?.crossover === 'bearish');
-            // VWAP: prix en-dessous = biais baissier
+            // Zone RSI pour SHORT - TRÈS ASSOUPLI pour permettre les corrections en bull market
+            // RSI entre 30 et 85 accepté (on peut shorter même avec RSI élevé = surachat)
+            const rsiOK = rsi >= 20 && rsi <= 85;
+            
+            // MACD: accepte si négatif, en baisse, OU simplement < 1.0 (pas fortement haussier)
+            const macdOK = macdHistogram < 1.0 || (advancedAnalysis?.macd?.crossover === 'bearish');
+            
+            // VWAP: prix en-dessous = biais baissier (bonus, pas obligatoire)
             const vwapOK = vwapPosition === 'below';
-            // CVD: tendance baissière = pression vendeuse
+            // CVD: tendance baissière = pression vendeuse (bonus, pas obligatoire)
             const cvdOK = cvdTrend === 'bearish' || cvdDivergence === 'bearish';
-            // EMA comme backup
-            const emaOK = ema200Position === 'below';
+            // EMA: pas utilisé comme filtre pour SHORT en bull market
+            // car le prix est souvent au-dessus de l'EMA200
             
             // Funding Rate positif = LONG SQUEEZE probable = BONUS pour SHORT
             if (fundingRate.signal === 'bearish') {
@@ -1117,10 +1120,13 @@ class TradeEngine {
                 fundingBonus = -1; // Malus si funding très négatif
             }
             
-            // Combo gagnant: RSI OK + (VWAP OU CVD OU MACD OU EMA)
-            // OU tendance très forte (score 7/7) avec au moins MACD OK
-            momentumAligned = (rsiOK && (vwapOK || cvdOK || macdOK || emaOK)) ||
-                             (absIchimokuScore >= 7 && macdOK);
+            // MOMENTUM ASSOUPLI POUR SHORT:
+            // En bull market, les corrections sont normales et tradables
+            // On accepte le SHORT si:
+            // 1. RSI OK (large plage 20-85)
+            // 2. ET (MACD pas trop haussier OU score Ichimoku fort)
+            // Les indicateurs VWAP/CVD sont des bonus, pas des bloqueurs
+            momentumAligned = rsiOK && (macdOK || absIchimokuScore >= 5);
         }
         
         // ===== FILTRE CONFLUENCE MINIMUM =====

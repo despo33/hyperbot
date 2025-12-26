@@ -357,7 +357,9 @@ class SignalDetector {
         }
 
         // Vérifie la confirmation Chikou si requise
-        if (this.thresholds.confirmationRequired && chikouConf.confirmed) {
+        // NOTE: Désactivé pour les signaux bearish (SHORT) car le Chikou a un biais haussier
+        // en bull market et bloque systématiquement les corrections légitimes
+        if (this.thresholds.confirmationRequired && chikouConf.confirmed && direction === 'bullish') {
             if (chikouConf.direction !== direction) {
                 return {
                     action: null,
