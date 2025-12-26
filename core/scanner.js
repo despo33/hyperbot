@@ -5,6 +5,7 @@
 
 import priceFetcher from './priceFetcher.js';
 import signalDetector from './signalDetector.js';
+import smcSignalDetector from './smcSignalDetector.js';
 import ichimoku from './ichimoku.js';
 
 // Top 20 cryptos par market cap disponibles sur Hyperliquid
@@ -29,9 +30,12 @@ class CryptoScanner {
      * Analyse une seule crypto
      * @param {string} symbol 
      * @param {string} timeframe 
+     * @param {Object} options - Options incluant la stratégie
      * @returns {Promise<Object>}
      */
-    async analyzeSymbol(symbol, timeframe = '1h') {
+    async analyzeSymbol(symbol, timeframe = '1h', options = {}) {
+        const strategy = options.strategy || 'ichimoku';
+        
         try {
             // Récupère les candles
             const candles = await priceFetcher.getCandles(symbol, timeframe, 100);
@@ -46,8 +50,16 @@ class CryptoScanner {
 
             const currentPrice = candles[candles.length - 1].close;
             
-            // Analyse Ichimoku complète
-            const analysis = signalDetector.analyze(candles);
+            // Analyse selon la stratégie choisie
+            let analysis;
+            if (strategy === 'smc') {
+                analysis = this.analyzeSMC(candles, timeframe);
+            } else if (strategy === 'bollinger') {
+                analysis = this.analyzeBollinger(candles, timeframe);
+            } else {
+                // Ichimoku par défaut
+                analysis = signalDetector.analyze(candles);
+            }
             
             // Calcul du changement 24h
             const change24h = candles.length >= 24 
@@ -145,19 +157,102 @@ class CryptoScanner {
     }
 
     /**
+     * Analyse avec la stratégie SMC (Smart Money Concepts)
+     * @param {Array} candles 
+     * @param {string} timeframe 
+     * @returns {Object}
+     */
+    analyzeSMC(candles, timeframe) {
+        const smcAnalysis = smcSignalDetector.analyze(candles, {}, timeframe);
+        
+        // Convertit le format SMC vers le format standard du scanner
+        const score = smcAnalysis.signal?.score || 0;
+        const direction = smcAnalysis.signal?.direction || 'neutral';
+        
+        return {
+            ichimokuScore: {
+                score: direction === 'long' ? Math.abs(score) : -Math.abs(score),
+                maxScore: 10,
+                normalizedScore: score / 10,
+                direction: direction === 'long' ? 'bullish' : direction === 'short' ? 'bearish' : 'neutral'
+            },
+            finalSignal: smcAnalysis.signal ? {
+                action: direction === 'long' ? 'BUY' : direction === 'short' ? 'SELL' : null,
+                confidence: smcAnalysis.signal.confidence > 0.7 ? 'high' : smcAnalysis.signal.confidence > 0.5 ? 'medium' : 'low'
+            } : null,
+            recommendation: {
+                action: direction === 'long' ? 'BUY' : direction === 'short' ? 'SELL' : 'NEUTRAL',
+                reason: smcAnalysis.signal?.reasons?.join(', ') || 'Analyse SMC'
+            },
+            detectedSignals: smcAnalysis.signal?.reasons || [],
+            levels: null,
+            strategy: 'smc'
+        };
+    }
+
+    /**
+     * Analyse avec la stratégie Bollinger Squeeze
+     * @param {Array} candles 
+     * @param {string} timeframe 
+     * @returns {Object}
+     */
+    analyzeBollinger(candles, timeframe) {
+        const bbAnalysis = signalDetector.analyzeBollingerSqueeze(candles, timeframe, {});
+        
+        if (!bbAnalysis || !bbAnalysis.success) {
+            return {
+                ichimokuScore: { score: 0, maxScore: 7, normalizedScore: 0, direction: 'neutral' },
+                finalSignal: null,
+                recommendation: { action: 'NEUTRAL', reason: 'Pas de signal Bollinger' },
+                detectedSignals: [],
+                levels: null,
+                strategy: 'bollinger'
+            };
+        }
+        
+        const signal = bbAnalysis.signal;
+        const score = signal?.score || 0;
+        const direction = signal?.direction || 'neutral';
+        
+        return {
+            ichimokuScore: {
+                score: direction === 'bullish' ? Math.abs(score) : -Math.abs(score),
+                maxScore: 7,
+                normalizedScore: score / 7,
+                direction: direction
+            },
+            finalSignal: signal ? {
+                action: signal.action,
+                confidence: signal.strength > 0.7 ? 'high' : signal.strength > 0.5 ? 'medium' : 'low'
+            } : null,
+            recommendation: {
+                action: signal?.action || 'NEUTRAL',
+                reason: signal?.description || 'Analyse Bollinger Squeeze'
+            },
+            detectedSignals: [signal?.description].filter(Boolean),
+            levels: bbAnalysis.levels,
+            strategy: 'bollinger',
+            squeeze: bbAnalysis.squeeze,
+            momentum: bbAnalysis.momentum
+        };
+    }
+
+    /**
      * Scanne toutes les cryptos de la liste
      * @param {Array<string>} symbols - Liste des symboles à analyser
      * @param {string} timeframe 
+     * @param {Object} options - Options incluant la stratégie
      * @returns {Promise<Array>}
      */
-    async scanAll(symbols = TOP_CRYPTOS, timeframe = '1h') {
+    async scanAll(symbols = TOP_CRYPTOS, timeframe = '1h', options = {}) {
         if (this.isScanning) {
             console.log('[SCANNER] Scan déjà en cours...');
             return Array.from(this.results.values());
         }
 
+        const strategy = options.strategy || 'ichimoku';
         this.isScanning = true;
-        console.log(`[SCANNER] Démarrage scan de ${symbols.length} cryptos...`);
+        console.log(`[SCANNER] Démarrage scan de ${symbols.length} cryptos (${strategy})...`);
 
         const results = [];
         
@@ -167,7 +262,7 @@ class CryptoScanner {
             const batch = symbols.slice(i, i + batchSize);
             
             const batchResults = await Promise.all(
-                batch.map(symbol => this.analyzeSymbol(symbol, timeframe))
+                batch.map(symbol => this.analyzeSymbol(symbol, timeframe, { strategy }))
             );
             
             results.push(...batchResults);

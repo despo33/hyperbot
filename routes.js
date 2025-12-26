@@ -1644,9 +1644,10 @@ router.get('/account/history', requireAuth, async (req, res) => {
 router.get('/scanner/scan', requireAuth, async (req, res) => {
     try {
         const timeframe = req.query.timeframe || '1h';
+        const strategy = req.query.strategy || 'ichimoku';
         const symbols = req.query.symbols ? req.query.symbols.split(',') : TOP_CRYPTOS;
         
-        const results = await scanner.scanAll(symbols, timeframe);
+        const results = await scanner.scanAll(symbols, timeframe, { strategy });
         const summary = scanner.getSummary();
         
         res.json({

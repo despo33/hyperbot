@@ -2223,13 +2223,14 @@ let isAutoScanning = false;
 async function startScan() {
     const btn = document.getElementById('startScanBtn');
     const timeframe = document.getElementById('scanTimeframe').value;
+    const strategy = document.getElementById('scanStrategy')?.value || 'ichimoku';
     
     btn.disabled = true;
-    btn.innerHTML = '<i data-lucide="loader"></i> Scan en cours...';
+    btn.innerHTML = '<i data-lucide="loader" class="spin"></i> Scan en cours...';
     lucide.createIcons();
 
     try {
-        const data = await apiRequest(`/scanner/scan?timeframe=${timeframe}`);
+        const data = await apiRequest(`/scanner/scan?timeframe=${timeframe}&strategy=${strategy}`);
         
         if (data.success) {
             updateScannerSummary(data.summary);
