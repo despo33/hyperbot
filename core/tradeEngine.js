@@ -2168,18 +2168,22 @@ class TradeEngine {
     getTradeRecommendation(score, rrr, winProb) {
         const absScore = Math.abs(score);
         
-        // Calcul du grade
+        // Calcul du grade - ASSOUPLI pour donner plus de poids au score Ichimoku
+        // Un score 7/7 est un signal très fort, même si RRR ou winProb sont moyens
         let grade, message, color;
         
-        if (absScore >= 5 && rrr >= 2 && winProb >= 0.65) {
+        // Grade A: Score très fort (6-7) OU combinaison forte
+        if (absScore >= 6 || (absScore >= 5 && rrr >= 1.5 && winProb >= 0.60)) {
             grade = 'A';
             message = 'Excellente opportunité - Signal très fort';
             color = 'green';
-        } else if (absScore >= 4 && rrr >= 1.5 && winProb >= 0.58) {
+        // Grade B: Score fort (5) OU bonne combinaison
+        } else if (absScore >= 5 || (absScore >= 4 && rrr >= 1.5 && winProb >= 0.55)) {
             grade = 'B';
             message = 'Bonne opportunité - Signal confirmé';
             color = 'green';
-        } else if (absScore >= 3 && rrr >= 1.5) {
+        // Grade C: Score moyen (3-4)
+        } else if (absScore >= 3) {
             grade = 'C';
             message = 'Opportunité moyenne - Prudence recommandée';
             color = 'yellow';
@@ -2193,7 +2197,7 @@ class TradeEngine {
             color = 'red';
         }
         
-        return { grade, message, color, shouldTrade: ['A', 'B'].includes(grade) };
+        return { grade, message, color, shouldTrade: ['A', 'B', 'C'].includes(grade) };
     }
 
     /**
