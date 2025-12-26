@@ -710,12 +710,36 @@ router.post('/config/trading', requireAuth, validate(tradingConfigSchema), async
 
 /**
  * GET /api/config/risk
- * Retourne la config risk management (PROTÉGÉ)
+ * Retourne la config risk management du profil actif (PROTÉGÉ)
  */
 router.get('/config/risk', requireAuth, async (req, res) => {
+    const globalConfig = riskManager.getConfig();
+    
+    // Priorité: Config du profil actif > botConfig global > riskManager par défaut
+    if (req.user.configProfiles && req.user.configProfiles.length > 0) {
+        const activeIndex = req.user.activeProfileIndex || 0;
+        const activeProfile = req.user.configProfiles[activeIndex];
+        if (activeProfile && activeProfile.config) {
+            return res.json({ 
+                config: {
+                    riskPerTrade: activeProfile.config.riskPerTrade ?? req.user.botConfig?.riskPerTrade ?? globalConfig.riskPerTrade ?? 2,
+                    maxPositionSize: activeProfile.config.maxPositionSize ?? req.user.botConfig?.maxPositionSize ?? globalConfig.maxPositionSize ?? 50,
+                    dailyLossLimit: activeProfile.config.dailyLossLimit ?? req.user.botConfig?.dailyLossLimit ?? globalConfig.dailyLossLimit ?? 5,
+                    maxDrawdown: activeProfile.config.maxDrawdown ?? req.user.botConfig?.maxDrawdown ?? globalConfig.maxDrawdown ?? 20,
+                    maxTradesPerDay: activeProfile.config.maxTradesPerDay ?? req.user.botConfig?.maxTradesPerDay ?? globalConfig.maxTradesPerDay ?? 10,
+                    maxConsecutiveLosses: activeProfile.config.maxConsecutiveLosses ?? req.user.botConfig?.maxConsecutiveLosses ?? globalConfig.maxConsecutiveLosses ?? 3,
+                    minRiskRewardRatio: activeProfile.config.minRiskRewardRatio ?? req.user.botConfig?.minRiskRewardRatio ?? globalConfig.minRiskRewardRatio ?? 1.5
+                },
+                fromUser: true,
+                fromProfile: true,
+                activeProfileIndex: activeIndex,
+                profileName: activeProfile.name
+            });
+        }
+    }
+    
+    // Fallback sur botConfig global
     if (req.user.botConfig) {
-        // Retourne les paramètres du profil utilisateur avec fallback sur riskManager
-        const globalConfig = riskManager.getConfig();
         return res.json({ 
             config: {
                 riskPerTrade: req.user.botConfig.riskPerTrade ?? globalConfig.riskPerTrade ?? 2,
@@ -726,10 +750,12 @@ router.get('/config/risk', requireAuth, async (req, res) => {
                 maxConsecutiveLosses: req.user.botConfig.maxConsecutiveLosses ?? globalConfig.maxConsecutiveLosses ?? 3,
                 minRiskRewardRatio: req.user.botConfig.minRiskRewardRatio ?? globalConfig.minRiskRewardRatio ?? 1.5
             },
-            fromUser: true 
+            fromUser: true,
+            fromProfile: false
         });
     }
-    res.json({ config: riskManager.getConfig(), fromUser: false });
+    
+    res.json({ config: globalConfig, fromUser: false, fromProfile: false });
 });
 
 /**

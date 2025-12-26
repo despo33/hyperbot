@@ -554,11 +554,23 @@ userSchema.methods.getActiveProfile = function() {
 
 // Méthode pour ajouter un profil
 userSchema.methods.addProfile = function(profileData) {
+    // IMPORTANT: Copie profonde pour éviter les références partagées entre profils
+    let configCopy;
+    if (profileData.config) {
+        configCopy = JSON.parse(JSON.stringify(profileData.config));
+    } else if (this.botConfig) {
+        // Copie profonde de botConfig (toObject() pour Mongoose, puis JSON pour les objets imbriqués)
+        const botConfigObj = this.botConfig.toObject ? this.botConfig.toObject() : this.botConfig;
+        configCopy = JSON.parse(JSON.stringify(botConfigObj));
+    } else {
+        configCopy = {};
+    }
+    
     const profile = {
         name: profileData.name || `Profil ${this.configProfiles.length + 1}`,
         description: profileData.description || '',
         isActive: this.configProfiles.length === 0,
-        config: profileData.config || { ...this.botConfig }
+        config: configCopy
     };
     this.configProfiles.push(profile);
     if (this.configProfiles.length === 1) {
@@ -572,10 +584,19 @@ userSchema.methods.setActiveProfile = function(index) {
     if (index >= 0 && index < this.configProfiles.length) {
         this.configProfiles.forEach((p, i) => p.isActive = (i === index));
         this.activeProfileIndex = index;
-        // Copie la config du profil dans botConfig
+        // IMPORTANT: Remplace complètement botConfig avec la config du profil
+        // (pas de merge pour éviter que les anciennes valeurs persistent)
         const profile = this.configProfiles[index];
         if (profile && profile.config) {
-            this.botConfig = { ...this.botConfig, ...profile.config };
+            // Convertit en objet simple si c'est un document Mongoose
+            const profileConfig = profile.config.toObject ? profile.config.toObject() : profile.config;
+            // Remplace botConfig avec les valeurs du profil
+            Object.keys(profileConfig).forEach(key => {
+                if (profileConfig[key] !== undefined) {
+                    this.botConfig[key] = profileConfig[key];
+                }
+            });
+            this.markModified('botConfig');
         }
         return true;
     }
