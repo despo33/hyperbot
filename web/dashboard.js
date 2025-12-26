@@ -1579,22 +1579,49 @@ async function loadTradingConfig() {
         
         // ===== MODE TP/SL (radio buttons) =====
         const tpslMode = config.tpslMode || 'auto';
+        console.log('[CONFIG] Chargement TP/SL:', {
+            tpslMode: config.tpslMode,
+            defaultTP: config.defaultTP,
+            defaultSL: config.defaultSL,
+            atrMultiplierSL: config.atrMultiplierSL,
+            atrMultiplierTP: config.atrMultiplierTP
+        });
+        
         const tpslModeRadio = document.querySelector(`input[name="tpslMode"][value="${tpslMode}"]`);
         if (tpslModeRadio) {
             tpslModeRadio.checked = true;
+            // Déclenche l'événement change pour afficher la bonne section
+            tpslModeRadio.dispatchEvent(new Event('change', { bubbles: true }));
         }
         
-        // TP/SL en mode pourcentage
+        // TP/SL en mode pourcentage - charge toujours les valeurs (même si 0)
         const percentTPEl = document.getElementById('percentTP');
         const percentSLEl = document.getElementById('percentSL');
-        if (percentTPEl && config.defaultTP) percentTPEl.value = config.defaultTP;
-        if (percentSLEl && config.defaultSL) percentSLEl.value = config.defaultSL;
+        if (percentTPEl && config.defaultTP !== undefined) {
+            percentTPEl.value = config.defaultTP;
+            // Met à jour l'affichage du slider
+            const percentTPValueEl = document.getElementById('percentTPValue');
+            if (percentTPValueEl) percentTPValueEl.textContent = '+' + config.defaultTP + '%';
+        }
+        if (percentSLEl && config.defaultSL !== undefined) {
+            percentSLEl.value = config.defaultSL;
+            const percentSLValueEl = document.getElementById('percentSLValue');
+            if (percentSLValueEl) percentSLValueEl.textContent = '-' + config.defaultSL + '%';
+        }
         
         // Multiplicateurs ATR
         const atrMultiplierSLEl = document.getElementById('atrMultiplierSL');
         const atrMultiplierTPEl = document.getElementById('atrMultiplierTP');
-        if (atrMultiplierSLEl) atrMultiplierSLEl.value = config.atrMultiplierSL || 1.5;
-        if (atrMultiplierTPEl) atrMultiplierTPEl.value = config.atrMultiplierTP || 2.5;
+        if (atrMultiplierSLEl) {
+            atrMultiplierSLEl.value = config.atrMultiplierSL || 1.5;
+            const atrSLValueEl = document.getElementById('atrMultiplierSLValue');
+            if (atrSLValueEl) atrSLValueEl.textContent = (config.atrMultiplierSL || 1.5) + 'x ATR';
+        }
+        if (atrMultiplierTPEl) {
+            atrMultiplierTPEl.value = config.atrMultiplierTP || 2.5;
+            const atrTPValueEl = document.getElementById('atrMultiplierTPValue');
+            if (atrTPValueEl) atrTPValueEl.textContent = (config.atrMultiplierTP || 2.5) + 'x ATR';
+        }
         
         // TP/SL personnalisés (ancien format)
         if (config.defaultTP && config.defaultSL) {
@@ -1787,11 +1814,20 @@ async function saveTradingConfig() {
             bbSqueezeOnly: document.getElementById('bbSqueezeOnly')?.checked ?? true
         };
 
-        await apiRequest('/config/trading', {
+        console.log('[CONFIG] Sauvegarde config trading:', {
+            tpslMode: config.tpslMode,
+            defaultTP: config.defaultTP,
+            defaultSL: config.defaultSL,
+            atrMultiplierSL: config.atrMultiplierSL,
+            atrMultiplierTP: config.atrMultiplierTP
+        });
+
+        const result = await apiRequest('/config/trading', {
             method: 'POST',
             body: JSON.stringify(config)
         });
 
+        console.log('[CONFIG] Réponse serveur:', result);
         showToast('Configuration trading sauvegardée', 'success');
     } catch (error) {
         showToast('Erreur: ' + error.message, 'error');
