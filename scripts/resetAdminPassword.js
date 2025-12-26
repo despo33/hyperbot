@@ -9,7 +9,7 @@ import User from '../models/User.js';
 
 dotenv.config();
 
-const NEW_PASSWORD = 'Admin123!';
+const NEW_PASSWORD = 'Bordeaux33++';
 
 async function resetAdminPassword() {
     try {
