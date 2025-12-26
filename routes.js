@@ -135,15 +135,27 @@ router.post('/bot/start', requireAuth, async (req, res) => {
             });
         }
         
-        // Récupère la config de l'utilisateur
-        const userConfig = req.user.botConfig || {};
+        // Récupère la config du profil actif (priorité sur botConfig global)
+        let userConfig = req.user.botConfig || {};
+        let profileName = 'default';
         
-        // Démarre le bot de l'utilisateur
+        if (req.user.configProfiles && req.user.configProfiles.length > 0) {
+            const activeIndex = req.user.activeProfileIndex || 0;
+            const activeProfile = req.user.configProfiles[activeIndex];
+            if (activeProfile && activeProfile.config) {
+                userConfig = activeProfile.config;
+                profileName = activeProfile.name;
+                console.log(`[BOT] Démarrage avec profil "${profileName}" pour ${req.user.username}`);
+            }
+        }
+        
+        // Démarre le bot de l'utilisateur avec la config du profil actif
         const success = await botManager.startBot(userId, activeWallet, userConfig);
         
         res.json({ 
             success, 
-            message: success ? 'Bot démarré' : 'Échec du démarrage',
+            message: success ? `Bot démarré avec profil "${profileName}"` : 'Échec du démarrage',
+            profileName,
             userId: userId.substring(0, 8) + '...'
         });
     } catch (error) {
