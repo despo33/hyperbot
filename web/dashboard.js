@@ -1490,14 +1490,24 @@ function escapeHtml(text) {
 // ==================== TRADING CONFIG ====================
 
 /**
- * Charge la configuration trading
+ * Charge la configuration trading du profil actif
  * Si le bot est en cours d'exécution, utilise la config active
  */
 async function loadTradingConfig() {
     try {
         const data = await apiRequest('/config/trading');
-        // Si le bot tourne, utilise la config active, sinon la config sauvegardée
+        // Si le bot tourne, utilise la config active, sinon la config du profil actif
         const config = (isBotRunning && activeBotConfig) ? activeBotConfig : data.config;
+        
+        // Affiche le nom du profil actif si disponible
+        if (data.profileName) {
+            const profileIndicator = document.getElementById('activeProfileName');
+            if (profileIndicator) {
+                profileIndicator.textContent = data.profileName;
+                profileIndicator.style.display = 'inline';
+            }
+            console.log(`[CONFIG] Chargement du profil: ${data.profileName}`);
+        }
 
         // Mode (charge la valeur sauvegardée)
         const modeEl = document.getElementById('configMode');

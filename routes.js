@@ -522,14 +522,31 @@ router.post('/cancel-orders', requireAuth, async (req, res) => {
 
 /**
  * GET /api/config/trading
- * Retourne la config trading de l'utilisateur (PROTÉGÉ)
+ * Retourne la config trading du profil actif de l'utilisateur (PROTÉGÉ)
  */
 router.get('/config/trading', requireAuth, async (req, res) => {
-    if (req.user.botConfig) {
-        return res.json({ config: req.user.botConfig, fromUser: true });
+    // Priorité: Config du profil actif > botConfig global > config par défaut
+    if (req.user.configProfiles && req.user.configProfiles.length > 0) {
+        const activeIndex = req.user.activeProfileIndex || 0;
+        const activeProfile = req.user.configProfiles[activeIndex];
+        if (activeProfile && activeProfile.config) {
+            return res.json({ 
+                config: activeProfile.config, 
+                fromUser: true, 
+                fromProfile: true,
+                activeProfileIndex: activeIndex,
+                profileName: activeProfile.name
+            });
+        }
     }
+    
+    // Fallback sur botConfig global
+    if (req.user.botConfig) {
+        return res.json({ config: req.user.botConfig, fromUser: true, fromProfile: false });
+    }
+    
     // Fallback config par défaut
-    res.json({ config: tradeEngine.config, fromUser: false });
+    res.json({ config: tradeEngine.config, fromUser: false, fromProfile: false });
 });
 
 /**
@@ -955,7 +972,8 @@ router.post('/profiles/:index/activate', requireAuth, async (req, res) => {
         res.json({ 
             success: true, 
             activeProfileIndex: index,
-            config: req.user.botConfig
+            profileName: profile.name,
+            config: profile.config || req.user.botConfig
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
