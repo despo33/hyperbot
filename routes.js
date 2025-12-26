@@ -25,6 +25,7 @@ import auth from './services/hyperliquidAuth.js';
 import api from './services/hyperliquidApi.js';
 import scanner, { TOP_CRYPTOS } from './core/scanner.js';
 import backtester from './core/backtester.js';
+import User from './models/User.js';
 
 // Utilitaires centralisés
 import { optionalAuth, requireAuth } from './utils/auth.js';
