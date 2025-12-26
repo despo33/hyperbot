@@ -1641,19 +1641,6 @@ async function loadTradingConfig() {
         const rsiOversoldEl = document.getElementById('rsiOversold');
         if (rsiOversoldEl) rsiOversoldEl.value = config.rsiOversold || 30;
         
-        // ===== INDICATEURS AVANCÉS =====
-        const useSupertrendEl = document.getElementById('useSupertrend');
-        if (useSupertrendEl) useSupertrendEl.checked = config.useSupertrend !== false;
-        
-        const useFibonacciEl = document.getElementById('useFibonacci');
-        if (useFibonacciEl) useFibonacciEl.checked = config.useFibonacci !== false;
-        
-        const useChikouAdvancedEl = document.getElementById('useChikouAdvanced');
-        if (useChikouAdvancedEl) useChikouAdvancedEl.checked = config.useChikouAdvanced !== false;
-        
-        const useKumoTwistEl = document.getElementById('useKumoTwist');
-        if (useKumoTwistEl) useKumoTwistEl.checked = config.useKumoTwist !== false;
-        
         // ===== MULTI-TIMEFRAME =====
         const mtfEl = document.getElementById('useMTF');
         const mtfSettingsEl = document.getElementById('mtfSettings');
@@ -1711,12 +1698,6 @@ async function loadTradingConfig() {
         
         const bbVolumeFilterEl = document.getElementById('bbVolumeFilter');
         if (bbVolumeFilterEl) bbVolumeFilterEl.checked = config.bbVolumeFilter !== false;
-        
-        const bbMomentumFilterEl = document.getElementById('bbMomentumFilter');
-        if (bbMomentumFilterEl) bbMomentumFilterEl.checked = config.bbMomentumFilter !== false;
-        
-        const bbSqueezeOnlyEl = document.getElementById('bbSqueezeOnly');
-        if (bbSqueezeOnlyEl) bbSqueezeOnlyEl.checked = config.bbSqueezeOnly !== false;
         
         console.log('[CONFIG] Configuration chargée:', config.strategy, 'TF:', tf, 'TP/SL mode:', tpslMode);
         
@@ -1795,11 +1776,6 @@ async function saveTradingConfig() {
             mtfPrimary: document.getElementById('mtfPrimary')?.value || '15m',
             mtfHigher: document.getElementById('mtfHigher')?.value || '4h',
             mtfConfirmations: parseInt(document.getElementById('mtfConfirmations')?.value || 2),
-            // Indicateurs avancés (nouveau)
-            useSupertrend: document.getElementById('useSupertrend')?.checked ?? true,
-            useFibonacci: document.getElementById('useFibonacci')?.checked ?? true,
-            useChikouAdvanced: document.getElementById('useChikouAdvanced')?.checked ?? true,
-            useKumoTwist: document.getElementById('useKumoTwist')?.checked ?? true,
             // Stratégie de trading
             strategy: document.getElementById('configStrategy')?.value || 'ichimoku',
             // Paramètres Bollinger Squeeze
@@ -1809,9 +1785,7 @@ async function saveTradingConfig() {
             kcMultiplier: parseFloat(document.getElementById('kcMultiplier')?.value || 1.5),
             momentumPeriod: parseInt(document.getElementById('momentumPeriod')?.value || 12),
             bbRsiFilter: document.getElementById('bbRsiFilter')?.checked ?? true,
-            bbVolumeFilter: document.getElementById('bbVolumeFilter')?.checked ?? true,
-            bbMomentumFilter: document.getElementById('bbMomentumFilter')?.checked ?? true,
-            bbSqueezeOnly: document.getElementById('bbSqueezeOnly')?.checked ?? true
+            bbVolumeFilter: document.getElementById('bbVolumeFilter')?.checked ?? true
         };
 
         console.log('[CONFIG] Sauvegarde config trading:', {
