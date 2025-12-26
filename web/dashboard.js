@@ -2423,7 +2423,7 @@ async function showTradeDetails(symbol) {
                     <!-- Recommandation -->
                     <div class="recommendation-box ${details.recommendation?.color || 'gray'}">
                         <span class="grade">${details.recommendation?.grade || '-'}</span>
-                        <span class="message">${details.recommendation?.message || 'Analyse en cours...'}</span>
+                        <span class="message">${details.recommendation?.message || "Pas d'opportunité détectée"}</span>
                     </div>
                     
                     <!-- Signal -->
@@ -2455,11 +2455,11 @@ async function showTradeDetails(symbol) {
                         <div class="trade-grid">
                             <div class="trade-item sl">
                                 <span class="label">Stop Loss</span>
-                                <span class="value">$${formatNumber(details.stopLoss)} (${details.slPercent}%)</span>
+                                <span class="value">${details.stopLoss ? `$${formatNumber(details.stopLoss)} (${details.slPercent || '-'}%)` : 'Non disponible'}</span>
                             </div>
                             <div class="trade-item tp">
                                 <span class="label">Take Profit</span>
-                                <span class="value">$${formatNumber(details.takeProfit)} (${details.tpPercent}%)</span>
+                                <span class="value">${details.takeProfit ? `$${formatNumber(details.takeProfit)} (${details.tpPercent || '-'}%)` : 'Non disponible'}</span>
                             </div>
                             <div class="trade-item">
                                 <span class="label">Risk/Reward</span>
@@ -2474,42 +2474,42 @@ async function showTradeDetails(symbol) {
                         <div class="trade-grid">
                             <div class="trade-item">
                                 <span class="label">Chance de gain</span>
-                                <span class="value highlight">${details.winProbabilityPercent}</span>
+                                <span class="value highlight">${details.winProbabilityPercent || '-'}</span>
                             </div>
                             <div class="trade-item">
                                 <span class="label">Gain potentiel</span>
-                                <span class="value positive">+$${details.potentialProfit}</span>
+                                <span class="value positive">${details.potentialProfit ? `+$${details.potentialProfit}` : '-'}</span>
                             </div>
                             <div class="trade-item">
                                 <span class="label">Perte potentielle</span>
-                                <span class="value negative">-$${details.potentialLoss}</span>
+                                <span class="value negative">${details.potentialLoss ? `-$${details.potentialLoss}` : '-'}</span>
                             </div>
                             <div class="trade-item">
                                 <span class="label">Expected Value</span>
-                                <span class="value ${parseFloat(details.expectedValue) >= 0 ? 'positive' : 'negative'}">$${details.expectedValue} (${details.expectedValuePercent})</span>
+                                <span class="value ${parseFloat(details.expectedValue) >= 0 ? 'positive' : 'negative'}">${details.expectedValue ? `$${details.expectedValue} (${details.expectedValuePercent || '-'})` : '-'}</span>
                             </div>
                         </div>
                     </div>
                     
                     <!-- Niveaux Ichimoku -->
-                    <div class="trade-section">
+                    <div class="trade-section" ${strategy !== 'ichimoku' ? 'style="display:none"' : ''}>
                         <h3>☁️ Niveaux Ichimoku</h3>
                         <div class="trade-grid small">
                             <div class="trade-item">
                                 <span class="label">Tenkan</span>
-                                <span class="value">$${formatNumber(details.ichimokuLevels?.tenkan)}</span>
+                                <span class="value">${details.ichimokuLevels?.tenkan ? `$${formatNumber(details.ichimokuLevels.tenkan)}` : '-'}</span>
                             </div>
                             <div class="trade-item">
                                 <span class="label">Kijun</span>
-                                <span class="value">$${formatNumber(details.ichimokuLevels?.kijun)}</span>
+                                <span class="value">${details.ichimokuLevels?.kijun ? `$${formatNumber(details.ichimokuLevels.kijun)}` : '-'}</span>
                             </div>
                             <div class="trade-item">
                                 <span class="label">Kumo Top</span>
-                                <span class="value">$${formatNumber(details.ichimokuLevels?.kumoTop)}</span>
+                                <span class="value">${details.ichimokuLevels?.kumoTop ? `$${formatNumber(details.ichimokuLevels.kumoTop)}` : '-'}</span>
                             </div>
                             <div class="trade-item">
                                 <span class="label">Kumo Bottom</span>
-                                <span class="value">$${formatNumber(details.ichimokuLevels?.kumoBottom)}</span>
+                                <span class="value">${details.ichimokuLevels?.kumoBottom ? `$${formatNumber(details.ichimokuLevels.kumoBottom)}` : '-'}</span>
                             </div>
                         </div>
                     </div>
