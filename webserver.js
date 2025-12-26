@@ -81,8 +81,9 @@ export function createWebServer(port = 3000) {
         },
         crossOriginEmbedderPolicy: false,
         crossOriginResourcePolicy: { policy: "cross-origin" },
-        // HSTS activé si ENABLE_HSTS=true dans .env (force HTTPS pendant 1 an)
-        hsts: process.env.ENABLE_HSTS === 'true' ? {
+        // HSTS activé par défaut en production (force HTTPS pendant 1 an)
+        // Désactiver avec ENABLE_HSTS=false si nécessaire
+        hsts: process.env.NODE_ENV === 'production' && process.env.ENABLE_HSTS !== 'false' ? {
             maxAge: 31536000,
             includeSubDomains: true,
             preload: true

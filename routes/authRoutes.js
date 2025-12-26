@@ -358,10 +358,20 @@ router.post('/login', validate(loginSchema), async (req, res) => {
 
         console.log(`[AUTH] Connexion réussie: ${user.username}`);
 
+        // Définit le token dans un cookie httpOnly sécurisé
+        const isProduction = process.env.NODE_ENV === 'production';
+        res.cookie('authToken', token, {
+            httpOnly: true,           // Non accessible via JavaScript (protection XSS)
+            secure: isProduction,     // HTTPS uniquement en production
+            sameSite: 'strict',       // Protection CSRF
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 jours
+            path: '/'
+        });
+
         res.json({
             success: true,
             message: 'Connexion réussie',
-            token,
+            token, // Garde le token dans la réponse pour compatibilité (transition)
             user: user.toPublicJSON()
         });
 
@@ -391,6 +401,27 @@ router.get('/me', requireAuth, async (req, res) => {
             error: 'Erreur lors de la récupération du profil' 
         });
     }
+});
+
+/**
+ * POST /api/auth/logout
+ * Déconnexion - supprime le cookie httpOnly
+ */
+router.post('/logout', (req, res) => {
+    // Supprime le cookie authToken
+    res.clearCookie('authToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/'
+    });
+    
+    console.log('[AUTH] Déconnexion utilisateur');
+    
+    res.json({
+        success: true,
+        message: 'Déconnexion réussie'
+    });
 });
 
 /**

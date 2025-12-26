@@ -20,6 +20,8 @@ router.get('/', requireAuth, async (req, res) => {
             name: w.name,
             address: w.address,
             tradingAddress: w.tradingAddress,
+            isAgentWallet: w.isAgentWallet || false,
+            masterAddress: w.masterAddress || null,
             isActive: w.isActive,
             addedAt: w.addedAt
         }));
@@ -41,16 +43,27 @@ router.get('/', requireAuth, async (req, res) => {
 
 /**
  * POST /api/wallets
- * Ajoute un nouveau wallet
+ * Ajoute un nouveau wallet (standard ou Agent Wallet Hyperliquid)
+ * 
+ * SÉCURITÉ: Agent Wallet = trading-only, ne peut pas faire de withdrawals
+ * C'est l'option recommandée pour la sécurité
  */
 router.post('/', requireAuth, async (req, res) => {
     try {
-        const { name, secretPhrase, tradingAddress } = req.body;
+        const { name, secretPhrase, tradingAddress, isAgentWallet, masterAddress } = req.body;
 
         if (!secretPhrase) {
             return res.status(400).json({ 
                 success: false, 
                 error: 'La phrase secrète est requise' 
+            });
+        }
+
+        // Pour un Agent Wallet, l'adresse master est requise
+        if (isAgentWallet && !masterAddress) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'L\'adresse du wallet principal (master) est requise pour un Agent Wallet' 
             });
         }
 
@@ -95,24 +108,34 @@ router.post('/', requireAuth, async (req, res) => {
             name: name || `Wallet ${req.user.wallets.length + 1}`,
             address,
             secretPhrase: encryptedSecret,
-            tradingAddress: tradingAddress || null
+            tradingAddress: tradingAddress || null,
+            isAgentWallet: isAgentWallet || false,
+            masterAddress: isAgentWallet ? masterAddress : null
         });
 
         await req.user.save();
 
-        console.log(`[WALLET] Nouveau wallet ajouté pour ${req.user.username}: ${address}`);
+        const walletType = isAgentWallet ? 'Agent Wallet (trading-only)' : 'Wallet standard';
+        console.log(`[WALLET] Nouveau ${walletType} ajouté pour ${req.user.username}: ${address}`);
 
         res.status(201).json({
             success: true,
-            message: 'Wallet ajouté avec succès',
+            message: isAgentWallet 
+                ? 'Agent Wallet ajouté avec succès (trading-only, sécurisé)' 
+                : 'Wallet ajouté avec succès',
             wallet: {
                 id: newWallet._id,
                 name: newWallet.name,
                 address: newWallet.address,
                 tradingAddress: newWallet.tradingAddress,
+                isAgentWallet: newWallet.isAgentWallet,
+                masterAddress: newWallet.masterAddress,
                 isActive: newWallet.isActive,
                 addedAt: newWallet.addedAt
-            }
+            },
+            securityNote: isAgentWallet 
+                ? '✅ Agent Wallet: Ne peut PAS effectuer de withdrawals (sécurisé)'
+                : '⚠️ Wallet standard: Peut effectuer des withdrawals. Considérez utiliser un Agent Wallet pour plus de sécurité.'
         });
 
     } catch (error) {

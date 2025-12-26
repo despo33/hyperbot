@@ -82,12 +82,18 @@ class UserBotInstance {
             const secret = decryptSecret(wallet.secretPhrase);
             await this.auth.initialize(secret);
             
-            if (wallet.tradingAddress) {
+            // Pour un Agent Wallet, utilise l'adresse master pour les requêtes de solde/positions
+            // L'Agent Wallet signe les transactions mais les positions sont sur le compte master
+            if (wallet.isAgentWallet && wallet.masterAddress) {
+                this.auth.setTradingAddress(wallet.masterAddress);
+                this.log(`🔐 Agent Wallet (trading-only) - Master: ${wallet.masterAddress.substring(0, 10)}...`, 'info');
+            } else if (wallet.tradingAddress) {
                 this.auth.setTradingAddress(wallet.tradingAddress);
             }
             
             this.activeWallet = wallet;
-            this.log(`Wallet initialisé: ${wallet.address.substring(0, 10)}...`, 'info');
+            const walletType = wallet.isAgentWallet ? 'Agent Wallet (sécurisé)' : 'Wallet';
+            this.log(`${walletType} initialisé: ${wallet.address.substring(0, 10)}...`, 'info');
             return true;
         } catch (error) {
             this.log(`Erreur initialisation wallet: ${error.message}`, 'error');

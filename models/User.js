@@ -197,6 +197,16 @@ const walletSchema = new mongoose.Schema({
     tradingAddress: {
         type: String
     },
+    // Agent Wallet Hyperliquid (trading-only, no withdraw)
+    isAgentWallet: {
+        type: Boolean,
+        default: false
+    },
+    // Adresse du wallet principal (master) si c'est un Agent Wallet
+    masterAddress: {
+        type: String,
+        default: null
+    },
     isActive: {
         type: Boolean,
         default: false

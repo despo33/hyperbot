@@ -28,9 +28,20 @@ function getAuthToken() {
 }
 
 /**
- * Déconnexion
+ * Déconnexion - appelle l'API pour supprimer le cookie httpOnly
  */
-function logout() {
+async function logout() {
+    try {
+        // Appelle l'API pour supprimer le cookie httpOnly côté serveur
+        await fetch('/api/auth/logout', { 
+            method: 'POST',
+            credentials: 'include' // Important pour envoyer les cookies
+        });
+    } catch (e) {
+        console.warn('[AUTH] Erreur logout API:', e);
+    }
+    
+    // Nettoie aussi le localStorage (pour compatibilité)
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
     window.location.href = '/login.html';
@@ -300,6 +311,7 @@ async function handleChangePassword(event) {
 
 /**
  * Effectue une requête API avec token d'authentification
+ * Supporte: cookie httpOnly (automatique) + header Authorization (fallback)
  */
 async function apiRequest(endpoint, options = {}) {
     const token = getAuthToken();
@@ -308,7 +320,7 @@ async function apiRequest(endpoint, options = {}) {
         ...options.headers
     };
     
-    // Ajoute le token d'authentification si disponible
+    // Ajoute le token d'authentification si disponible (fallback pour compatibilité)
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;
     }
@@ -316,7 +328,8 @@ async function apiRequest(endpoint, options = {}) {
     try {
         const response = await fetch(`${API_BASE}${endpoint}`, {
             ...options,
-            headers
+            headers,
+            credentials: 'include' // Envoie les cookies httpOnly automatiquement
         });
 
         const data = await response.json();

@@ -24,15 +24,19 @@ if (!process.env.JWT_SECRET) {
 /**
  * Middleware optionnel - récupère l'utilisateur si token présent
  * Ne bloque pas si pas de token
+ * Supporte: cookie httpOnly (priorité) OU header Authorization
  */
 export async function optionalAuth(req, res, next) {
+    // Priorité: cookie httpOnly > header Authorization
+    const tokenFromCookie = req.cookies?.authToken;
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const tokenFromHeader = authHeader && authHeader.split(' ')[1];
+    
+    const token = tokenFromCookie || tokenFromHeader;
     
     if (token) {
         try {
             const decoded = jwt.verify(token, JWT_SECRET);
-            // Utilise lean() pour de meilleures performances, mais garde les méthodes nécessaires
             req.user = await User.findById(decoded.userId).select('-password');
         } catch (e) {
             // Token invalide, continue sans user
@@ -44,10 +48,15 @@ export async function optionalAuth(req, res, next) {
 
 /**
  * Middleware requis - bloque si pas de token valide
+ * Supporte: cookie httpOnly (priorité) OU header Authorization
  */
 export async function requireAuth(req, res, next) {
+    // Priorité: cookie httpOnly > header Authorization
+    const tokenFromCookie = req.cookies?.authToken;
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const tokenFromHeader = authHeader && authHeader.split(' ')[1];
+    
+    const token = tokenFromCookie || tokenFromHeader;
     
     if (!token) {
         return res.status(401).json({ error: 'Token manquant' });
