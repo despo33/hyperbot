@@ -1862,13 +1862,42 @@ router.get('/backtest/:filename', requireAuth, (req, res) => {
 
 // ==================== ADMIN ROUTES ====================
 
+// Rate limiting pour les routes admin (protection brute force)
+const adminRateLimits = new Map();
+const ADMIN_RATE_LIMIT = 30; // 30 requêtes
+const ADMIN_RATE_WINDOW = 60000; // par minute
+
 /**
- * Middleware pour vérifier le rôle admin
+ * Middleware pour vérifier le rôle admin avec rate limiting et audit
  */
 function requireAdmin(req, res, next) {
+    // Vérifie le rôle
     if (!req.user || req.user.role !== 'admin') {
+        console.log(`[SECURITY] Tentative d'accès admin refusée - IP: ${req.ip} - User: ${req.user?.email || 'non-auth'}`);
         return res.status(403).json({ success: false, error: 'Accès refusé. Droits administrateur requis.' });
     }
+    
+    // Rate limiting par IP
+    const ip = req.ip;
+    const now = Date.now();
+    const userLimit = adminRateLimits.get(ip) || { count: 0, resetTime: now + ADMIN_RATE_WINDOW };
+    
+    if (now > userLimit.resetTime) {
+        userLimit.count = 0;
+        userLimit.resetTime = now + ADMIN_RATE_WINDOW;
+    }
+    
+    userLimit.count++;
+    adminRateLimits.set(ip, userLimit);
+    
+    if (userLimit.count > ADMIN_RATE_LIMIT) {
+        console.log(`[SECURITY] Rate limit admin dépassé - IP: ${ip} - User: ${req.user.email}`);
+        return res.status(429).json({ success: false, error: 'Trop de requêtes. Réessayez dans 1 minute.' });
+    }
+    
+    // Log d'audit pour les actions admin
+    console.log(`[ADMIN AUDIT] ${req.method} ${req.path} - Admin: ${req.user.email} - IP: ${ip}`);
+    
     next();
 }
 
