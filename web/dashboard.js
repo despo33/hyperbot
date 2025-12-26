@@ -2399,7 +2399,11 @@ async function showTradeDetails(symbol) {
     try {
         showToast(`Chargement des détails pour ${symbol}...`, 'info');
         
-        const details = await apiRequest(`/trade-details/${symbol}`);
+        // Récupère la stratégie sélectionnée dans le scanner
+        const strategy = document.getElementById('scanStrategy')?.value || 'ichimoku';
+        const timeframe = document.getElementById('scanTimeframe')?.value || '15m';
+        
+        const details = await apiRequest(`/trade-details/${symbol}?strategy=${strategy}&timeframe=${timeframe}`);
         
         if (!details.success) {
             showToast(`Erreur: ${details.error || details.reason}`, 'error');
@@ -2431,7 +2435,7 @@ async function showTradeDetails(symbol) {
                                 <span class="value ${details.direction}">${details.signal || '-'}</span>
                             </div>
                             <div class="trade-item">
-                                <span class="label">Score Ichimoku</span>
+                                <span class="label">Score ${strategy === 'smc' ? 'SMC' : strategy === 'bollinger' ? 'Bollinger' : 'Ichimoku'}</span>
                                 <span class="value">${details.score}/${details.maxScore}</span>
                             </div>
                             <div class="trade-item">

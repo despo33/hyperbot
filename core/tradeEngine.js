@@ -1928,11 +1928,13 @@ class TradeEngine {
     /**
      * Calcule les détails d'un trade potentiel pour un symbole
      * @param {string} symbol 
+     * @param {Object} options - Options incluant strategy et timeframe
      * @returns {Promise<Object>}
      */
-    async getTradeDetails(symbol) {
+    async getTradeDetails(symbol, options = {}) {
         try {
-            const timeframe = this.config.timeframes[0];
+            const strategy = options.strategy || this.config.strategy || 'ichimoku';
+            const timeframe = options.timeframe || this.config.timeframes[0];
             const candles = await priceFetcher.getCandles(symbol, timeframe, 250);
             
             if (!candles || candles.length < 60) {
@@ -1941,11 +1943,60 @@ class TradeEngine {
             
             const currentPrice = candles[candles.length - 1].close;
             
-            // Analyse complète avec signalDetector pour avoir les niveaux Ichimoku
-            const fullAnalysis = signalDetector.analyze(candles, {}, timeframe);
+            // Analyse selon la stratégie sélectionnée
+            let fullAnalysis;
+            let analysis;
             
-            // Analyse simplifiée pour le score et la direction
-            const analysis = await this.analyzeSymbol(symbol);
+            if (strategy === 'smc') {
+                // Stratégie SMC
+                const smcAnalysis = smcSignalDetector.analyze(candles, {}, timeframe);
+                const smcScore = smcAnalysis.signal?.score || 0;
+                const smcDirection = smcAnalysis.signal?.direction || 'neutral';
+                
+                fullAnalysis = {
+                    ichimoku: {},
+                    signals: {}
+                };
+                
+                analysis = {
+                    success: true,
+                    score: smcDirection === 'long' ? smcScore : -smcScore,
+                    direction: smcDirection === 'long' ? 'bullish' : smcDirection === 'short' ? 'bearish' : 'neutral',
+                    signal: smcDirection === 'long' ? 'BUY' : smcDirection === 'short' ? 'SELL' : null,
+                    tradeable: smcAnalysis.tradeable,
+                    winProbability: smcAnalysis.winProbability || 0.6,
+                    confluence: smcAnalysis.confluence || 0,
+                    confidence: smcAnalysis.signal?.confidence > 0.7 ? 'high' : 'medium',
+                    tpsl: { tp: 3.0, sl: 1.5 }
+                };
+            } else if (strategy === 'bollinger') {
+                // Stratégie Bollinger Squeeze
+                const bbAnalysis = signalDetector.analyzeBollingerSqueeze(candles, timeframe, {});
+                const bbSignal = bbAnalysis.signal;
+                const bbScore = bbSignal?.score || 0;
+                const bbDirection = bbSignal?.direction || 'neutral';
+                
+                fullAnalysis = {
+                    ichimoku: {},
+                    signals: {}
+                };
+                
+                analysis = {
+                    success: true,
+                    score: bbDirection === 'bullish' ? bbScore : -bbScore,
+                    direction: bbDirection,
+                    signal: bbSignal?.action || null,
+                    tradeable: bbAnalysis.success && bbSignal,
+                    winProbability: bbAnalysis.winProbability || 0.6,
+                    confluence: (bbSignal?.rsiConfirms ? 1 : 0) + (bbSignal?.volumeConfirms ? 1 : 0),
+                    confidence: bbSignal?.strength > 0.7 ? 'high' : 'medium',
+                    tpsl: { tp: 2.5, sl: 1.2 }
+                };
+            } else {
+                // Stratégie Ichimoku (par défaut)
+                fullAnalysis = signalDetector.analyze(candles, {}, timeframe);
+                analysis = await this.analyzeSymbol(symbol);
+            }
             
             if (!analysis.success) {
                 return { success: false, error: analysis.error };

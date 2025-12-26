@@ -1714,11 +1714,15 @@ router.get('/scanner/symbol/:symbol', requireAuth, async (req, res) => {
 /**
  * GET /api/trade-details/:symbol
  * Retourne les détails complets d'un trade potentiel (SL, TP, probabilités) (PROTÉGÉ)
+ * Accepte les paramètres strategy et timeframe pour utiliser la même stratégie que le scanner
  */
 router.get('/trade-details/:symbol', requireAuth, async (req, res) => {
     try {
         const { symbol } = req.params;
-        const details = await tradeEngine.getTradeDetails(symbol.toUpperCase());
+        const strategy = req.query.strategy || 'ichimoku';
+        const timeframe = req.query.timeframe || '15m';
+        
+        const details = await tradeEngine.getTradeDetails(symbol.toUpperCase(), { strategy, timeframe });
         res.json(details);
     } catch (error) {
         res.status(500).json({ error: error.message });
