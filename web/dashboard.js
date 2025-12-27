@@ -18,6 +18,40 @@ let currentUser = null;
 let activeBotConfig = null;
 let isBotRunning = false;
 
+// ==================== THEME ====================
+
+/**
+ * Initialise le thème depuis localStorage ou préférence système
+ */
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = savedTheme || (prefersDark ? 'dark' : 'dark'); // Default to dark
+    document.documentElement.setAttribute('data-theme', theme);
+}
+
+/**
+ * Toggle entre mode clair et sombre
+ */
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    
+    // Animation du bouton
+    const btn = document.getElementById('themeToggle');
+    if (btn) {
+        btn.style.transform = 'scale(0.9) rotate(180deg)';
+        setTimeout(() => {
+            btn.style.transform = '';
+        }, 300);
+    }
+}
+
+// Initialise le thème au chargement
+initTheme();
+
 // ==================== AUTHENTIFICATION ====================
 
 /**
