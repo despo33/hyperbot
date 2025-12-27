@@ -802,14 +802,17 @@ class TradeEngine {
      * @returns {Object}
      */
     async analyzeWithSMC(symbol, timeframe, candles, currentPrice, preset, tpsl) {
-        // Analyse SMC
+        // Analyse SMC avec les signaux activés par l'utilisateur
         const smcAnalysis = smcSignalDetector.analyze(candles, {
             minScore: this.config.minScore || preset.minScore,
             minConfluence: preset.minConfluence,
             useRSIFilter: this.config.useRSIFilter,
-            useMACDFilter: true,
-            useVolumeFilter: true,
-            useSessionFilter: true
+            // Signaux SMC activés par l'utilisateur (Order Blocks, FVG, BOS)
+            smcSignals: this.config.smcSignals || {
+                orderBlocks: true,
+                fvg: true,
+                bos: true
+            }
         }, timeframe);
 
         if (!smcAnalysis || !smcAnalysis.signal) {

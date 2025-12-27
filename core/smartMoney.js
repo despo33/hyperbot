@@ -40,6 +40,9 @@ class SmartMoney {
 
     /**
      * Analyse complète SMC
+     * @param {Array} candles - Données de prix
+     * @param {Object} options - Options de configuration
+     * @param {Object} options.smcSignals - Signaux activés par l'utilisateur {orderBlocks, fvg, bos}
      */
     analyze(candles, options = {}) {
         if (!candles || candles.length < 100) {
@@ -48,38 +51,44 @@ class SmartMoney {
 
         const config = { ...this.config, ...options };
         
-        // 1. Identifier la structure du marché
+        // Signaux activés par l'utilisateur (par défaut tous activés)
+        const enabledSignals = options.smcSignals || {
+            orderBlocks: true,
+            fvg: true,
+            bos: true
+        };
+        
+        // 1. Identifier la structure du marché (toujours nécessaire)
         const swings = this.identifySwings(candles, config.swingLookback);
         const structure = this.analyzeMarketStructure(candles, swings);
         
-        // 2. Détecter les Order Blocks
-        const orderBlocks = this.detectOrderBlocks(candles, swings, config);
+        // 2. Détecter les Order Blocks (si activé)
+        const orderBlocks = enabledSignals.orderBlocks !== false 
+            ? this.detectOrderBlocks(candles, swings, config) 
+            : [];
         
-        // 3. Détecter les Fair Value Gaps
-        const fvgs = this.detectFVGs(candles, config);
+        // 3. Détecter les Fair Value Gaps (si activé)
+        const fvgs = enabledSignals.fvg !== false 
+            ? this.detectFVGs(candles, config) 
+            : [];
         
-        // 4. Détecter Break of Structure
-        const bos = this.detectBOS(candles, swings, structure);
+        // 4. Détecter Break of Structure (si activé)
+        const bos = enabledSignals.bos !== false 
+            ? this.detectBOS(candles, swings, structure) 
+            : [];
         
-        // 5. Détecter les Liquidity Sweeps
-        const liquiditySweeps = this.detectLiquiditySweeps(candles, swings, config);
-        
-        // 6. Calculer les zones Premium/Discount
-        const premiumDiscount = this.calculatePremiumDiscount(candles, swings);
-        
-        // 7. Identifier la session actuelle
+        // 5. Identifier la session actuelle
         const currentSession = this.getCurrentSession(candles[candles.length - 1].timestamp);
         
-        // 8. Générer le signal SMC
+        // 6. Générer le signal SMC avec les signaux activés
         const signal = this.generateSignal(candles, {
             swings,
             structure,
             orderBlocks,
             fvgs,
             bos,
-            liquiditySweeps,
-            premiumDiscount,
-            currentSession
+            currentSession,
+            enabledSignals
         });
 
         return {
@@ -88,10 +97,9 @@ class SmartMoney {
             orderBlocks,
             fvgs,
             bos,
-            liquiditySweeps,
-            premiumDiscount,
             currentSession,
-            signal
+            signal,
+            enabledSignals
         };
     }
 
@@ -617,6 +625,7 @@ class SmartMoney {
 
     /**
      * Génère le signal de trading SMC
+     * Utilise uniquement les signaux activés par l'utilisateur
      */
     generateSignal(candles, analysis) {
         const {
@@ -624,9 +633,8 @@ class SmartMoney {
             orderBlocks,
             fvgs,
             bos,
-            liquiditySweeps,
-            premiumDiscount,
-            currentSession
+            currentSession,
+            enabledSignals = { orderBlocks: true, fvg: true, bos: true }
         } = analysis;
 
         const currentPrice = candles[candles.length - 1].close;
@@ -649,97 +657,66 @@ class SmartMoney {
             confluences.push({ name: 'Market Structure', direction: 'bearish', weight: 2 });
         }
 
-        // 2. Break of Structure récent (+2)
-        const recentBOS = bos.find(b => b.age <= 5);
-        if (recentBOS) {
-            if (recentBOS.direction === 'bullish') {
-                score += 2;
-                reasons.push(`BOS/CHoCH bullish (${recentBOS.type})`);
-                confluences.push({ name: 'BOS', direction: 'bullish', weight: 2 });
-            } else {
-                score -= 2;
-                reasons.push(`BOS/CHoCH bearish (${recentBOS.type})`);
-                confluences.push({ name: 'BOS', direction: 'bearish', weight: 2 });
-            }
-        }
-
-        // 3. Prix dans un Order Block (+2)
-        const activeOB = orderBlocks.find(ob => ob.tested);
-        if (activeOB) {
-            if (activeOB.type === 'bullish') {
-                score += 2;
-                reasons.push('Prix dans Order Block bullish');
-                confluences.push({ name: 'Order Block', direction: 'bullish', weight: 2 });
-            } else {
-                score -= 2;
-                reasons.push('Prix dans Order Block bearish');
-                confluences.push({ name: 'Order Block', direction: 'bearish', weight: 2 });
-            }
-        }
-
-        // 4. FVG proche (+1)
-        const nearestFVG = fvgs[0];
-        if (nearestFVG) {
-            const distToFVG = Math.abs(currentPrice - nearestFVG.midpoint) / currentPrice * 100;
-            if (distToFVG < 0.5) { // Très proche du FVG
-                if (nearestFVG.type === 'bullish') {
-                    score += 1;
-                    reasons.push('Proche FVG bullish');
-                    confluences.push({ name: 'FVG', direction: 'bullish', weight: 1 });
+        // 2. Break of Structure récent (+2) - si activé
+        if (enabledSignals.bos !== false) {
+            const recentBOS = bos.find(b => b.age <= 5);
+            if (recentBOS) {
+                if (recentBOS.direction === 'bullish') {
+                    score += 2;
+                    reasons.push(`BOS bullish (${recentBOS.type})`);
+                    confluences.push({ name: 'BOS', direction: 'bullish', weight: 2 });
                 } else {
-                    score -= 1;
-                    reasons.push('Proche FVG bearish');
-                    confluences.push({ name: 'FVG', direction: 'bearish', weight: 1 });
+                    score -= 2;
+                    reasons.push(`BOS bearish (${recentBOS.type})`);
+                    confluences.push({ name: 'BOS', direction: 'bearish', weight: 2 });
                 }
             }
         }
 
-        // 5. Liquidity Sweep récent (+2)
-        const recentSweep = liquiditySweeps.find(s => s.age <= 3);
-        if (recentSweep) {
-            if (recentSweep.type === 'bullish') {
-                score += 2;
-                reasons.push('Liquidity sweep bullish');
-                confluences.push({ name: 'Liquidity Sweep', direction: 'bullish', weight: 2 });
-            } else {
-                score -= 2;
-                reasons.push('Liquidity sweep bearish');
-                confluences.push({ name: 'Liquidity Sweep', direction: 'bearish', weight: 2 });
+        // 3. Prix dans un Order Block (+2) - si activé
+        if (enabledSignals.orderBlocks !== false) {
+            const activeOB = orderBlocks.find(ob => ob.tested);
+            if (activeOB) {
+                if (activeOB.type === 'bullish') {
+                    score += 2;
+                    reasons.push('Prix dans Order Block bullish');
+                    confluences.push({ name: 'Order Block', direction: 'bullish', weight: 2 });
+                } else {
+                    score -= 2;
+                    reasons.push('Prix dans Order Block bearish');
+                    confluences.push({ name: 'Order Block', direction: 'bearish', weight: 2 });
+                }
             }
         }
 
-        // 6. Zone Premium/Discount (+1)
-        if (premiumDiscount) {
-            if (premiumDiscount.currentZone === 'discount' && score > 0) {
-                score += 1;
-                reasons.push('Prix en zone Discount (achat optimal)');
-                confluences.push({ name: 'Discount Zone', direction: 'bullish', weight: 1 });
-            } else if (premiumDiscount.currentZone === 'premium' && score < 0) {
-                score -= 1;
-                reasons.push('Prix en zone Premium (vente optimal)');
-                confluences.push({ name: 'Premium Zone', direction: 'bearish', weight: 1 });
+        // 4. FVG proche (+1) - si activé
+        if (enabledSignals.fvg !== false) {
+            const nearestFVG = fvgs[0];
+            if (nearestFVG) {
+                const distToFVG = Math.abs(currentPrice - nearestFVG.midpoint) / currentPrice * 100;
+                if (distToFVG < 0.5) { // Très proche du FVG
+                    if (nearestFVG.type === 'bullish') {
+                        score += 1;
+                        reasons.push('Proche FVG bullish');
+                        confluences.push({ name: 'FVG', direction: 'bullish', weight: 1 });
+                    } else {
+                        score -= 1;
+                        reasons.push('Proche FVG bearish');
+                        confluences.push({ name: 'FVG', direction: 'bearish', weight: 1 });
+                    }
+                }
             }
         }
 
-        // 7. Session de trading (+1 si bonne session)
-        if (currentSession.isHighVolume) {
-            // Bonus pour overlap London-NY
-            if (score > 0) score += 1;
-            if (score < 0) score -= 1;
-            reasons.push('Session haute volatilité (London-NY)');
-        } else if (!currentSession.isTradingSession) {
-            // Pénalité pour session asiatique
-            score = Math.round(score * 0.7);
-            reasons.push('Session basse volatilité (Asie)');
-        }
+        // NOTE: Liquidity Sweeps et Premium/Discount supprimés (trop restrictifs)
 
-        // Détermine la direction finale
-        if (score >= 4) {
+        // Détermine la direction finale (seuils assouplis: 3 au lieu de 4)
+        if (score >= 3) {
             direction = 'long';
-            confidence = Math.min(score / 10, 1);
-        } else if (score <= -4) {
+            confidence = Math.min(score / 8, 1);
+        } else if (score <= -3) {
             direction = 'short';
-            confidence = Math.min(Math.abs(score) / 10, 1);
+            confidence = Math.min(Math.abs(score) / 8, 1);
         }
 
         // Calcul des niveaux TP/SL basés sur la structure

@@ -47,9 +47,16 @@ class SMCSignalDetector {
         }
 
         const config = { ...this.config, ...customConfig };
+        
+        // Récupère les signaux activés par l'utilisateur
+        const smcSignals = customConfig.smcSignals || {
+            orderBlocks: true,
+            fvg: true,
+            bos: true
+        };
 
-        // 1. Analyse SMC principale
-        const smcAnalysis = smartMoney.analyze(candles);
+        // 1. Analyse SMC principale avec les signaux activés
+        const smcAnalysis = smartMoney.analyze(candles, { smcSignals });
         
         if (!smcAnalysis || !smcAnalysis.signal) {
             return {
