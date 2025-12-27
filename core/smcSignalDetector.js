@@ -141,17 +141,8 @@ class SMCSignalDetector {
             winProbability += smcSignal.confluenceCount * 0.02;
             
             // Bonus pour bonne session
-            if (smcSignal.session.isHighVolume) {
+            if (smcSignal.session?.isHighVolume) {
                 winProbability += 0.05;
-            }
-            
-            // Bonus pour zone discount/premium correcte
-            if (smcAnalysis.premiumDiscount) {
-                if (smcSignal.direction === 'long' && smcAnalysis.premiumDiscount.currentZone === 'discount') {
-                    winProbability += 0.05;
-                } else if (smcSignal.direction === 'short' && smcAnalysis.premiumDiscount.currentZone === 'premium') {
-                    winProbability += 0.05;
-                }
             }
             
             // Cap à 85%

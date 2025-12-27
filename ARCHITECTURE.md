@@ -1,15 +1,16 @@
 # 🏗️ Architecture du Trading Bot Hyperliquid
 
 > **Document de référence pour les développeurs et l'IA assistant**
-> Dernière mise à jour: Décembre 2024
+> Dernière mise à jour: 27 Décembre 2024
 
 ---
 
 ## 📋 Vue d'ensemble
 
-Bot de trading automatisé pour **Hyperliquid DEX** avec deux stratégies principales:
-1. **Ichimoku Kinko Hyo** - Stratégie par défaut
-2. **Smart Money Concepts (SMC)** - Stratégie alternative
+Bot de trading automatisé pour **Hyperliquid DEX** avec trois stratégies:
+1. **Ichimoku Kinko Hyo** - Stratégie par défaut (signaux TK Cross, Kumo, Chikou)
+2. **Smart Money Concepts (SMC)** - Order Blocks, FVG, BOS (simplifié)
+3. **Bollinger Squeeze** - Breakout après compression de volatilité
 
 ### Stack Technique
 - **Backend**: Node.js 18+ (ES Modules `type: "module"`)
@@ -33,8 +34,10 @@ bot/
 │
 ├── core/                     # 🧠 LOGIQUE MÉTIER
 │   ├── tradeEngine.js        # ⭐ MOTEUR PRINCIPAL (~2400 lignes)
-│   ├── signalDetector.js     # Détection signaux Ichimoku
-│   ├── smcSignalDetector.js  # Détection signaux SMC
+│   ├── signalDetector.js     # Détection signaux Ichimoku + Bollinger
+│   ├── smcSignalDetector.js  # Détection signaux SMC (Order Blocks, FVG, BOS)
+│   ├── smartMoney.js         # Analyse SMC (structure, swings, zones)
+│   ├── bollingerSqueeze.js   # Stratégie Bollinger Squeeze
 │   ├── ichimoku.js           # Calculs Ichimoku
 │   ├── indicators.js         # RSI, MACD, EMA200, Bollinger, etc.
 │   ├── riskManager.js        # Gestion du risque, calcul SL/TP
@@ -101,13 +104,10 @@ bot/
 │     ├── strategy='ichimoku' → signalDetector.analyze()          │
 │     └── strategy='smc' → smcSignalDetector.analyze()            │
 │                                                                 │
-│  4. Filtres appliqués:                                          │
-│     ├── EMA200 (tendance)                                       │
-│     ├── RSI (surachat/survente)                                 │
-│     ├── MACD (momentum)                                         │
-│     ├── ADX (force tendance)                                    │
-│     ├── Supertrend (direction)                                  │
-│     └── Chikou (confirmation Ichimoku)                          │
+│  4. Filtres appliqués (selon stratégie):                        │
+│     ├── Ichimoku: EMA200, RSI, MACD, Supertrend, Chikou         │
+│     ├── SMC: RSI uniquement (filtres assouplis)                 │
+│     └── Bollinger: RSI, Volume                                  │
 │                                                                 │
 │  5. riskManager.canTrade() vérifie:                             │
 │     ├── Limite trades/jour                                      │
@@ -150,11 +150,16 @@ class TradeEngine {
 ```javascript
 this.config = {
     symbols: ['BTC', 'ETH', ...],  // 20 cryptos par défaut
-    timeframes: ['15m'],
+    timeframes: ['15m'],           // Peut être un array si multiTFTrading
+    multiTFTrading: false,         // Trading sur plusieurs TF en parallèle
     mode: 'auto' | 'manual',
     leverage: 5,
-    strategy: 'ichimoku' | 'smc',
-    // MTF...
+    strategy: 'ichimoku' | 'smc' | 'bollinger',
+    // Signaux Ichimoku
+    enabledSignals: { tkCross, kumoBreakout, kumoTwist, kijunBounce },
+    // Signaux SMC (simplifiés)
+    smcSignals: { orderBlocks: true, fvg: true, bos: true },
+    // MTF (confirmation)
     useMTF: true,
     mtfPrimary: '15m',
     mtfHigher: '4h'
@@ -315,31 +320,38 @@ MONGODB_URI=xxx  # Optionnel
 
 ### Local (Windows)
 ```powershell
-cd C:\Users\33666\Desktop\robot\analyse\bot
+cd "C:\Users\33666\Desktop\PROJET IA\robot\analyse"
 npm start
 # Dashboard: http://localhost:3002
 ```
 
-### Production (PM2)
+### Production (VPS avec PM2)
 ```bash
-pm2 start server.js --name trading-bot
-pm2 logs trading-bot
-pm2 restart trading-bot
+ssh root@srv1195545
+cd /var/www/hyperbot
+git pull
+pm2 restart hyperbot
+pm2 logs hyperbot
 ```
 
 ---
 
 ## 📝 Historique des Modifications Récentes
 
-### Décembre 2024
+### 27 Décembre 2024
+- ✅ **Simplification SMC**: Garde uniquement Order Blocks, FVG, BOS
+- ✅ **Suppression filtres SMC restrictifs**: Session, Volume, MACD, Premium/Discount
+- ✅ **Multi-TF Trading**: Option pour trader sur plusieurs timeframes en parallèle
+- ✅ **Synchronisation Backtesting/Trading**: Mêmes paramètres SMC
+- ✅ **Nettoyage web-vue**: Suppression du frontend Vue.js non utilisé
+
+### Décembre 2024 (avant)
 - ✅ Ajout stratégie SMC (Smart Money Concepts)
-- ✅ Filtres dynamiques selon stratégie (Ichimoku vs SMC)
-- ✅ Interface MTF modernisée (slider)
+- ✅ Ajout stratégie Bollinger Squeeze
+- ✅ Filtres dynamiques selon stratégie
 - ✅ Cache API intelligent (prix 2s, candles 5s)
 - ✅ Correction modal trade details (SL/TP, niveaux Ichimoku)
-- ✅ Exécution trade avec calcul taille position automatique
-- ✅ Nettoyage logs de debug
-- ✅ Réduction buffer logs (500 → 200)
+- ✅ Système de profils de configuration
 
 ---
 
@@ -359,7 +371,7 @@ pm2 restart trading-bot
 
 ### Redémarrages fréquents PM2 (↺ élevé)
 **Cause**: Crashes non gérés
-**Solution**: `pm2 logs trading-bot --err` pour identifier
+**Solution**: `pm2 logs hyperbot --err` pour identifier
 
 ---
 

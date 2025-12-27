@@ -1921,8 +1921,10 @@ class TradeEngine {
             let analysis;
             
             if (strategy === 'smc') {
-                // Stratégie SMC
-                const smcAnalysis = smcSignalDetector.analyze(candles, {}, timeframe);
+                // Stratégie SMC avec signaux activés par l'utilisateur
+                const smcAnalysis = smcSignalDetector.analyze(candles, {
+                    smcSignals: this.config.smcSignals || { orderBlocks: true, fvg: true, bos: true }
+                }, timeframe);
                 const smcScore = smcAnalysis.signal?.score || 0;
                 const smcDirection = smcAnalysis.signal?.direction || 'neutral';
                 

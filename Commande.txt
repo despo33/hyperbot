@@ -5,40 +5,40 @@
 ==================== SERVEUR VPS (SSH) ====================
 
 # Connexion SSH au serveur
-ssh root@72.62.25.146
+ssh root@srv1195545
 
 # Aller dans le dossier du projet
 cd /var/www/hyperbot
 
 # Pull les dernières modifications
-git pull origin main
+git pull
 
 # Voir les logs en temps réel
-pm2 logs trading-bot
+pm2 logs hyperbot
 
-# Redémarrer le bot
-pm2 restart trading-bot
+# Redémarrer le bot (après git pull)
+pm2 restart hyperbot
 
 # Arrêter le bot
-pm2 stop trading-bot
+pm2 stop hyperbot
 
 # Démarrer le bot
-pm2 start trading-bot
+pm2 start hyperbot
 
 # Voir le statut des processus
 pm2 list
 
 # Voir les détails du bot
-pm2 show trading-bot
+pm2 show hyperbot
 
 # Sauvegarder la config PM2
 pm2 save
 
 # Voir les logs d'erreur uniquement
-pm2 logs trading-bot --err
+pm2 logs hyperbot --err
 
 # Voir les 100 dernières lignes de logs
-pm2 logs trading-bot --lines 100
+pm2 logs hyperbot --lines 100
 
 
 ==================== GIT (Local & Serveur) ====================
@@ -74,14 +74,10 @@ git reset --hard origin/main
 ==================== POWERSHELL (Windows Local) ====================
 
 # Aller dans le dossier du projet
-cd c:\Users\33666\Desktop\robot\analyse
-
-# Copier fichiers vers serveur (SCP)
-scp bot\routes.js root@72.62.25.146:/var/www/hyperbot/bot/
-scp bot\web\dashboard.js root@72.62.25.146:/var/www/hyperbot/bot/web/
+cd "c:\Users\33666\Desktop\PROJET IA\robot\analyse"
 
 # Exécuter commande SSH directement
-ssh root@72.62.25.146 "pm2 restart trading-bot"
+ssh root@srv1195545 "cd /var/www/hyperbot && git pull && pm2 restart hyperbot"
 
 # Voir contenu d'un fichier
 cat bot\routes.js
