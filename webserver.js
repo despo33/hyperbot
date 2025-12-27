@@ -121,12 +121,6 @@ export function createWebServer(port = 3000) {
         maxAge: '1d'             // Cache 1 jour en production
     }));
     
-    // Ancien frontend (legacy) - toujours accessible sur /legacy
-    app.use('/legacy', express.static(path.join(__dirname, 'web'), {
-        dotfiles: 'deny',
-        index: false,
-        maxAge: '1d'
-    }));
 
     // Routes API
     app.use('/api', routes);
@@ -416,8 +410,8 @@ export function createWebServer(port = 3000) {
     function stop() {
         return new Promise((resolve) => {
             // Ferme toutes les connexions WebSocket
-            clients.forEach(client => {
-                client.close(1000, 'Serveur arrêté');
+            clients.forEach((clientData, ws) => {
+                ws.close(1000, 'Serveur arrêté');
             });
             clients.clear();
 
