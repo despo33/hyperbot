@@ -1,26 +1,50 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { History as HistoryIcon, TrendingUp, TrendingDown, Calendar, Download, Filter } from 'lucide-react';
-
-const mockTrades = [
-  { id: 1, symbol: 'BTC', direction: 'LONG', entry: 42150, exit: 43200, pnl: 125.50, pnlPercent: 2.49, date: '2024-12-27 10:30', duration: '2h 15m' },
-  { id: 2, symbol: 'ETH', direction: 'SHORT', entry: 2280, exit: 2320, pnl: -45.20, pnlPercent: -1.75, date: '2024-12-27 08:15', duration: '45m' },
-  { id: 3, symbol: 'SOL', direction: 'LONG', entry: 98.50, exit: 102.30, pnl: 78.90, pnlPercent: 3.86, date: '2024-12-26 16:00', duration: '4h 30m' },
-  { id: 4, symbol: 'BTC', direction: 'LONG', entry: 41800, exit: 42150, pnl: 52.30, pnlPercent: 0.84, date: '2024-12-26 12:00', duration: '1h 20m' },
-  { id: 5, symbol: 'DOGE', direction: 'SHORT', entry: 0.092, exit: 0.088, pnl: 35.60, pnlPercent: 4.35, date: '2024-12-25 20:00', duration: '3h' },
-];
+import { History as HistoryIcon, TrendingUp, TrendingDown, Calendar, Download, RefreshCw } from 'lucide-react';
+import { accountAPI } from '@/services/api';
 
 export function History() {
-  const [trades] = useState(mockTrades);
+  const [trades, setTrades] = useState([]);
   const [filter, setFilter] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function loadTrades() {
+      try {
+        setLoading(true);
+        const data = await accountAPI.getFills();
+        if (data.fills) {
+          // Transforme les fills en format de trades
+          const formattedTrades = data.fills.map((fill, i) => ({
+            id: i,
+            symbol: fill.coin,
+            direction: fill.side === 'B' ? 'LONG' : 'SHORT',
+            entry: parseFloat(fill.px),
+            size: parseFloat(fill.sz),
+            pnl: parseFloat(fill.closedPnl || 0),
+            fee: parseFloat(fill.fee || 0),
+            date: new Date(fill.time).toLocaleString('fr-FR'),
+            timestamp: fill.time,
+          }));
+          setTrades(formattedTrades);
+        }
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadTrades();
+  }, []);
 
   const stats = {
     totalTrades: trades.length,
     wins: trades.filter(t => t.pnl > 0).length,
     losses: trades.filter(t => t.pnl < 0).length,
     totalPnl: trades.reduce((sum, t) => sum + t.pnl, 0),
-    winRate: (trades.filter(t => t.pnl > 0).length / trades.length * 100).toFixed(1),
+    winRate: trades.length > 0 ? (trades.filter(t => t.pnl > 0).length / trades.length * 100).toFixed(1) : 0,
   };
 
   return (

@@ -1,18 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CandlestickChart, Settings, TrendingUp, Clock, Target, Percent, Layers, Save } from 'lucide-react';
+import { CandlestickChart, Settings, TrendingUp, Clock, Target, Percent, Layers, Save, RefreshCw } from 'lucide-react';
+import { tradingAPI } from '@/services/api';
 
 export function Trading() {
   const [config, setConfig] = useState({
-    symbol: 'BTC',
-    timeframe: '15m',
+    symbols: ['BTC'],
+    timeframes: ['15m'],
     strategy: 'ichimoku',
     mode: 'multi',
     minScore: 5,
     minWinProbability: 60,
-    takeProfit: 2.5,
-    stopLoss: 1.5,
+    defaultTP: 2.5,
+    defaultSL: 1.5,
     leverage: 5,
     analysisInterval: 60,
     enabledSignals: {
@@ -22,37 +23,104 @@ export function Trading() {
       chikouConfirm: true,
     }
   });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
 
-  const timeframes = ['1m', '5m', '15m', '30m', '1h', '4h', '1d'];
+  const timeframeOptions = ['1m', '5m', '15m', '30m', '1h', '4h', '1d'];
   const strategies = [
     { value: 'ichimoku', label: 'Ichimoku' },
     { value: 'smc', label: 'Smart Money Concepts' },
     { value: 'bollinger', label: 'Bollinger Squeeze' },
   ];
 
+  // Charge la config au démarrage
+  useEffect(() => {
+    async function loadConfig() {
+      try {
+        const data = await tradingAPI.getConfig();
+        if (data.config) {
+          setConfig(prev => ({ ...prev, ...data.config }));
+        }
+      } catch (err) {
+        console.log('Config par défaut utilisée');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadConfig();
+  }, []);
+
   const handleChange = (field, value) => {
     setConfig(prev => ({ ...prev, [field]: value }));
+    setSuccess(null);
   };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      setError(null);
+      await tradingAPI.saveConfig(config);
+      setSuccess('Configuration sauvegardée !');
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReset = async () => {
+    try {
+      const data = await tradingAPI.getConfig();
+      if (data.config) {
+        setConfig(prev => ({ ...prev, ...data.config }));
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <RefreshCw className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="p-4 rounded-lg bg-success/10 border border-success/30 text-success">
+          {success}
+        </div>
+      )}
+
       {/* Mode & Stratégie */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">
               <CandlestickChart className="w-4 h-4" />
-              Symbole
+              Symboles
             </CardTitle>
           </CardHeader>
           <CardContent>
             <input
               type="text"
-              value={config.symbol}
-              onChange={(e) => handleChange('symbol', e.target.value.toUpperCase())}
+              value={Array.isArray(config.symbols) ? config.symbols.join(', ') : config.symbols}
+              onChange={(e) => handleChange('symbols', e.target.value.toUpperCase().split(',').map(s => s.trim()).filter(Boolean))}
               className="w-full px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent"
               placeholder="BTC, ETH, SOL..."
             />
+            <p className="text-xs text-muted-foreground mt-1">Séparez par des virgules</p>
           </CardContent>
         </Card>
 
@@ -250,10 +318,10 @@ export function Trading() {
 
       {/* Actions */}
       <div className="flex justify-end gap-3">
-        <Button variant="outline">Réinitialiser</Button>
-        <Button>
-          <Save className="w-4 h-4" />
-          Sauvegarder
+        <Button variant="outline" onClick={handleReset}>Réinitialiser</Button>
+        <Button onClick={handleSave} disabled={saving}>
+          {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          {saving ? 'Sauvegarde...' : 'Sauvegarder'}
         </Button>
       </div>
     </div>
