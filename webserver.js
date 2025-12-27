@@ -134,32 +134,20 @@ export function createWebServer(port = 3000) {
     app.use('/api/wallets', walletRoutes);
     app.use('/api/admin', adminRoutes);
 
-    // Routes pour le nouveau frontend Vue.js (SPA)
-    if (frontendMode === 'vue') {
-        // Toutes les routes non-API renvoient index.html (SPA routing)
-        app.get('*', (req, res, next) => {
-            // Skip API routes
-            if (req.path.startsWith('/api') || req.path.startsWith('/legacy')) {
-                return next();
-            }
-            res.sendFile(path.join(__dirname, webDir, 'index.html'));
-        });
-    } else {
-        // Route par défaut - redirige vers login ou dashboard (legacy)
-        app.get('/', (req, res) => {
-            res.sendFile(path.join(__dirname, 'web', 'login.html'));
-        });
-        
-        // Route dashboard (protégée côté client)
-        app.get('/dashboard', (req, res) => {
-            res.sendFile(path.join(__dirname, 'web', 'dashboard.html'));
-        });
-        
-        // Route reset password
-        app.get('/reset-password', (req, res) => {
-            res.sendFile(path.join(__dirname, 'web', 'reset-password.html'));
-        });
-    }
+    // Route par défaut - redirige vers login
+    app.get('/', (req, res) => {
+        res.sendFile(path.join(__dirname, 'web', 'login.html'));
+    });
+    
+    // Route dashboard (protégée côté client)
+    app.get('/dashboard', (req, res) => {
+        res.sendFile(path.join(__dirname, 'web', 'dashboard.html'));
+    });
+    
+    // Route reset password
+    app.get('/reset-password', (req, res) => {
+        res.sendFile(path.join(__dirname, 'web', 'reset-password.html'));
+    });
 
     // Gestion des erreurs
     app.use((err, req, res, next) => {
