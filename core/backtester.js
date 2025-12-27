@@ -368,13 +368,23 @@ class Backtester {
 
         // ===== STRATÉGIE SMC (Smart Money Concepts) =====
         if (strategy === 'smc') {
+            // Signaux SMC activés par l'utilisateur (Order Blocks, FVG, BOS)
+            const smcSignals = config.smcSignals || {
+                orderBlocks: true,
+                fvg: true,
+                bos: true
+            };
+            
             const smcAnalysis = smcSignalDetector.analyze(candles, {
                 minScore,
                 minConfluence,
                 useRSIFilter,
-                useMACDFilter,
-                useVolumeFilter,
-                useSessionFilter
+                // Filtres désactivés par défaut pour SMC simplifié
+                useMACDFilter: false,
+                useVolumeFilter: false,
+                useSessionFilter: false,
+                // Signaux SMC activés
+                smcSignals
             }, timeframe);
 
             if (!smcAnalysis || !smcAnalysis.tradeable) {

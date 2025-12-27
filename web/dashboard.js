@@ -4421,12 +4421,17 @@ async function runBacktest() {
     
     // ===== FILTRES SELON LA STRATÉGIE =====
     if (strategy === 'smc') {
-        // Filtres SMC
-        config.useRSIFilter = document.getElementById('btSMCRSI')?.checked ?? true;
-        config.useMACDFilter = document.getElementById('btSMCMACD')?.checked ?? true;
-        config.useVolumeFilter = document.getElementById('btSMCVolume')?.checked ?? true;
-        config.useSessionFilter = document.getElementById('btSMCSession')?.checked ?? true;
-        // Désactive les filtres Ichimoku pour SMC
+        // Signaux SMC (simplifiés: Order Blocks, FVG, BOS)
+        config.smcSignals = {
+            orderBlocks: document.getElementById('btSMCOrderBlocks')?.checked ?? true,
+            fvg: document.getElementById('btSMCFVG')?.checked ?? true,
+            bos: document.getElementById('btSMCBOS')?.checked ?? true
+        };
+        // Désactive les filtres restrictifs pour SMC
+        config.useRSIFilter = true;  // Garde RSI mais assoupli
+        config.useMACDFilter = false;
+        config.useVolumeFilter = false;
+        config.useSessionFilter = false;
         config.useEMA200Filter = false;
         config.useSupertrendFilter = false;
         config.useStrictFilters = false;

@@ -1898,35 +1898,27 @@
                                     </div>
                                 </div>
 
-                                <!-- ===== FILTRES SMC ===== -->
+                                <!-- ===== SIGNAUX SMC ===== -->
                                 <div id="btSMCFilters" style="display: none;">
-                                    <h4 style="margin-top: 1rem; margin-bottom: 0.5rem;">💎 Filtres Smart Money Concepts</h4>
+                                    <h4 style="margin-top: 1rem; margin-bottom: 0.5rem;">💎 Signaux Smart Money Concepts</h4>
                                     <div class="checkbox-group">
                                         <label class="checkbox-label">
-                                            <input type="checkbox" id="btSMCRSI" checked>
-                                            <span>📉 Filtre RSI (évite surachat/survente)</span>
+                                            <input type="checkbox" id="btSMCOrderBlocks" checked>
+                                            <span>📦 Order Blocks (zones institutionnelles)</span>
                                         </label>
                                         <label class="checkbox-label">
-                                            <input type="checkbox" id="btSMCMACD" checked>
-                                            <span>📊 Filtre MACD (confirmation momentum)</span>
+                                            <input type="checkbox" id="btSMCFVG" checked>
+                                            <span>📊 Fair Value Gaps (déséquilibres de prix)</span>
                                         </label>
                                         <label class="checkbox-label">
-                                            <input type="checkbox" id="btSMCVolume" checked>
-                                            <span>📈 Filtre Volume (volume suffisant)</span>
-                                        </label>
-                                        <label class="checkbox-label">
-                                            <input type="checkbox" id="btSMCSession" checked>
-                                            <span>🕐 Filtre Session (London/New York uniquement)</span>
+                                            <input type="checkbox" id="btSMCBOS" checked>
+                                            <span>💥 Break of Structure (confirmation tendance)</span>
                                         </label>
                                     </div>
                                     
                                     <div class="info-box" style="margin-top: 1rem; padding: 0.75rem; background: rgba(99, 102, 241, 0.1); border-radius: 8px; border-left: 3px solid var(--primary);">
                                         <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">
-                                            <strong>💡 SMC utilise automatiquement :</strong><br>
-                                            • Order Blocks (zones institutionnelles)<br>
-                                            • Fair Value Gaps (déséquilibres de prix)<br>
-                                            • Break of Structure (changements de tendance)<br>
-                                            • Zones Premium/Discount (entrées optimales)
+                                            <strong>💡 SMC Simplifié:</strong> Détecte les entrées institutionnelles via Order Blocks, FVG et BOS. Seuils assouplis pour plus de signaux.
                                         </p>
                                     </div>
                                 </div>
