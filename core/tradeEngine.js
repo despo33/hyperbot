@@ -716,16 +716,20 @@ class TradeEngine {
         const adxValue = adx.value || 0;
         const adxOK = adxValue === 0 || adxValue >= preset.adxMin;
         
-        // ===== FILTRE QUALITÉ SIGNAL MINIMUM =====
-        // Exige un grade minimum de C pour trader
-        const minGradeRequired = 'C';
+        // ===== FILTRES SUPERTREND ET CHIKOU (désactivés - simplification) =====
+        // Ces filtres étaient trop restrictifs et bloquaient des opportunités valides
+        const supertrend = analysis.indicators?.supertrend || {};
+        const chikouAdvanced = analysis.indicators?.chikouAdvanced || {};
+        const supertrendOK = true; // Désactivé - ne bloque plus
+        const chikouOK = true;     // Désactivé - ne bloque plus
         
         // Calcul probabilité de gain
-        const winProbability = this.calculateWinProbability(analysis, confluence, 0);
+        const confidence = analysis.finalSignal?.confidence || 'medium';
+        const winProbability = this.calculateWinProbability(ichimokuScore, confidence, null, 0);
         const meetsWinProb = winProbability >= preset.minWinProbability;
         
-        // Signal tradeable ? - FILTRES RENFORCÉS (incluant Supertrend et Chikou)
-        const tradeable = signalDirection && hasStrongScore && hasMinConfluence && rsiOK && adxOK && meetsWinProb && trendOK && macdTrendOK && supertrendOK && chikouOK;
+        // Signal tradeable ? - Filtres simplifiés
+        const tradeable = signalDirection && hasStrongScore && hasMinConfluence && rsiOK && adxOK && meetsWinProb && trendOK && macdTrendOK;
         
         // Qualité du signal
         let signalQuality = { score: 0, grade: 'D' };

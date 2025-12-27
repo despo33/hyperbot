@@ -147,6 +147,12 @@ export const tradingConfigSchema = Joi.object({
         kumoTwist: Joi.boolean(),
         kijunBounce: Joi.boolean()
     }),
+    // Signaux SMC (simplifiés)
+    smcSignals: Joi.object({
+        orderBlocks: Joi.boolean(),
+        fvg: Joi.boolean(),
+        bos: Joi.boolean()
+    }),
     // Stratégie de trading
     strategy: Joi.string()
         .valid('ichimoku', 'smc', 'bollinger'),
