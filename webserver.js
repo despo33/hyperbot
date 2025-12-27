@@ -114,12 +114,8 @@ export function createWebServer(port = 3000) {
     // En production, définir CORS_ORIGINS dans .env
     app.use(secureCors);
 
-    // Choix du frontend: 'vue' pour le nouveau, 'legacy' pour l'ancien
-    const frontendMode = process.env.FRONTEND_MODE || 'legacy';
-    const webDir = frontendMode === 'vue' ? 'web-vue' : 'web';
-    
     // Fichiers statiques (dashboard) - avec options de sécurité
-    app.use(express.static(path.join(__dirname, webDir), {
+    app.use(express.static(path.join(__dirname, 'web'), {
         dotfiles: 'deny',        // Refuse l'accès aux fichiers .xxx
         index: false,            // Pas d'index automatique
         maxAge: '1d'             // Cache 1 jour en production
