@@ -7,6 +7,7 @@ import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -114,13 +115,21 @@ export function createWebServer(port = 3000) {
     // En production, définir CORS_ORIGINS dans .env
     app.use(secureCors);
 
-    // Fichiers statiques (dashboard) - avec options de sécurité
-    app.use(express.static(path.join(__dirname, 'web'), {
-        dotfiles: 'deny',        // Refuse l'accès aux fichiers .xxx
-        index: false,            // Pas d'index automatique
-        maxAge: '1d'             // Cache 1 jour en production
-    }));
+    // Fichiers statiques - React build (production) ou ancien dashboard (fallback)
+    const reactBuildPath = path.join(__dirname, 'web-react', 'dist');
+    const legacyWebPath = path.join(__dirname, 'web');
     
+    // Vérifie si le build React existe
+    const useReactBuild = fs.existsSync(reactBuildPath);
+    const staticPath = useReactBuild ? reactBuildPath : legacyWebPath;
+    
+    console.log(`[SERVER] Serving static files from: ${useReactBuild ? 'web-react/dist (React)' : 'web (Legacy)'}`);
+    
+    app.use(express.static(staticPath, {
+        dotfiles: 'deny',
+        index: useReactBuild ? 'index.html' : false,
+        maxAge: '1d'
+    }));
 
     // Routes API
     app.use('/api', routes);
@@ -128,20 +137,29 @@ export function createWebServer(port = 3000) {
     app.use('/api/wallets', walletRoutes);
     app.use('/api/admin', adminRoutes);
 
-    // Route par défaut - redirige vers login
-    app.get('/', (req, res) => {
-        res.sendFile(path.join(__dirname, 'web', 'login.html'));
-    });
-    
-    // Route dashboard (protégée côté client)
-    app.get('/dashboard', (req, res) => {
-        res.sendFile(path.join(__dirname, 'web', 'dashboard.html'));
-    });
-    
-    // Route reset password
-    app.get('/reset-password', (req, res) => {
-        res.sendFile(path.join(__dirname, 'web', 'reset-password.html'));
-    });
+    // Si React build existe, toutes les routes non-API servent index.html (SPA)
+    if (useReactBuild) {
+        app.get('*', (req, res, next) => {
+            // Skip API routes
+            if (req.path.startsWith('/api') || req.path.startsWith('/ws')) {
+                return next();
+            }
+            res.sendFile(path.join(reactBuildPath, 'index.html'));
+        });
+    } else {
+        // Legacy routes (ancien dashboard HTML)
+        app.get('/', (req, res) => {
+            res.sendFile(path.join(legacyWebPath, 'login.html'));
+        });
+        
+        app.get('/dashboard', (req, res) => {
+            res.sendFile(path.join(legacyWebPath, 'dashboard.html'));
+        });
+        
+        app.get('/reset-password', (req, res) => {
+            res.sendFile(path.join(legacyWebPath, 'reset-password.html'));
+        });
+    }
 
     // Gestion des erreurs
     app.use((err, req, res, next) => {
