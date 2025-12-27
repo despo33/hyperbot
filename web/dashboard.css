@@ -86,42 +86,345 @@
 
 /* === LIGHT THEME === */
 [data-theme="light"] {
-    --bg-primary: #f8fafc;
-    --bg-secondary: #f1f5f9;
-    --bg-tertiary: #e2e8f0;
+    --bg-primary: #f5f7fa;
+    --bg-secondary: #eef1f6;
+    --bg-tertiary: #e4e8ef;
     --bg-card: #ffffff;
-    --bg-card-hover: #f8fafc;
-    --bg-hover: rgba(0, 0, 0, 0.04);
+    --bg-card-hover: #fafbfc;
+    --bg-hover: rgba(99, 102, 241, 0.08);
     --bg-elevated: #ffffff;
-    --bg-input: #f1f5f9;
+    --bg-input: #f0f2f5;
     
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-muted: #94a3b8;
-    --text-accent: #4338ca;
+    --text-primary: #1a1d26;
+    --text-secondary: #4b5563;
+    --text-muted: #6b7280;
+    --text-accent: #4f46e5;
     
-    --border-color: rgba(0, 0, 0, 0.08);
-    --border-color-hover: rgba(0, 0, 0, 0.15);
+    --border-color: rgba(0, 0, 0, 0.1);
+    --border-color-hover: rgba(99, 102, 241, 0.3);
     
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.12);
-    --shadow-xl: 0 20px 50px rgba(0, 0, 0, 0.15);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.1);
+    --shadow-xl: 0 20px 50px rgba(0, 0, 0, 0.12);
     
-    --success-bg: rgba(16, 185, 129, 0.1);
-    --danger-bg: rgba(239, 68, 68, 0.1);
-    --warning-bg: rgba(245, 158, 11, 0.1);
-    --info-bg: rgba(14, 165, 233, 0.1);
+    --success-bg: rgba(16, 185, 129, 0.12);
+    --danger-bg: rgba(239, 68, 68, 0.12);
+    --warning-bg: rgba(245, 158, 11, 0.12);
+    --info-bg: rgba(14, 165, 233, 0.12);
     
-    --glass-bg: rgba(255, 255, 255, 0.7);
-    --glass-border: rgba(0, 0, 0, 0.08);
-    --glass-blur: 20px;
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    --glass-border: rgba(0, 0, 0, 0.1);
+    --glass-blur: 12px;
     
     --sidebar-bg: #ffffff;
-    --header-bg: rgba(248, 250, 252, 0.9);
+    --header-bg: rgba(255, 255, 255, 0.95);
     
     --accent-primary: #4f46e5;
     --accent-secondary: #6366f1;
+    --accent-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #a855f7 100%);
+}
+
+/* === LIGHT THEME SPECIFIC OVERRIDES === */
+
+/* Sidebar en mode clair */
+[data-theme="light"] .sidebar {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    border-right: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Logo en mode clair - garder le gradient visible */
+[data-theme="light"] .sidebar-header .logo {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+[data-theme="light"] .sidebar-header .logo svg {
+    color: white;
+}
+
+/* Navigation items en mode clair */
+[data-theme="light"] .nav-item {
+    color: #4b5563;
+}
+
+[data-theme="light"] .nav-item:hover {
+    background: rgba(99, 102, 241, 0.08);
+    color: #4f46e5;
+}
+
+[data-theme="light"] .nav-item.active {
+    background: rgba(99, 102, 241, 0.12);
+    color: #4f46e5;
+    border-color: rgba(99, 102, 241, 0.2);
+}
+
+[data-theme="light"] .nav-item.active::before {
+    background: #4f46e5;
+}
+
+/* Header en mode clair */
+[data-theme="light"] .header {
+    background: rgba(255, 255, 255, 0.9);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    backdrop-filter: blur(12px);
+}
+
+[data-theme="light"] .header h1 {
+    color: #1a1d26;
+    background: none;
+    -webkit-text-fill-color: #1a1d26;
+}
+
+/* Cards en mode clair */
+[data-theme="light"] .card {
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .card:hover {
+    border-color: rgba(99, 102, 241, 0.2);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+}
+
+[data-theme="light"] .card::before {
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(99, 102, 241, 0.1) 50%, 
+        transparent 100%
+    );
+}
+
+[data-theme="light"] .card-header h3 {
+    color: #1a1d26;
+}
+
+/* Boutons en mode clair */
+[data-theme="light"] .btn-outline {
+    border-color: rgba(0, 0, 0, 0.15);
+    color: #4b5563;
+}
+
+[data-theme="light"] .btn-outline:hover {
+    background: rgba(99, 102, 241, 0.08);
+    border-color: #4f46e5;
+    color: #4f46e5;
+}
+
+/* Status badges en mode clair */
+[data-theme="light"] .status-badge.online {
+    background: rgba(16, 185, 129, 0.15);
+    color: #059669;
+}
+
+[data-theme="light"] .status-badge.offline {
+    background: rgba(239, 68, 68, 0.15);
+    color: #dc2626;
+}
+
+/* Connection status en mode clair */
+[data-theme="light"] .connection-status {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Inputs en mode clair */
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+    background: #f5f7fa;
+    border-color: rgba(0, 0, 0, 0.12);
+    color: #1a1d26;
+}
+
+[data-theme="light"] input:focus,
+[data-theme="light"] select:focus,
+[data-theme="light"] textarea:focus {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+/* Logs en mode clair */
+[data-theme="light"] .log-entry {
+    background: #f8fafc;
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .log-entry.error {
+    background: rgba(239, 68, 68, 0.08);
+}
+
+[data-theme="light"] .log-entry.trade {
+    background: rgba(16, 185, 129, 0.08);
+}
+
+/* User dropdown en mode clair */
+[data-theme="light"] .user-dropdown {
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="light"] .dropdown-item:hover {
+    background: rgba(99, 102, 241, 0.08);
+}
+
+/* Scrollbar en mode clair */
+[data-theme="light"] ::-webkit-scrollbar-track {
+    background: #f0f2f5;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+    background: #c4c9d4;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+    background: #a0a7b5;
+}
+
+/* Sidebar footer en mode clair */
+[data-theme="light"] .sidebar-footer {
+    border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .user-info {
+    color: #4b5563;
+}
+
+[data-theme="light"] .logout-btn {
+    border-color: rgba(0, 0, 0, 0.1);
+    color: #4b5563;
+}
+
+/* Stats et valeurs en mode clair */
+[data-theme="light"] .stat-value,
+[data-theme="light"] .balance,
+[data-theme="light"] .value {
+    color: #1a1d26;
+}
+
+[data-theme="light"] .stat-value.positive,
+[data-theme="light"] .value.positive {
+    color: #059669;
+}
+
+[data-theme="light"] .stat-value.negative,
+[data-theme="light"] .value.negative {
+    color: #dc2626;
+}
+
+/* Tables en mode clair */
+[data-theme="light"] table {
+    background: #ffffff;
+}
+
+[data-theme="light"] th {
+    background: #f5f7fa;
+    color: #4b5563;
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] td {
+    border-color: rgba(0, 0, 0, 0.06);
+    color: #1a1d26;
+}
+
+[data-theme="light"] tr:hover td {
+    background: rgba(99, 102, 241, 0.04);
+}
+
+/* Modals en mode clair */
+[data-theme="light"] .modal {
+    background: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="light"] .modal-content {
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+/* Tabs en mode clair */
+[data-theme="light"] .tab-btn {
+    color: #6b7280;
+}
+
+[data-theme="light"] .tab-btn:hover {
+    color: #4f46e5;
+    background: rgba(99, 102, 241, 0.08);
+}
+
+[data-theme="light"] .tab-btn.active {
+    color: #4f46e5;
+    background: rgba(99, 102, 241, 0.12);
+}
+
+/* Tooltips en mode clair */
+[data-theme="light"] .tooltip,
+[data-theme="light"] [data-tooltip]::after {
+    background: #1a1d26;
+    color: #ffffff;
+}
+
+/* Welcome banner en mode clair */
+[data-theme="light"] .welcome-banner {
+    background: #ffffff;
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .welcome-banner::before {
+    opacity: 0.03;
+}
+
+[data-theme="light"] .welcome-text h2 {
+    color: #1a1d26;
+}
+
+[data-theme="light"] .welcome-text p {
+    color: #4b5563;
+}
+
+/* Toggle buttons en mode clair */
+[data-theme="light"] .toggle-btn {
+    background: #e4e8ef;
+}
+
+[data-theme="light"] .toggle-btn.active {
+    background: #4f46e5;
+}
+
+/* Checkboxes en mode clair */
+[data-theme="light"] input[type="checkbox"] {
+    accent-color: #4f46e5;
+}
+
+/* Range sliders en mode clair */
+[data-theme="light"] input[type="range"] {
+    accent-color: #4f46e5;
+}
+
+/* Config sections en mode clair */
+[data-theme="light"] .config-section {
+    background: #f8fafc;
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .config-section h4 {
+    color: #1a1d26;
+}
+
+/* Info boxes en mode clair */
+[data-theme="light"] .info-box {
+    background: rgba(99, 102, 241, 0.08);
+    border-color: rgba(99, 102, 241, 0.2);
+}
+
+/* Icônes SVG en mode clair - assurer la visibilité */
+[data-theme="light"] .nav-item svg,
+[data-theme="light"] .card-header svg {
+    color: currentColor;
 }
 
 * {
