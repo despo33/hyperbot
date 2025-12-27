@@ -14,22 +14,22 @@ class SMCSignalDetector {
         this.shortName = 'SMC';
         
         this.config = {
-            // Score minimum pour un signal valide
-            minScore: 4,
-            minConfluence: 3,
+            // Score minimum pour un signal valide (assoupli)
+            minScore: 3,
+            minConfluence: 2,
             
-            // Filtres additionnels
+            // Filtres additionnels (simplifiés)
             useRSIFilter: true,
-            useMACDFilter: true,
-            useVolumeFilter: true,
-            useSessionFilter: true,
+            useMACDFilter: false,  // Désactivé - bloque trop de SHORT
+            useVolumeFilter: false, // Désactivé - trop restrictif
+            useSessionFilter: false, // Désactivé - permet de trader 24/7
             
-            // RSI
-            rsiOverbought: 70,
-            rsiOversold: 30,
+            // RSI (assoupli)
+            rsiOverbought: 75,
+            rsiOversold: 25,
             
-            // Volume
-            minVolumeRatio: 0.8
+            // Volume (non utilisé)
+            minVolumeRatio: 0.5
         };
     }
 
