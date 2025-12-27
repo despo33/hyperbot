@@ -10,13 +10,10 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import CryptoJS from 'crypto-js';
+import { encryptSecret, decryptSecret } from '../utils/crypto.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Clé de chiffrement pour les fichiers sensibles (à définir via variable d'environnement)
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'hyperliquid-bot-secret-key-32ch';
 
 /**
  * Classe d'authentification Hyperliquid
@@ -221,8 +218,8 @@ class HyperliquidAuth {
             savedAt: new Date().toISOString()
         });
 
-        // Chiffrement AES-256
-        const encrypted = CryptoJS.AES.encrypt(data, ENCRYPTION_KEY).toString();
+        // Chiffrement AES-256 via module centralisé
+        const encrypted = encryptSecret(data);
 
         // Assure que le dossier storage existe
         const storageDir = path.dirname(this.keysPath);
@@ -246,8 +243,8 @@ class HyperliquidAuth {
             }
 
             const encrypted = fs.readFileSync(this.keysPath, 'utf8');
-            const decrypted = CryptoJS.AES.decrypt(encrypted, ENCRYPTION_KEY);
-            const data = JSON.parse(decrypted.toString(CryptoJS.enc.Utf8));
+            const decrypted = decryptSecret(encrypted);
+            const data = JSON.parse(decrypted);
 
             // Charge l'adresse de trading si présente
             if (data.tradingAddress) {
@@ -499,7 +496,7 @@ class HyperliquidAuth {
                 savedAt: new Date().toISOString()
             });
 
-            const encrypted = CryptoJS.AES.encrypt(data, ENCRYPTION_KEY).toString();
+            const encrypted = encryptSecret(data);
 
             const storageDir = path.dirname(this.walletsPath);
             if (!fs.existsSync(storageDir)) {
@@ -533,8 +530,8 @@ class HyperliquidAuth {
             }
 
             const encrypted = fs.readFileSync(this.walletsPath, 'utf8');
-            const decrypted = CryptoJS.AES.decrypt(encrypted, ENCRYPTION_KEY);
-            const data = JSON.parse(decrypted.toString(CryptoJS.enc.Utf8));
+            const decrypted = decryptSecret(encrypted);
+            const data = JSON.parse(decrypted);
 
             this.wallets = data.wallets || {};
             
